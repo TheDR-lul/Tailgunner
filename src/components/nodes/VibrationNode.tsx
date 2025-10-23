@@ -35,6 +35,31 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
   const POINT_RADIUS = 6;
   const HOVER_RADIUS = 8;
   
+  // Синхронизация с data при изменении (загрузка сохраненного паттерна)
+  useEffect(() => {
+    if (data.duration !== undefined) setDuration(data.duration);
+    if (data.curve) setCurve(data.curve);
+    if (data.mode) setMode(data.mode);
+    if (data.repeatCount !== undefined) setRepeatCount(data.repeatCount);
+    if (data.randomMin !== undefined) {
+      setEnableRandom(true);
+      setRandomMin(data.randomMin);
+    }
+    if (data.randomMax !== undefined) setRandomMax(data.randomMax);
+  }, [data]);
+  
+  // Обновляем data при изменении локальных состояний
+  useEffect(() => {
+    data.duration = duration;
+    data.curve = curve;
+    data.mode = mode;
+    data.repeatCount = repeatCount;
+    if (enableRandom) {
+      data.randomMin = randomMin;
+      data.randomMax = randomMax;
+    }
+  }, [duration, curve, mode, repeatCount, enableRandom, randomMin, randomMax, data]);
+  
   // Отрисовка графика
   useEffect(() => {
     const canvas = canvasRef.current;

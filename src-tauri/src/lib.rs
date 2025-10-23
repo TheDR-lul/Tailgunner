@@ -8,8 +8,9 @@ mod haptic_engine;
 mod event_triggers;
 mod wt_vehicles_api;
 mod dynamic_triggers;
+mod ui_patterns;
 
-use haptic_engine::HapticEngine;
+use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
 use profile_manager::Profile;
 use device_manager::DeviceInfo;
@@ -94,6 +95,96 @@ fn get_preset_patterns() -> Vec<VibrationPattern> {
     ]
 }
 
+#[tauri::command]
+async fn get_game_status(state: tauri::State<'_, AppState>) -> Result<GameStatusInfo, String> {
+    let engine = state.engine.lock().await;
+    engine.get_game_status().await
+        .map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize)]
+struct DebugInfo {
+    indicators: String,
+    triggers_count: usize,
+    patterns_active: usize,
+}
+
+#[tauri::command]
+async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<DebugInfo, String> {
+    let engine = state.engine.lock().await;
+    let status = engine.get_game_status().await.map_err(|e| e.to_string())?;
+    
+    Ok(DebugInfo {
+        indicators: format!(
+            "Speed: {} km/h, Alt: {} m, G: {:.1}, RPM: {}, Fuel: {}%",
+            status.speed_kmh, status.altitude_m, status.g_load, 
+            status.engine_rpm, status.fuel_percent
+        ),
+        triggers_count: 0, // TODO: get from engine
+        patterns_active: 0, // TODO: get from engine
+    })
+}
+
+#[tauri::command]
+async fn get_triggers(state: tauri::State<'_, AppState>) -> Result<Vec<event_triggers::EventTrigger>, String> {
+    let engine = state.engine.lock().await;
+    let manager = engine.trigger_manager.read().await;
+    Ok(manager.get_triggers().to_vec())
+}
+
+#[tauri::command]
+async fn toggle_trigger(state: tauri::State<'_, AppState>, id: String, enabled: bool) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    let mut manager = engine.trigger_manager.write().await;
+    manager.toggle_trigger(&id, enabled);
+    
+    log::info!("[Triggers] Toggle '{}' to {}", id, enabled);
+    Ok(format!("Trigger {} toggled to {}", id, enabled))
+}
+
+#[tauri::command]
+async fn add_pattern(
+    state: tauri::State<'_, AppState>,
+    pattern: ui_patterns::UIPattern
+) -> Result<String, String> {
+    log::info!("[UI Patterns] Received pattern: {}", pattern.name);
+    
+    // Конвертируем UIPattern → EventTrigger
+    let trigger = pattern.to_trigger()
+        .ok_or_else(|| "Failed to convert pattern to trigger".to_string())?;
+    
+    log::info!("[UI Patterns] Converted to trigger: {:?}", trigger.name);
+    
+    // Добавляем в TriggerManager
+    let engine = state.engine.lock().await;
+    let mut manager = engine.trigger_manager.write().await;
+    manager.add_trigger(trigger);
+    
+    log::info!("[UI Patterns] ✅ Pattern '{}' added to engine", pattern.name);
+    Ok(format!("Pattern '{}' added successfully", pattern.name))
+}
+
+#[tauri::command]
+async fn remove_pattern(
+    state: tauri::State<'_, AppState>,
+    id: String
+) -> Result<String, String> {
+    log::info!("[UI Patterns] Removing pattern: {}", id);
+    
+    // TODO: Добавить метод remove_trigger в TriggerManager
+    Ok(format!("Pattern '{}' removed", id))
+}
+
+#[tauri::command]
+async fn toggle_pattern(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    enabled: bool
+) -> Result<String, String> {
+    // Паттерны это триггеры, используем toggle_trigger
+    toggle_trigger(state, id, enabled).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Инициализация логгера
@@ -113,6 +204,13 @@ pub fn run() {
             get_profiles,
             test_vibration,
             get_preset_patterns,
+            get_game_status,
+            get_debug_info,
+            get_triggers,
+            toggle_trigger,
+            add_pattern,
+            remove_pattern,
+            toggle_pattern,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

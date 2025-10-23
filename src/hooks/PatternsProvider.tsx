@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Node, Edge } from 'reactflow';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface Pattern {
   id: string;
@@ -40,8 +41,19 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
         }));
         setPatterns(patternsWithDates);
         if ((window as any).debugLog) {
-          (window as any).debugLog('info', `Loaded ${patternsWithDates.length} patterns`);
+          (window as any).debugLog('info', `Loaded ${patternsWithDates.length} patterns from localStorage`);
         }
+        
+        // Синхронизируем все паттерны с Rust движком
+        patternsWithDates.forEach(async (pattern: Pattern) => {
+          try {
+            await invoke('add_pattern', { pattern });
+            console.log(`✅ Synced pattern '${pattern.name}' to Rust`);
+          } catch (error) {
+            console.error(`Failed to sync pattern '${pattern.name}':`, error);
+          }
+        });
+        
       } catch (error) {
         console.error('Failed to load patterns:', error);
       }
@@ -57,7 +69,7 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const addPattern = useCallback((name: string, nodes: Node[], edges: Edge[]) => {
+  const addPattern = useCallback(async (name: string, nodes: Node[], edges: Edge[]) => {
     const newPattern: Pattern = {
       id: Date.now().toString(),
       name,
@@ -66,6 +78,8 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
       edges,
       createdAt: new Date(),
     };
+    
+    // Сохраняем в localStorage
     setPatterns(prev => {
       const updated = [...prev, newPattern];
       savePatterns(updated);
@@ -76,6 +90,21 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
       
       return updated;
     });
+    
+    // Синхронизируем с Rust движком
+    try {
+      await invoke('add_pattern', { pattern: newPattern });
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('success', `✅ Pattern '${name}' synced to Rust engine`);
+      }
+    } catch (error) {
+      console.error('Failed to sync pattern with Rust:', error);
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('error', `❌ Failed to sync pattern: ${error}`);
+      }
+    }
   }, [savePatterns]);
 
   const updatePattern = useCallback((id: string, updates: Partial<Pattern>) => {
@@ -103,15 +132,40 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
     });
   }, [savePatterns]);
 
-  const togglePattern = useCallback((id: string) => {
+  const togglePattern = useCallback(async (id: string) => {
+    // Получаем текущее состояние и переключаем
+    const pattern = patterns.find(p => p.id === id);
+    if (!pattern) return;
+    
+    const newEnabled = !pattern.enabled;
+    
+    // Обновляем в localStorage
     setPatterns(prev => {
       const updated = prev.map(p => 
-        p.id === id ? { ...p, enabled: !p.enabled } : p
+        p.id === id ? { ...p, enabled: newEnabled } : p
       );
       savePatterns(updated);
       return updated;
     });
-  }, [savePatterns]);
+    
+    // Синхронизируем с Rust движком
+    try {
+      await invoke('toggle_pattern', { id, enabled: newEnabled });
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog(
+          newEnabled ? 'success' : 'warn', 
+          `${newEnabled ? '✅' : '⏸'} Pattern '${pattern.name}' ${newEnabled ? 'enabled' : 'disabled'}`
+        );
+      }
+    } catch (error) {
+      console.error('Failed to toggle pattern in Rust:', error);
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('error', `❌ Failed to toggle pattern: ${error}`);
+      }
+    }
+  }, [patterns, savePatterns]);
 
   return (
     <PatternsContext.Provider value={{

@@ -87,10 +87,12 @@ impl TriggerCondition {
 pub struct EventTrigger {
     pub id: String,
     pub name: String,
+    pub description: String,     // Описание триггера
     pub condition: TriggerCondition,
     pub event: GameEvent,
-    pub cooldown_ms: u64,       // Минимальное время между срабатываниями
+    pub cooldown_ms: u64,        // Минимальное время между срабатываниями
     pub enabled: bool,
+    pub is_builtin: bool,        // Встроенный или пользовательский
 }
 
 /// Менеджер триггеров
@@ -116,106 +118,126 @@ impl TriggerManager {
         self.triggers.push(EventTrigger {
             id: "overspeed_800".to_string(),
             name: "Превышение 800 км/ч".to_string(),
+            description: "Срабатывает когда приборная скорость превышает 800 км/ч. Используется для предупреждения о критической скорости.".to_string(),
             condition: TriggerCondition::IASAbove(800.0),
             event: GameEvent::Overspeed,
             cooldown_ms: 5000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Критическая G-перегрузка
         self.triggers.push(EventTrigger {
             id: "over_g_10".to_string(),
             name: "G-перегрузка >10G".to_string(),
+            description: "Срабатывает при экстремальной перегрузке (>10G положительная или >5G отрицательная). Предупреждение о риске срыва потока или повреждения конструкции.".to_string(),
             condition: TriggerCondition::Or(
                 Box::new(TriggerCondition::GLoadAbove(10.0)),
                 Box::new(TriggerCondition::GLoadBelow(-5.0)),
             ),
             event: GameEvent::OverG,
             cooldown_ms: 2000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Высокий угол атаки
         self.triggers.push(EventTrigger {
             id: "high_aoa_15".to_string(),
             name: "Угол атаки >15°".to_string(),
+            description: "Срабатывает при высоком угле атаки (>15°). Предупреждение о приближении к срыву потока.".to_string(),
             condition: TriggerCondition::AOAAbove(15.0),
             event: GameEvent::HighAOA,
             cooldown_ms: 3000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Критический угол атаки
         self.triggers.push(EventTrigger {
             id: "critical_aoa_20".to_string(),
             name: "Критический угол атаки >20°".to_string(),
+            description: "Срабатывает при критическом угле атаки (>20°). Высокий риск сваливания!".to_string(),
             condition: TriggerCondition::AOAAbove(20.0),
             event: GameEvent::CriticalAOA,
             cooldown_ms: 2000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Преодоление звукового барьера
         self.triggers.push(EventTrigger {
             id: "mach_1".to_string(),
             name: "Преодоление Mach 1.0".to_string(),
+            description: "Срабатывает при достижении скорости звука (Mach >0.98). Чувствуй звуковой барьер!".to_string(),
             condition: TriggerCondition::MachAbove(0.98),
             event: GameEvent::Mach1,
             cooldown_ms: 10000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Низкое топливо
         self.triggers.push(EventTrigger {
             id: "low_fuel_10".to_string(),
             name: "Топливо <10%".to_string(),
+            description: "Срабатывает когда остается меньше 10% топлива. Пора возвращаться на базу!".to_string(),
             condition: TriggerCondition::FuelBelow(10.0),
             event: GameEvent::LowFuel,
             cooldown_ms: 30000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Критическое топливо
         self.triggers.push(EventTrigger {
             id: "critical_fuel_5".to_string(),
             name: "Топливо <5%".to_string(),
+            description: "Срабатывает когда остается меньше 5% топлива. КРИТИЧЕСКИ МАЛО ТОПЛИВА!".to_string(),
             condition: TriggerCondition::FuelBelow(5.0),
             event: GameEvent::CriticalFuel,
             cooldown_ms: 15000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Низкая высота
         self.triggers.push(EventTrigger {
             id: "low_altitude_100".to_string(),
             name: "Низкая высота <100м".to_string(),
+            description: "Срабатывает на опасно малой высоте (<100м) при скорости >200 км/ч. Осторожно, земля близко!".to_string(),
             condition: TriggerCondition::And(
                 Box::new(TriggerCondition::AltitudeBelow(100.0)),
                 Box::new(TriggerCondition::SpeedAbove(200.0)),
             ),
             event: GameEvent::LowAltitude,
             cooldown_ms: 5000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Перегрев двигателя
         self.triggers.push(EventTrigger {
             id: "engine_overheat_250".to_string(),
             name: "Перегрев двигателя >250°".to_string(),
+            description: "Срабатывает при температуре двигателя выше 250°C. Риск повреждения двигателя!".to_string(),
             condition: TriggerCondition::TempAbove(250.0),
             event: GameEvent::EngineOverheat,
             cooldown_ms: 10000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
         
         // Низкий боезапас
         self.triggers.push(EventTrigger {
             id: "low_ammo_20".to_string(),
             name: "Боезапас <20%".to_string(),
+            description: "Срабатывает когда остается меньше 20% боезапаса. Экономь патроны!".to_string(),
             condition: TriggerCondition::AmmoBelow(20.0),
             event: GameEvent::LowAmmo,
             cooldown_ms: 30000,
-            enabled: true,
+            enabled: false,  // По умолчанию отключен
+            is_builtin: true,
         });
     }
     
@@ -224,8 +246,11 @@ impl TriggerManager {
         let mut events = Vec::new();
         let now = std::time::Instant::now();
         
+        log::trace!("[Triggers] Checking {} triggers", self.triggers.len());
+        
         for trigger in &self.triggers {
             if !trigger.enabled {
+                log::trace!("[Triggers] Skipping disabled trigger: {}", trigger.name);
                 continue;
             }
             
@@ -233,15 +258,24 @@ impl TriggerManager {
             if let Some(last_time) = self.last_triggered.get(&trigger.id) {
                 let elapsed = now.duration_since(*last_time).as_millis() as u64;
                 if elapsed < trigger.cooldown_ms {
+                    log::trace!("[Triggers] {} on cooldown ({}/{}ms)", trigger.name, elapsed, trigger.cooldown_ms);
                     continue;
                 }
             }
             
             // Проверка условия
-            if self.evaluate_condition(&trigger.condition, state) {
+            let result = self.evaluate_condition(&trigger.condition, state);
+            log::debug!("[Triggers] {} - Condition: {:?}, Result: {}", trigger.name, trigger.condition, result);
+            
+            if result {
+                log::info!("[Triggers] ✅ TRIGGERED: {} -> {:?}", trigger.name, trigger.event);
                 events.push(trigger.event.clone());
                 self.last_triggered.insert(trigger.id.clone(), now);
             }
+        }
+        
+        if !events.is_empty() {
+            log::info!("[Triggers] Total events triggered: {}", events.len());
         }
         
         events
@@ -252,22 +286,42 @@ impl TriggerManager {
         let ind = &state.indicators;
         
         match condition {
-            TriggerCondition::SpeedAbove(val) => ind.speed > *val,
+            TriggerCondition::SpeedAbove(val) => {
+                let result = ind.speed > *val;
+                log::trace!("  SpeedAbove: {} > {} = {}", ind.speed, val, result);
+                result
+            },
             TriggerCondition::SpeedBelow(val) => ind.speed < *val,
             TriggerCondition::AltitudeAbove(val) => ind.altitude > *val,
             TriggerCondition::AltitudeBelow(val) => ind.altitude < *val,
             TriggerCondition::RPMAbove(val) => ind.engine_rpm > *val,
             TriggerCondition::TempAbove(val) => ind.engine_temp > *val,
             
-            TriggerCondition::GLoadAbove(val) => ind.g_load > *val,
+            TriggerCondition::GLoadAbove(val) => {
+                let result = ind.g_load > *val;
+                log::trace!("  GLoadAbove: {} > {} = {}", ind.g_load, val, result);
+                result
+            },
             TriggerCondition::GLoadBelow(val) => ind.g_load < *val,
             
-            TriggerCondition::AOAAbove(val) => ind.aoa > *val,
+            TriggerCondition::AOAAbove(val) => {
+                let result = ind.aoa > *val;
+                log::trace!("  AOAAbove: {} > {} = {}", ind.aoa, val, result);
+                result
+            },
             TriggerCondition::AOABelow(val) => ind.aoa < *val,
             
-            TriggerCondition::IASAbove(val) => ind.ias > *val,
+            TriggerCondition::IASAbove(val) => {
+                let result = ind.ias > *val;
+                log::trace!("  IASAbove: {} > {} = {}", ind.ias, val, result);
+                result
+            },
             TriggerCondition::TASAbove(val) => ind.tas > *val,
-            TriggerCondition::MachAbove(val) => ind.mach > *val,
+            TriggerCondition::MachAbove(val) => {
+                let result = ind.mach > *val;
+                log::trace!("  MachAbove: {} > {} = {}", ind.mach, val, result);
+                result
+            },
             
             TriggerCondition::FuelBelow(percent) => {
                 if ind.fuel_max > 0.0 {

@@ -39,3 +39,13 @@ export interface Profile {
 export type VehicleType = 'Tank' | 'Aircraft' | 'Helicopter' | 'Ship' | 'Unknown';
 export type GameMode = 'Arcade' | 'Realistic' | 'Simulator' | 'Any';
 
+export interface GameStatusInfo {
+  connected: boolean;
+  vehicle_name: string;
+  speed_kmh: number;
+  altitude_m: number;
+  g_load: number;
+  engine_rpm: number;
+  fuel_percent: number;
+}
+

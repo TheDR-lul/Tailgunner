@@ -114,7 +114,25 @@ impl ProfileManager {
             },
         };
         light_mappings.insert(GameEvent::Hit, light_hit.clone());
-        light_mappings.insert(GameEvent::CriticalHit, light_hit);
+        light_mappings.insert(GameEvent::CriticalHit, light_hit.clone());
+        
+        // Аэродинамические события
+        light_mappings.insert(GameEvent::Overspeed, light_hit.clone());
+        light_mappings.insert(GameEvent::OverG, light_hit.clone());
+        light_mappings.insert(GameEvent::HighAOA, light_hit.clone());
+        light_mappings.insert(GameEvent::CriticalAOA, light_hit.clone());
+        light_mappings.insert(GameEvent::Mach1, light_hit.clone());
+        
+        // Топливо и боезапас
+        light_mappings.insert(GameEvent::LowFuel, light_hit.clone());
+        light_mappings.insert(GameEvent::CriticalFuel, light_hit.clone());
+        light_mappings.insert(GameEvent::LowAmmo, light_hit.clone());
+        
+        // Окружение
+        light_mappings.insert(GameEvent::LowAltitude, light_hit.clone());
+        
+        // Повреждения
+        light_mappings.insert(GameEvent::EngineDamaged, light_hit);
 
         self.profiles.push(Profile {
             id: "light_background".to_string(),

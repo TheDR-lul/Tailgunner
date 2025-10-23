@@ -12,16 +12,42 @@ use crate::{
     wt_telemetry::WTTelemetryReader,
 };
 use anyhow::Result;
+use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameStatusInfo {
+    pub connected: bool,
+    pub vehicle_name: String,
+    pub speed_kmh: i32,
+    pub altitude_m: i32,
+    pub g_load: f32,
+    pub engine_rpm: i32,
+    pub fuel_percent: i32,
+}
+
+impl GameStatusInfo {
+    pub fn disconnected() -> Self {
+        Self {
+            connected: false,
+            vehicle_name: "N/A".to_string(),
+            speed_kmh: 0,
+            altitude_m: 0,
+            g_load: 0.0,
+            engine_rpm: 0,
+            fuel_percent: 0,
+        }
+    }
+}
 
 pub struct HapticEngine {
     telemetry: Arc<RwLock<WTTelemetryReader>>,
     device_manager: Arc<DeviceManager>,
     event_engine: Arc<RwLock<EventEngine>>,
     profile_manager: Arc<RwLock<ProfileManager>>,
-    trigger_manager: Arc<RwLock<TriggerManager>>,
+    pub trigger_manager: Arc<RwLock<TriggerManager>>,  // pub для доступа из lib.rs
     dynamic_trigger_manager: Arc<DynamicTriggerManager>,
     rate_limiter: Arc<RateLimiter>,
     running: Arc<RwLock<bool>>,
@@ -80,9 +106,19 @@ impl HapticEngine {
                 let game_state = {
                     let mut telem = telemetry.write().await;
                     match telem.get_state().await {
-                        Ok(state) => state,
-                        Err(_) => {
+                        Ok(state) => {
+                            log::debug!("[WT] Vehicle: {:?}, Speed: {:.0} km/h, Alt: {:.0}m, Fuel: {:.0}/{:.0} kg", 
+                                state.type_, 
+                                state.indicators.speed,  // Уже в км/ч из API
+                                state.indicators.altitude,
+                                state.indicators.fuel,
+                                state.indicators.fuel_max
+                            );
+                            state
+                        },
+                        Err(e) => {
                             // Игра не запущена или не доступна
+                            log::warn!("[WT] Game not connected: {}", e);
                             drop(telem);
                             tokio::time::sleep(Duration::from_secs(1)).await;
                             continue;
@@ -115,6 +151,10 @@ impl HapticEngine {
                 events.extend(dynamic_events);
 
                 // Обрабатываем каждое событие
+                if !events.is_empty() {
+                    log::info!("[Events] Detected {} events: {:?}", events.len(), events);
+                }
+                
                 for event in events {
                     let pattern = {
                         let pm = profile_manager.read().await;
@@ -122,12 +162,16 @@ impl HapticEngine {
                     };
                     
                     if let Some(pattern) = pattern {
+                        log::info!("[Pattern] Executing pattern for event {:?}: Attack={:.0}ms, Hold={:.0}ms", 
+                            event, pattern.attack.duration_ms, pattern.hold.duration_ms);
                         Self::execute_pattern_async(
                             Arc::clone(&device_manager),
                             Arc::clone(&rate_limiter),
                             Arc::clone(&current_intensity),
                             pattern,
                         );
+                    } else {
+                        log::warn!("[Pattern] No pattern found for event {:?}", event);
                     }
                 }
 
@@ -194,6 +238,32 @@ impl HapticEngine {
                 let _ = device_manager.send_vibration(0.0).await;
             }
         });
+    }
+
+    /// Получить текущее состояние игры
+    pub async fn get_game_status(&self) -> Result<GameStatusInfo> {
+        let mut telem = self.telemetry.write().await;
+        match telem.get_state().await {
+            Ok(state) => {
+                // Рассчитываем топливо в процентах (fuel в кг, fuel_max в кг)
+                let fuel_percent = if state.indicators.fuel_max > 0.0 {
+                    ((state.indicators.fuel / state.indicators.fuel_max * 100.0) as i32).min(100)
+                } else {
+                    0
+                };
+                
+                Ok(GameStatusInfo {
+                    connected: true,
+                    vehicle_name: format!("{:?}", state.type_),
+                    speed_kmh: state.indicators.speed as i32, // Уже в км/ч
+                    altitude_m: state.indicators.altitude as i32,
+                    g_load: state.indicators.g_load,
+                    engine_rpm: state.indicators.engine_rpm as i32,
+                    fuel_percent,
+                })
+            },
+            Err(_) => Ok(GameStatusInfo::disconnected()),
+        }
     }
 
     /// Проверка статуса

@@ -11,6 +11,8 @@ import { PatternManager } from "./components/PatternManager";
 import { PatternEditorModal } from "./components/PatternEditorModal";
 import { DebugConsole } from "./components/DebugConsole";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { GameStatus } from "./components/GameStatus";
+import { BuiltinTriggers } from "./components/BuiltinTriggers";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
 
@@ -81,15 +83,17 @@ function App() {
           <aside className="sidebar-left">
             <Dashboard />
             <DeviceList />
+            <GameStatus />
           </aside>
 
-          {/* Центральная область - паттерны и профили */}
-          <section className="main-area">
-            <PatternManager onEditPattern={handleEditPattern} />
-            <ProfileList />
-          </section>
-        </div>
-      </main>
+              {/* Центральная область - паттерны, триггеры и профили */}
+              <section className="main-area">
+                <PatternManager onEditPattern={handleEditPattern} />
+                <BuiltinTriggers />
+                <ProfileList />
+              </section>
+            </div>
+          </main>
 
       {/* Консоль отладки */}
       <DebugConsole />

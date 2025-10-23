@@ -1,7 +1,7 @@
 // API для работы с Tauri backend
 
 import { invoke } from '@tauri-apps/api/core';
-import type { DeviceInfo, Profile, VibrationPattern } from './types';
+import type { DeviceInfo, Profile, VibrationPattern, GameStatusInfo } from './types';
 
 export const api = {
   // Инициализация устройств
@@ -59,6 +59,24 @@ export const api = {
   // Получение пресетов паттернов
   async getPresetPatterns(): Promise<VibrationPattern[]> {
     return invoke<VibrationPattern[]>('get_preset_patterns');
+  },
+
+  // Получение статуса игры
+  async getGameStatus(): Promise<GameStatusInfo> {
+    try {
+      return await invoke<GameStatusInfo>('get_game_status');
+    } catch (error) {
+      console.error('Failed to get game status:', error);
+      return {
+        connected: false,
+        vehicle_name: 'N/A',
+        speed_kmh: 0,
+        altitude_m: 0,
+        g_load: 0,
+        engine_rpm: 0,
+        fuel_percent: 0,
+      };
+    }
   },
 };
 
