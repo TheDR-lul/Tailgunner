@@ -1,145 +1,103 @@
 import { useState, useEffect } from 'react';
-import { Play, Square, Zap } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Play, Square, Zap, Shield } from 'lucide-react';
 import { api } from '../api';
 
 export function Dashboard() {
+  const { t } = useTranslation();
   const [isRunning, setIsRunning] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const running = await api.isRunning();
+        setIsRunning(running);
+      } catch (error) {
+        // Тихо игнорируем
+      }
+    };
+    
     checkStatus();
-    const interval = setInterval(checkStatus, 2000);
+    const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  async function checkStatus() {
+  const handleStart = async () => {
     try {
-      const running = await api.isRunning();
-      setIsRunning(running);
-    } catch (error) {
-      console.error('Failed to check status:', error);
-    }
-  }
-
-  async function handleStart() {
-    setLoading(true);
-    try {
-      const result = await api.startEngine();
-      setMessage(result);
+      await api.startEngine();
       setIsRunning(true);
-    } catch (error) {
-      setMessage(`Ошибка: ${error}`);
-    } finally {
-      setLoading(false);
+      if ((window as any).debugLog) {
+        (window as any).debugLog('success', '✅ Система запущена');
+      }
+    } catch (error: any) {
+      if ((window as any).debugLog) {
+        (window as any).debugLog('error', `❌ Ошибка запуска: ${error.message}`);
+      }
     }
-  }
+  };
 
-  async function handleStop() {
-    setLoading(true);
+  const handleStop = async () => {
     try {
-      const result = await api.stopEngine();
-      setMessage(result);
+      await api.stopEngine();
       setIsRunning(false);
-    } catch (error) {
-      setMessage(`Ошибка: ${error}`);
-    } finally {
-      setLoading(false);
+      if ((window as any).debugLog) {
+        (window as any).debugLog('info', '⏹️ Система остановлена');
+      }
+    } catch (error: any) {
+      if ((window as any).debugLog) {
+        (window as any).debugLog('error', `❌ Ошибка остановки: ${error.message}`);
+      }
     }
-  }
+  };
 
-  async function handleTest() {
-    setLoading(true);
+  const handleTest = async () => {
     try {
-      await api.testVibration(0.5, 500);
-      setMessage('Тестовая вибрация отправлена');
-    } catch (error) {
-      setMessage(`Ошибка: ${error}`);
-    } finally {
-      setLoading(false);
+      await api.testVibration(0.8, 500);
+      if ((window as any).debugLog) {
+        (window as any).debugLog('info', '⚡ Тест вибрации выполнен');
+      }
+    } catch (error: any) {
+      if ((window as any).debugLog) {
+        (window as any).debugLog('error', `❌ Ошибка теста: ${error.message}`);
+      }
     }
-  }
+  };
 
   return (
-    <div className="card">
+    <div className="card dashboard-card">
       <div className="card-header">
-        <h3 className="card-title">
-          <Zap size={20} />
-          Управление
-        </h3>
-        <p className="card-description">
-          Запуск и остановка системы
-        </p>
+        <h2>⚡ {t('dashboard.title')}</h2>
+        <p>{t('dashboard.description')}</p>
       </div>
 
-      <div className="card-content">
-        <div className="control-panel">
-          <div className={`status-badge ${isRunning ? 'active' : 'inactive'}`}>
-            <span className="status-dot"></span>
-            {isRunning ? 'Система активна' : 'Система остановлена'}
-          </div>
-
-          <div className="control-buttons">
-            {!isRunning ? (
-              <button
-                className="btn btn-primary"
-                onClick={handleStart}
-                disabled={loading}
-              >
-                <Play size={18} />
-                Запустить
-              </button>
-            ) : (
-              <button
-                className="btn btn-danger"
-                onClick={handleStop}
-                disabled={loading}
-              >
-                <Square size={18} />
-                Остановить
-              </button>
-            )}
-
-            <button
-              className="btn btn-secondary"
-              onClick={handleTest}
-              disabled={loading}
-            >
-              Тест вибрации
+      <div className="card-body">
+        <div className="control-buttons">
+          {!isRunning ? (
+            <button className="btn btn-primary btn-lg" onClick={handleStart}>
+              <Play size={20} />
+              {t('dashboard.btn_start')}
             </button>
-          </div>
-
-          {message && (
-            <div style={{
-              padding: '1rem',
-              background: 'var(--bg-hover)',
-              borderRadius: '0.5rem',
-              fontSize: '0.875rem',
-              color: 'var(--text-dim)',
-            }}>
-              {message}
-            </div>
+          ) : (
+            <button className="btn btn-danger btn-lg" onClick={handleStop}>
+              <Square size={20} />
+              {t('dashboard.btn_stop')}
+            </button>
           )}
+          
+          <button className="btn btn-secondary" onClick={handleTest}>
+            <Zap size={18} />
+            {t('dashboard.btn_test')}
+          </button>
+        </div>
 
-          <div style={{
-            marginTop: '2rem',
-            padding: '1rem',
-            background: 'rgba(0, 212, 255, 0.05)',
-            border: '1px solid var(--accent)',
-            borderRadius: '0.75rem',
-            fontSize: '0.875rem',
-          }}>
-            <h4 style={{ marginBottom: '0.5rem', color: 'var(--accent)' }}>
-              ✓ EAC-Safe
-            </h4>
-            <p style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
-              Приложение читает только публичные данные с localhost:8111.
-              Никакой инъекции в память игры. Риск бана — ноль.
-            </p>
+        <div className="safety-badge">
+          <Shield size={20} className="safety-icon" />
+          <div className="safety-text">
+            <strong>{t('dashboard.eac_safe_title')}</strong>
+            <small>{t('dashboard.eac_safe_desc')}</small>
           </div>
         </div>
       </div>
     </div>
   );
 }
-

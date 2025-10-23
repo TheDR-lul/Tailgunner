@@ -1,50 +1,110 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import "./App.css";
+import "./styles/nodes.css";
+import "./styles/modal.css";
+import "./styles/scrollbar.css";
+import { Dashboard } from "./components/Dashboard";
+import { DeviceList } from "./components/DeviceList";
+import { ProfileList } from "./components/ProfileList";
+import { PatternManager } from "./components/PatternManager";
+import { PatternEditorModal } from "./components/PatternEditorModal";
+import { DebugConsole } from "./components/DebugConsole";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { api } from "./api";
+import { usePatterns, Pattern } from "./hooks/usePatterns";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const { t } = useTranslation();
+  const [isRunning, setIsRunning] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editingPattern, setEditingPattern] = useState<Pattern | undefined>();
+  
+  const { addPattern, updatePattern } = usePatterns();
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  // Проверка статуса системы (НЕ автоподключение!)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const running = await api.isRunning();
+        setIsRunning(running);
+      } catch (error) {
+        // Тихо игнорируем
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleEditPattern = (pattern?: Pattern) => {
+    setEditingPattern(pattern);
+    setIsEditorOpen(true);
+  };
+
+  const handleSavePattern = (name: string, nodes: any[], edges: any[]) => {
+    if (editingPattern) {
+      updatePattern(editingPattern.id, { name, nodes, edges });
+    } else {
+      addPattern(name, nodes, edges);
+    }
+  };
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className="app-container">
+      {/* Современный хедер */}
+      <header className="app-header">
+        <div className="header-content">
+          <div className="header-brand">
+            <div className="brand-icon">⚡</div>
+            <div className="brand-info">
+              <h1>{t('app.title')}</h1>
+              <span className="brand-subtitle">{t('app.subtitle')}</span>
+            </div>
+          </div>
+          
+          <div className="header-actions">
+            <LanguageSwitcher />
+            <div className={`status-chip ${isRunning ? 'running' : 'stopped'}`}>
+              <span className="status-indicator"></span>
+              <span className="status-text">
+                {isRunning ? t('header.status_active') : t('header.status_stopped')}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+      {/* Контент с сеткой */}
+      <main className="app-main">
+        <div className="content-grid">
+          {/* Левая панель - управление */}
+          <aside className="sidebar-left">
+            <Dashboard />
+            <DeviceList />
+          </aside>
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
+          {/* Центральная область - паттерны и профили */}
+          <section className="main-area">
+            <PatternManager onEditPattern={handleEditPattern} />
+            <ProfileList />
+          </section>
+        </div>
+      </main>
+
+      {/* Консоль отладки */}
+      <DebugConsole />
+
+      {/* Модальное окно редактора */}
+      <PatternEditorModal
+        isOpen={isEditorOpen}
+        onClose={() => {
+          setIsEditorOpen(false);
+          setEditingPattern(undefined);
         }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+        onSave={handleSavePattern}
+        initialData={editingPattern}
+      />
+    </div>
   );
 }
 

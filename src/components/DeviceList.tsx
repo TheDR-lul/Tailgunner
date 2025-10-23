@@ -1,108 +1,110 @@
 import { useState } from 'react';
-import { Wifi, RefreshCw, Bluetooth } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Bluetooth, RefreshCw, Zap } from 'lucide-react';
 import { api } from '../api';
 import type { DeviceInfo } from '../types';
 
 export function DeviceList() {
+  const { t } = useTranslation();
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  async function loadDevices() {
+  const handleInit = async () => {
+    setIsLoading(true);
+    try {
+      await api.initDevices();
+      setIsInitialized(true);
+      await handleRefresh();
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('success', '✅ Intiface подключен');
+      }
+    } catch (error: any) {
+      if ((window as any).debugLog) {
+        (window as any).debugLog('warn', '⚠️ Не удалось подключиться к Intiface');
+        (window as any).debugLog('info', '💡 Скачать: https://intiface.com/central/');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
     try {
       const deviceList = await api.getDevices();
       setDevices(deviceList);
-    } catch (error) {
-      console.error('Failed to load devices:', error);
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('info', `📱 Найдено устройств: ${deviceList.length}`);
+      }
+    } catch (error: any) {
+      if ((window as any).debugLog) {
+        (window as any).debugLog('error', '❌ Ошибка обновления устройств');
+      }
     }
-  }
-
-  async function handleInit() {
-    setLoading(true);
-    try {
-      await api.initDevices();
-      setInitialized(true);
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      await loadDevices();
-    } catch (error) {
-      console.error('Failed to init devices:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  };
 
   return (
-    <div className="card">
+    <div className="card device-card">
       <div className="card-header">
-        <h3 className="card-title">
-          <Bluetooth size={20} />
-          Устройства
-        </h3>
-        <p className="card-description">
-          Подключенные вибро-устройства
-        </p>
+        <h2>📱 {t('devices.title')}</h2>
+        <p>{t('devices.description')}</p>
       </div>
 
-      <div className="card-content">
-        {!initialized ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <Wifi size={48} />
-            </div>
-            <p>Сначала инициализируйте Buttplug/Intiface</p>
-            <button
-              className="btn btn-primary"
+      <div className="card-body">
+        {!isInitialized ? (
+          <div className="empty-state-compact">
+            <Bluetooth size={48} className="empty-icon" />
+            <p>{t('devices.empty_init')}</p>
+            <button 
+              className="btn btn-primary" 
               onClick={handleInit}
-              disabled={loading}
-              style={{ marginTop: '1rem' }}
+              disabled={isLoading}
             >
-              <RefreshCw size={16} className={loading ? 'spin' : ''} />
-              {loading ? 'Инициализация...' : 'Инициализировать'}
+              {isLoading ? (
+                <>
+                  <RefreshCw size={16} className="spin" />
+                  {t('devices.initializing')}
+                </>
+              ) : (
+                <>
+                  <Zap size={16} />
+                  {t('devices.btn_init')}
+                </>
+              )}
             </button>
-          </div>
-        ) : devices.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <Bluetooth size={48} />
-            </div>
-            <p>Устройства не найдены</p>
-            <p style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-              Убедитесь, что Intiface Desktop запущен
-            </p>
-            <button
-              className="btn btn-secondary"
-              onClick={loadDevices}
-              style={{ marginTop: '1rem' }}
-            >
-              <RefreshCw size={16} />
-              Обновить
-            </button>
+            <small className="hint">{t('devices.empty_hint')}</small>
           </div>
         ) : (
           <>
-            {devices.map((device) => (
-              <div key={device.id} className="device-item">
-                <div className="device-icon">
-                  <Bluetooth size={20} />
-                </div>
-                <div className="device-info">
-                  <h4>{device.name}</h4>
-                  <p>{device.device_type}</p>
-                </div>
-              </div>
-            ))}
-            <button
-              className="btn btn-secondary"
-              onClick={loadDevices}
-              style={{ marginTop: '1rem' }}
-            >
+            <button className="btn btn-secondary btn-sm" onClick={handleRefresh}>
               <RefreshCw size={16} />
-              Обновить список
+              {t('devices.btn_refresh')}
             </button>
+            
+            {devices.length === 0 ? (
+              <div className="empty-state-compact">
+                <p>{t('devices.empty_devices')}</p>
+                <small className="hint">{t('devices.empty_hint')}</small>
+              </div>
+            ) : (
+              <div className="device-list">
+                {devices.map((device) => (
+                  <div key={device.id} className="device-item">
+                    <div className="device-icon">🎮</div>
+                    <div className="device-info">
+                      <strong>{device.name}</strong>
+                      <span className="device-type">{device.device_type}</span>
+                    </div>
+                    <div className="device-status">●</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
     </div>
   );
 }
-
