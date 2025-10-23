@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "butt_thunder",
-        "width": 800,
-        "height": 600
+        "title": "Butt Thunder - Haptic Feedback",
+        "width": 1280,
+        "height": 720,
+        "minWidth": 1024,
+        "minHeight": 576
       }
     ],
     "security": {

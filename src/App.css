@@ -4,38 +4,40 @@
 ============================================ */
 
 :root {
-  /* Цветовая палитра */
-  --primary: #00d4ff;
-  --primary-dark: #0099cc;
-  --primary-glow: rgba(0, 212, 255, 0.4);
+  /* War Thunder Color Palette */
+  --primary: #ff9933;
+  --primary-dark: #cc7a29;
+  --primary-glow: rgba(255, 153, 51, 0.3);
   
-  --secondary: #8b5cf6;
-  --secondary-glow: rgba(139, 92, 246, 0.4);
+  --secondary: #5d8aa8;
+  --secondary-glow: rgba(93, 138, 168, 0.3);
   
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --success: #4ade80;
+  --warning: #fb923c;
+  --danger: #f87171;
   
-  --bg-primary: #0f1117;
-  --bg-secondary: #1a1d29;
-  --bg-tertiary: #24283b;
-  --bg-hover: #2d3348;
+  --bg-primary: #0d0f14;
+  --bg-secondary: #14161e;
+  --bg-tertiary: #1a1f29;
+  --bg-card: #1e2433;
+  --bg-hover: #252b3a;
   
-  --text-primary: #f8fafc;
+  --text-primary: #e2e8f0;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
   
-  --border: rgba(148, 163, 184, 0.1);
-  --border-strong: rgba(148, 163, 184, 0.2);
+  --border: rgba(255, 153, 51, 0.1);
+  --border-strong: rgba(255, 153, 51, 0.25);
+  --border-accent: rgba(255, 153, 51, 0.4);
   
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 20px var(--primary-glow);
   
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
   --radius-full: 9999px;
   
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -72,9 +74,21 @@ body {
 /* Header */
 .app-header {
   background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border-accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 153, 51, 0.1);
   backdrop-filter: blur(10px);
   z-index: 50;
+  position: relative;
+}
+
+.app-header::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
 }
 
 .header-content {
@@ -212,17 +226,29 @@ body {
 ============================================ */
 
 .card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
   padding: 1.5rem;
   transition: var(--transition);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
+  opacity: 0.5;
 }
 
 .card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 153, 51, 0.1);
 }
 
 .card-header {
@@ -277,23 +303,28 @@ body {
 
 .btn-primary {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: white;
-  box-shadow: 0 4px 12px var(--primary-glow);
+  color: #000;
+  font-weight: 600;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px var(--primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px var(--primary-glow);
+  box-shadow: 0 6px 16px var(--primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, #ffaa44, var(--primary));
 }
 
 .btn-primary:active {
   transform: translateY(0);
+  box-shadow: 0 2px 8px var(--primary-glow), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .btn-secondary {
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
 }
 
 .btn-secondary:hover {
