@@ -6,7 +6,7 @@ use crate::{
     event_engine::EventEngine,
     event_triggers::TriggerManager,
     dynamic_triggers::DynamicTriggerManager,
-    pattern_engine::VibrationPattern,
+    pattern_engine::{VibrationPattern, GameEvent},
     profile_manager::ProfileManager,
     rate_limiter::RateLimiter,
     wt_telemetry::WTTelemetryReader,
@@ -133,7 +133,7 @@ impl HapticEngine {
                 }
 
                 // Детектируем события из state
-                let mut events = {
+                let basic_events = {
                     let mut ee = event_engine.write().await;
                     ee.detect_events(&game_state)
                 };
@@ -147,16 +147,23 @@ impl HapticEngine {
                 // Проверяем динамические триггеры (на основе данных о технике)
                 let dynamic_events = dynamic_trigger_manager.check_dynamic_triggers(&game_state).await;
                 
-                events.extend(trigger_events);
-                events.extend(dynamic_events);
-
+                // Объединяем события: базовые, динамические и триггеры (триггеры могут иметь кастомные паттерны)
+                let mut all_events: Vec<(GameEvent, Option<VibrationPattern>)> = trigger_events;
+                all_events.extend(basic_events.into_iter().map(|e| (e, None)));
+                all_events.extend(dynamic_events.into_iter().map(|e| (e, None)));
+                
                 // Обрабатываем каждое событие
-                if !events.is_empty() {
-                    log::info!("[Events] Detected {} events: {:?}", events.len(), events);
+                if !all_events.is_empty() {
+                    log::info!("[Events] Detected {} events", all_events.len());
                 }
                 
-                for event in events {
-                    let pattern = {
+                for (event, custom_pattern) in all_events {
+                    // Сначала проверяем кастомный паттерн из триггера
+                    let pattern = if let Some(p) = custom_pattern {
+                        log::info!("[Pattern] Using custom pattern from UI trigger");
+                        Some(p)
+                    } else {
+                        // Иначе ищем в профиле
                         let pm = profile_manager.read().await;
                         pm.get_pattern_for_event(&event).cloned()
                     };

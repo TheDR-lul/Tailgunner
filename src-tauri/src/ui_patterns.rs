@@ -64,10 +64,11 @@ impl UIPattern {
             name: self.name.clone(),
             description: format!("Пользовательский паттерн: {}", self.name),
             condition,
-            event: GameEvent::Custom(pattern),
+            event: GameEvent::UserTriggered,  // Универсальное событие для UI триггеров
             cooldown_ms: 1000, // По умолчанию 1 секунда
             enabled: self.enabled,
             is_builtin: false,
+            pattern: Some(pattern),  // Кастомный паттерн напрямую в триггере
         })
     }
     
@@ -150,6 +151,7 @@ impl UIPattern {
         let decay_duration = duration_ms / 4;
         
         Some(VibrationPattern {
+            name: "UI Custom Pattern".to_string(),  // Имя паттерна
             attack: EnvelopeStage {
                 duration_ms: attack_duration,
                 start_intensity: 0.0,

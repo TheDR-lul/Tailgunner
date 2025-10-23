@@ -2,7 +2,7 @@
 /// Позволяет создавать кастомные события на основе значений индикаторов
 
 use crate::wt_telemetry::GameState;
-use crate::pattern_engine::GameEvent;
+use crate::pattern_engine::{GameEvent, VibrationPattern};
 use serde::{Deserialize, Serialize};
 
 /// Условие триггера
@@ -93,6 +93,7 @@ pub struct EventTrigger {
     pub cooldown_ms: u64,        // Минимальное время между срабатываниями
     pub enabled: bool,
     pub is_builtin: bool,        // Встроенный или пользовательский
+    pub pattern: Option<crate::pattern_engine::VibrationPattern>, // Кастомный паттерн для UI триггеров
 }
 
 /// Менеджер триггеров
@@ -124,6 +125,7 @@ impl TriggerManager {
             cooldown_ms: 5000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Критическая G-перегрузка
@@ -139,6 +141,7 @@ impl TriggerManager {
             cooldown_ms: 2000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Высокий угол атаки
@@ -151,6 +154,7 @@ impl TriggerManager {
             cooldown_ms: 3000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Критический угол атаки
@@ -163,6 +167,7 @@ impl TriggerManager {
             cooldown_ms: 2000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Преодоление звукового барьера
@@ -175,6 +180,7 @@ impl TriggerManager {
             cooldown_ms: 10000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Низкое топливо
@@ -187,6 +193,7 @@ impl TriggerManager {
             cooldown_ms: 30000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Критическое топливо
@@ -199,6 +206,7 @@ impl TriggerManager {
             cooldown_ms: 15000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Низкая высота
@@ -214,6 +222,7 @@ impl TriggerManager {
             cooldown_ms: 5000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Перегрев двигателя
@@ -226,6 +235,7 @@ impl TriggerManager {
             cooldown_ms: 10000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
         
         // Низкий боезапас
@@ -238,11 +248,12 @@ impl TriggerManager {
             cooldown_ms: 30000,
             enabled: false,  // По умолчанию отключен
             is_builtin: true,
+            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
         });
     }
     
     /// Проверка всех триггеров
-    pub fn check_triggers(&mut self, state: &GameState) -> Vec<GameEvent> {
+    pub fn check_triggers(&mut self, state: &GameState) -> Vec<(GameEvent, Option<VibrationPattern>)> {
         let mut events = Vec::new();
         let now = std::time::Instant::now();
         
@@ -269,7 +280,8 @@ impl TriggerManager {
             
             if result {
                 log::info!("[Triggers] ✅ TRIGGERED: {} -> {:?}", trigger.name, trigger.event);
-                events.push(trigger.event.clone());
+                // Возвращаем событие И паттерн (если есть)
+                events.push((trigger.event.clone(), trigger.pattern.clone()));
                 self.last_triggered.insert(trigger.id.clone(), now);
             }
         }

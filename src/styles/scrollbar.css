@@ -1,27 +1,32 @@
 /* Custom Scrollbar Styles */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg);
-  border-radius: 4px;
+  background: transparent;
+  margin: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 3px;
   transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent);
+  background: rgba(139, 92, 246, 0.6);
 }
 
 /* Firefox Scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) var(--bg);
+  scrollbar-color: rgba(139, 92, 246, 0.3) transparent;
+}
+
+/* Main content scrollbar */
+main {
+  padding-right: 8px;
 }
 

@@ -166,7 +166,7 @@ async fn add_pattern(
 
 #[tauri::command]
 async fn remove_pattern(
-    state: tauri::State<'_, AppState>,
+    _state: tauri::State<'_, AppState>,
     id: String
 ) -> Result<String, String> {
     log::info!("[UI Patterns] Removing pattern: {}", id);

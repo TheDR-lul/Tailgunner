@@ -159,6 +159,7 @@ pub enum GameEvent {
     
     // === КАСТОМНЫЕ ТРИГГЕРЫ ===
     CustomTrigger(String),
+    UserTriggered,  // Универсальное событие для UI паттернов
 }
 
 impl VibrationPattern {
