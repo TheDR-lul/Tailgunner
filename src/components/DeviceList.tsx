@@ -18,12 +18,12 @@ export function DeviceList() {
       await handleRefresh();
       
       if ((window as any).debugLog) {
-        (window as any).debugLog('success', '✅ Intiface подключен');
+        (window as any).debugLog('success', '✅ Intiface connected');
       }
     } catch (error: any) {
       if ((window as any).debugLog) {
-        (window as any).debugLog('warn', '⚠️ Не удалось подключиться к Intiface');
-        (window as any).debugLog('info', '💡 Скачать: https://intiface.com/central/');
+        (window as any).debugLog('warn', '⚠️ Failed to connect to Intiface');
+        (window as any).debugLog('info', '💡 Download: https://intiface.com/central/');
       }
     } finally {
       setIsLoading(false);
@@ -36,11 +36,11 @@ export function DeviceList() {
       setDevices(deviceList);
       
       if ((window as any).debugLog) {
-        (window as any).debugLog('info', `📱 Найдено устройств: ${deviceList.length}`);
+        (window as any).debugLog('info', `📱 Found ${deviceList.length} device(s)`);
       }
     } catch (error: any) {
       if ((window as any).debugLog) {
-        (window as any).debugLog('error', '❌ Ошибка обновления устройств');
+        (window as any).debugLog('error', '❌ Failed to refresh devices');
       }
     }
   };

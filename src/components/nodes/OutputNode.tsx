@@ -5,10 +5,10 @@ export function OutputNode() {
     <div className="node-output">
       <Handle type="target" position={Position.Left} id="vibration" />
       
-      <div className="node-header">📳 Устройство</div>
+      <div className="node-header">📳 Output</div>
       <div className="node-body">
         <div className="output-icon">🎯</div>
-        <div className="output-text">Отправить на устройство</div>
+        <div className="output-text">Send to device</div>
       </div>
     </div>
   );

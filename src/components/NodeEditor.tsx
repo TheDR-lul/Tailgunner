@@ -31,7 +31,7 @@ const initialNodes: Node[] = [
     id: 'speed-input',
     type: 'input',
     position: { x: 50, y: 100 },
-    data: { label: 'Скорость', indicator: 'IAS (км/ч)', value: 0 },
+    data: { label: 'Speed', indicator: 'IAS (km/h)', value: 0 },
   },
   {
     id: 'condition-1',
@@ -91,7 +91,7 @@ export function NodeEditor() {
   const getDefaultNodeData = (type: string) => {
     switch (type) {
       case 'input':
-        return { label: 'Индикатор', indicator: 'Скорость', value: 0 };
+        return { label: 'Indicator', indicator: 'Speed', value: 0 };
       case 'condition':
         return { operator: '>', threshold: 100 };
       case 'vibration':
@@ -129,8 +129,8 @@ export function NodeEditor() {
     <div className="card" style={{ height: '600px', position: 'relative' }}>
       <div className="card-header">
         <div>
-          <h2>🎨 Нодовый редактор триггеров</h2>
-          <p>Собирайте триггеры как в Blender</p>
+          <h2>🎨 Node-based Trigger Editor</h2>
+          <p>Build triggers like in Blender</p>
         </div>
       </div>
 
@@ -138,25 +138,25 @@ export function NodeEditor() {
       <div className="node-toolbar">
         <div className="node-buttons">
           <button className="btn btn-primary" onClick={() => addNode('input')}>
-            ➕ Индикатор
+            ➕ Input
           </button>
           <button className="btn btn-primary" onClick={() => addNode('condition')}>
-            ➕ Условие
+            ➕ Condition
           </button>
           <button className="btn btn-primary" onClick={() => addNode('vibration')}>
-            ➕ Вибрация
+            ➕ Vibration
           </button>
           <button className="btn btn-primary" onClick={() => addNode('output')}>
-            ➕ Устройство
+            ➕ Output
           </button>
         </div>
         
         <div className="node-actions">
           <button className="btn btn-secondary" onClick={exportConfig}>
-            💾 Экспорт
+            💾 Export
           </button>
           <button className="btn btn-danger" onClick={clearAll}>
-            🗑️ Очистить
+            🗑️ Clear
           </button>
         </div>
       </div>

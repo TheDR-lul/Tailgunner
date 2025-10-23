@@ -14,7 +14,11 @@
     "delete": "Delete",
     "enable": "Enable",
     "disable": "Disable",
-    "close": "Close"
+    "close": "Close",
+    "on": "ON",
+    "off": "OFF",
+    "cooldown": "cooldown",
+    "loading": "Loading..."
   },
   "dashboard": {
     "title": "Control Panel",
@@ -37,11 +41,33 @@
     "empty_devices": "No devices detected",
     "empty_hint": "Launch Intiface Central and connect devices"
   },
+  "game_status": {
+    "title": "Game Status",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "vehicle": "Vehicle",
+    "unknown": "Unknown",
+    "speed": "Speed",
+    "altitude": "Altitude",
+    "g_load": "G-Load",
+    "rpm": "RPM",
+    "fuel": "Fuel"
+  },
   "profiles": {
     "title": "Profiles",
-    "description": "Presets for different vehicle types",
+    "description": "Automatic presets for different vehicle types",
     "loading": "Loading profiles...",
-    "patterns_count": "patterns"
+    "patterns_count": "patterns",
+    "game_mode_arcade": "Arcade",
+    "game_mode_realistic": "Realistic",
+    "game_mode_simulator": "Simulator",
+    "game_mode_any": "All modes"
+  },
+  "triggers": {
+    "title": "Built-in Triggers",
+    "description": "Automatic events based on game indicators",
+    "no_triggers": "No triggers",
+    "cooldown": "{{time}}s cooldown"
   },
   "pattern_manager": {
     "title": "Pattern Manager",
@@ -60,26 +86,73 @@
     "name_required": "Enter pattern name",
     "import": "Import",
     "export": "Export",
-    "import_error": "Import error. Check the file."
+    "import_error": "Import error. Check the file.",
+    "add_input_node": "Add Input Node",
+    "add_vibration_node": "Add Vibration Node"
   },
   "nodes": {
     "input": {
       "title": "Input",
-      "default_label": "Indicator"
-    },
-    "condition": {
-      "title": "Condition"
+      "default_label": "Indicator",
+      "select_indicator": "Select indicator",
+      "select_operator": "Select operator",
+      "enter_value": "Enter value"
     },
     "vibration": {
-      "title": "Vibration"
+      "title": "Vibration",
+      "duration": "Duration",
+      "seconds": "s",
+      "intensity": "Intensity",
+      "time": "Time",
+      "mode": "Mode",
+      "mode_once": "Once",
+      "mode_continuous": "Continuous",
+      "mode_repeat": "Repeat",
+      "repeat_count": "Repeat count",
+      "random": "Random",
+      "random_min": "Min",
+      "random_max": "Max"
     },
     "output": {
       "title": "Output"
     }
   },
+  "indicators": {
+    "speed": "Speed",
+    "altitude": "Altitude",
+    "rpm": "Engine RPM",
+    "temperature": "Temperature",
+    "g_load": "G-Load",
+    "aoa": "Angle of Attack",
+    "ias": "Indicated Airspeed",
+    "tas": "True Airspeed",
+    "mach": "Mach Number",
+    "fuel": "Fuel",
+    "ammo": "Ammo"
+  },
+  "events": {
+    "Hit": "Hit",
+    "CriticalHit": "Critical Hit",
+    "PenetrationHit": "Penetration",
+    "Overspeed": "Overspeed",
+    "OverG": "G-Overload",
+    "HighAOA": "High Angle of Attack",
+    "CriticalAOA": "Critical Angle of Attack",
+    "Mach1": "Mach 1.0",
+    "LowFuel": "Low Fuel",
+    "CriticalFuel": "Critically Low Fuel",
+    "LowAmmo": "Low Ammo",
+    "LowAltitude": "Low Altitude",
+    "EngineDamaged": "Engine Damaged",
+    "EngineDestroyed": "Engine Destroyed",
+    "TrackBroken": "Track Broken",
+    "Shooting": "Firing",
+    "CannonFiring": "Cannon Firing"
+  },
   "debug": {
     "title": "Debug Console",
-    "initialized": "System initialized"
+    "initialized": "System initialized",
+    "hint": "💡 <strong>Rust logs (triggers, parser)</strong> → check terminal!  For detailed logs run: <code>RUST_LOG=debug npm run tauri dev</code>"
   },
   "settings": {
     "title": "Settings",
@@ -90,4 +163,3 @@
     "save_config": "Auto-save configuration"
   }
 }
-

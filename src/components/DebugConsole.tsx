@@ -58,16 +58,16 @@ export function DebugConsole() {
     };
   }, [t]);
 
-  // Периодически получаем debug info из Rust
+  // Periodically fetch debug info from Rust
   useEffect(() => {
     const fetchDebugInfo = async () => {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         const info = await invoke('get_debug_info');
-        // Логи из Rust можно выводить в терминале
+        // Rust logs can be viewed in terminal
         // console.log('[Rust Debug]', info);
       } catch (error) {
-        // Игнорируем ошибки если движок не запущен
+        // Ignore errors if engine is not running
       }
     };
 
@@ -96,10 +96,10 @@ export function DebugConsole() {
       {isExpanded && (
         <div className="debug-body">
           <div className="log-entry log-info" style={{ borderBottom: '1px solid var(--border)', marginBottom: '8px', paddingBottom: '8px' }}>
-            <span className="log-message">
-              💡 <strong>Rust логи (триггеры, парсер)</strong> → смотри в терминале!  
-              Для детальных логов запусти: <code style={{background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px'}}>RUST_LOG=debug npm run tauri dev</code>
-            </span>
+            <span 
+              className="log-message"
+              dangerouslySetInnerHTML={{ __html: t('debug.hint') }}
+            />
           </div>
           {logs.map((log) => (
             <div key={log.id} className={`log-entry log-${log.level}`}>

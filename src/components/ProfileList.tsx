@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Layers, Gamepad2, ChevronDown, ChevronUp, Power } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import type { Profile } from '../types';
 
 export function ProfileList() {
+  const { t } = useTranslation();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
 
@@ -40,42 +42,18 @@ export function ProfileList() {
     Unknown: '🎮',
   };
 
-  const modeLabels: Record<string, string> = {
-    Arcade: 'Аркада',
-    Realistic: 'Реалистика',
-    Simulator: 'Симулятор',
-    Any: 'Все режимы',
-  };
-
-  const eventLabels: Record<string, string> = {
-    Hit: 'Попадание',
-    CriticalHit: 'Критическое попадание',
-    PenetrationHit: 'Пробитие',
-    Overspeed: 'Превышение скорости',
-    OverG: 'G-перегрузка',
-    HighAOA: 'Высокий угол атаки',
-    CriticalAOA: 'Критический угол атаки',
-    Mach1: 'Mach 1.0',
-    LowFuel: 'Мало топлива',
-    CriticalFuel: 'Критически мало топлива',
-    LowAmmo: 'Мало боезапаса',
-    LowAltitude: 'Низкая высота',
-    EngineDamaged: 'Повреждение двигателя',
-    EngineDestroyed: 'Уничтожен двигатель',
-    TrackBroken: 'Сломана гусеница',
-    Shooting: 'Выстрел',
-    CannonFiring: 'Стрельба из пушки',
-  };
+  const getModeLabel = (mode: string) => t(`profiles.game_mode_${mode.toLowerCase()}`);
+  const getEventLabel = (event: string) => t(`events.${event}`, event);
 
   return (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">
           <Layers size={20} />
-          Профили
+          {t('profiles.title')}
         </h3>
         <p className="card-description">
-          Автоматические пресеты для разных типов техники
+          {t('profiles.description')}
         </p>
       </div>
 
@@ -85,7 +63,7 @@ export function ProfileList() {
             <div className="empty-state-icon">
               <Gamepad2 size={48} />
             </div>
-            <p>Загрузка профилей...</p>
+            <p>{t('profiles.loading')}</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -118,20 +96,20 @@ export function ProfileList() {
                         style={{ fontSize: '11px', padding: '4px 8px' }}
                       >
                         <Power size={12} />
-                        {profile.enabled ? 'ВКЛ' : 'ВЫКЛ'}
+                        {profile.enabled ? t('common.on') : t('common.off')}
                       </button>
                     </div>
                   </div>
                   
                   <div className="profile-description">
-                    {modeLabels[profile.game_mode]} • {patterns.length} паттернов
+                    {getModeLabel(profile.game_mode)} • {patterns.length} {t('profiles.patterns_count')}
                   </div>
                   
                   {isExpanded && (
                     <div className="profile-patterns">
                       {patterns.map(([eventName, pattern]) => (
                         <div key={eventName} className="pattern-chip">
-                          <span className="pattern-name">{eventLabels[eventName] || eventName}</span>
+                          <span className="pattern-name">{getEventLabel(eventName)}</span>
                           <span className="pattern-duration">
                             {((pattern.attack.duration_ms + pattern.hold.duration_ms + pattern.decay.duration_ms) / 1000).toFixed(1)}s
                           </span>

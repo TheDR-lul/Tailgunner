@@ -8,28 +8,28 @@ interface InputNodeData {
   value?: number;
 }
 
-const INDICATORS = [
-  { id: 'speed', label: 'Скорость (IAS)', unit: 'км/ч' },
-  { id: 'altitude', label: 'Высота', unit: 'м' },
-  { id: 'g_load', label: 'G-перегрузка', unit: 'G' },
-  { id: 'aoa', label: 'Угол атаки', unit: '°' },
-  { id: 'engine_rpm', label: 'Обороты двигателя', unit: 'RPM' },
-  { id: 'engine_temp', label: 'Температура двигателя', unit: '°C' },
-  { id: 'fuel', label: 'Топливо', unit: 'кг' },
-  { id: 'ammo_count', label: 'Боезапас', unit: 'шт' },
-  { id: 'mach', label: 'Число Маха', unit: 'M' },
-  { id: 'tas', label: 'TAS', unit: 'км/ч' },
-];
-
 export function InputNode({ data, id }: { data: InputNodeData; id: string }) {
   const { t } = useTranslation();
   const [indicator, setIndicator] = useState(data.indicator || 'speed');
+  
+  const INDICATORS = [
+    { id: 'speed', label: t('indicators.ias'), unit: 'km/h' },
+    { id: 'altitude', label: t('indicators.altitude'), unit: 'm' },
+    { id: 'g_load', label: t('indicators.g_load'), unit: 'G' },
+    { id: 'aoa', label: t('indicators.aoa'), unit: '°' },
+    { id: 'engine_rpm', label: t('indicators.rpm'), unit: 'RPM' },
+    { id: 'engine_temp', label: t('indicators.temperature'), unit: '°C' },
+    { id: 'fuel', label: t('indicators.fuel'), unit: 'kg' },
+    { id: 'ammo_count', label: t('indicators.ammo'), unit: 'pcs' },
+    { id: 'mach', label: t('indicators.mach'), unit: 'M' },
+    { id: 'tas', label: t('indicators.tas'), unit: 'km/h' },
+  ];
   
   const selectedIndicator = INDICATORS.find(i => i.id === indicator) || INDICATORS[0];
   
   return (
     <div className="node-input" onClick={(e) => e.stopPropagation()}>
-      <div className="node-header">📊 Индикатор</div>
+      <div className="node-header">📊 {t('nodes.input.title')}</div>
       <div className="node-body">
         <select 
           value={indicator}

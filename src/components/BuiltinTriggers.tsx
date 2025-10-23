@@ -10,6 +10,7 @@ interface EventTrigger {
   enabled: boolean;
   is_builtin: boolean;
   cooldown_ms: number;
+  event: string;
 }
 
 export function BuiltinTriggers() {
@@ -28,7 +29,7 @@ export function BuiltinTriggers() {
       setLoading(false);
       
       if ((window as any).debugLog) {
-        (window as any).debugLog('info', `Загружено ${result.length} встроенных триггеров`);
+        (window as any).debugLog('info', `Loaded ${result.length} built-in triggers`);
       }
     } catch (error) {
       console.error('Failed to load triggers:', error);
@@ -47,7 +48,7 @@ export function BuiltinTriggers() {
         const trigger = triggers.find(t => t.id === id);
         (window as any).debugLog(
           enabled ? 'success' : 'warn', 
-          `${trigger?.name}: ${enabled ? 'включен' : 'выключен'}`
+          `${trigger?.name}: ${enabled ? 'enabled' : 'disabled'}`
         );
       }
     } catch (error) {
@@ -59,19 +60,19 @@ export function BuiltinTriggers() {
     <div className="card">
       <div className="card-header">
         <div>
-          <h2><Zap size={20} style={{display: 'inline', marginRight: '8px'}} />Встроенные триггеры</h2>
-          <p>Автоматические события на основе показателей игры</p>
+          <h2><Zap size={20} style={{display: 'inline', marginRight: '8px'}} />{t('triggers.title')}</h2>
+          <p>{t('triggers.description')}</p>
         </div>
       </div>
 
       <div className="trigger-list">
         {loading ? (
           <div className="empty-state">
-            <p>Загрузка...</p>
+            <p>{t('common.loading')}</p>
           </div>
         ) : triggers.length === 0 ? (
           <div className="empty-state">
-            <p>Нет триггеров</p>
+            <p>{t('triggers.no_triggers')}</p>
           </div>
         ) : (
           triggers.map((trigger) => (
@@ -81,9 +82,9 @@ export function BuiltinTriggers() {
             >
               <div className="trigger-info">
                 <div className="trigger-header">
-                  <h3>{trigger.name}</h3>
+                  <h3>{t(`events.${trigger.event}`, trigger.name)}</h3>
                   <span className="trigger-cooldown">
-                    {(trigger.cooldown_ms / 1000).toFixed(0)}s cooldown
+                    {t('triggers.cooldown', { time: (trigger.cooldown_ms / 1000).toFixed(0) })}
                   </span>
                 </div>
                 <p className="trigger-description">
@@ -95,10 +96,10 @@ export function BuiltinTriggers() {
               <button
                 className={`btn-toggle ${trigger.enabled ? 'active' : ''}`}
                 onClick={() => toggleTrigger(trigger.id, !trigger.enabled)}
-                title={trigger.enabled ? 'Выключить' : 'Включить'}
+                title={trigger.enabled ? t('common.disable') : t('common.enable')}
               >
                 <Power size={18} />
-                {trigger.enabled ? 'ВКЛ' : 'ВЫКЛ'}
+                {trigger.enabled ? t('common.on') : t('common.off')}
               </button>
             </div>
           ))

@@ -3,8 +3,8 @@ import { initReactI18next } from 'react-i18next';
 import ruTranslations from './locales/ru.json';
 import enTranslations from './locales/en.json';
 
-// Определяем язык из localStorage или используем дефолтный
-const savedLanguage = localStorage.getItem('language') || 'ru';
+// Get language from localStorage or use default
+const savedLanguage = localStorage.getItem('language') || 'en';
 
 i18n
   .use(initReactI18next)
@@ -14,9 +14,9 @@ i18n
       en: { translation: enTranslations },
     },
     lng: savedLanguage,
-    fallbackLng: 'ru',
+    fallbackLng: 'en',
     interpolation: {
-      escapeValue: false, // React уже защищает от XSS
+      escapeValue: false, // React already protects from XSS
     },
   });
 

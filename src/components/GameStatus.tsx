@@ -21,14 +21,14 @@ export function GameStatus() {
       const gameStatus = await api.getGameStatus();
       setStatus(gameStatus);
       
-      // Логируем только при подключении/отключении
+      // Log only on connection/disconnection
       if (gameStatus.connected && !status.connected) {
         if ((window as any).debugLog) {
-          (window as any).debugLog('success', `WT подключен: ${gameStatus.vehicle_name}`);
+          (window as any).debugLog('success', `WT connected: ${gameStatus.vehicle_name}`);
         }
       } else if (!gameStatus.connected && status.connected) {
         if ((window as any).debugLog) {
-          (window as any).debugLog('warn', 'WT отключен');
+          (window as any).debugLog('warn', 'WT disconnected');
         }
       }
     }, 1000);
@@ -42,7 +42,7 @@ export function GameStatus() {
         <div>
           <h2>{t('game_status.title') || 'War Thunder'}</h2>
           <div className={`status-indicator ${status.connected ? 'connected' : 'disconnected'}`}>
-            {status.connected ? '🟢 Подключено' : '🔴 Не подключено'}
+            {status.connected ? `🟢 ${t('game_status.connected')}` : `🔴 ${t('game_status.disconnected')}`}
           </div>
         </div>
       </div>
@@ -52,31 +52,31 @@ export function GameStatus() {
           <div className="stat-item">
             <Gamepad2 size={18} className="stat-icon" />
             <div className="stat-content">
-              <span className="stat-label">Техника</span>
-              <span className="stat-value">{status.vehicle_name}</span>
+              <span className="stat-label">{t('game_status.vehicle')}</span>
+              <span className="stat-value">{status.vehicle_name || t('game_status.unknown')}</span>
             </div>
           </div>
 
           <div className="stat-item">
             <Gauge size={18} className="stat-icon" />
             <div className="stat-content">
-              <span className="stat-label">Скорость</span>
-              <span className="stat-value">{status.speed_kmh} км/ч</span>
+              <span className="stat-label">{t('game_status.speed')}</span>
+              <span className="stat-value">{status.speed_kmh} km/h</span>
             </div>
           </div>
 
           <div className="stat-item">
             <Mountain size={18} className="stat-icon" />
             <div className="stat-content">
-              <span className="stat-label">Высота</span>
-              <span className="stat-value">{status.altitude_m} м</span>
+              <span className="stat-label">{t('game_status.altitude')}</span>
+              <span className="stat-value">{status.altitude_m} m</span>
             </div>
           </div>
 
           <div className="stat-item">
             <Zap size={18} className="stat-icon" />
             <div className="stat-content">
-              <span className="stat-label">Перегрузка</span>
+              <span className="stat-label">{t('game_status.g_load')}</span>
               <span className={`stat-value ${Math.abs(status.g_load) > 8 ? 'text-danger' : ''}`}>
                 {status.g_load.toFixed(1)} G
               </span>
@@ -86,7 +86,7 @@ export function GameStatus() {
           <div className="stat-item">
             <Droplet size={18} className="stat-icon" />
             <div className="stat-content">
-              <span className="stat-label">Топливо</span>
+              <span className="stat-label">{t('game_status.fuel')}</span>
               <span className={`stat-value ${status.fuel_percent < 20 ? 'text-warning' : ''}`}>
                 {status.fuel_percent}%
               </span>
@@ -96,7 +96,7 @@ export function GameStatus() {
       ) : (
         <div className="empty-state">
           <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>
-            Запустите War Thunder и зайдите в бой
+            Launch War Thunder and enter battle
           </p>
         </div>
       )}

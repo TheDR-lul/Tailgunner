@@ -13,7 +13,7 @@ export function Dashboard() {
         const running = await api.isRunning();
         setIsRunning(running);
       } catch (error) {
-        // Тихо игнорируем
+        // Silently ignore
       }
     };
     
@@ -27,11 +27,11 @@ export function Dashboard() {
       await api.startEngine();
       setIsRunning(true);
       if ((window as any).debugLog) {
-        (window as any).debugLog('success', '✅ Система запущена');
+        (window as any).debugLog('success', '✅ System started');
       }
     } catch (error: any) {
       if ((window as any).debugLog) {
-        (window as any).debugLog('error', `❌ Ошибка запуска: ${error.message}`);
+        (window as any).debugLog('error', `❌ Start error: ${error.message}`);
       }
     }
   };
@@ -41,11 +41,11 @@ export function Dashboard() {
       await api.stopEngine();
       setIsRunning(false);
       if ((window as any).debugLog) {
-        (window as any).debugLog('info', '⏹️ Система остановлена');
+        (window as any).debugLog('info', '⏹️ System stopped');
       }
     } catch (error: any) {
       if ((window as any).debugLog) {
-        (window as any).debugLog('error', `❌ Ошибка остановки: ${error.message}`);
+        (window as any).debugLog('error', `❌ Stop error: ${error.message}`);
       }
     }
   };
@@ -59,7 +59,7 @@ export function Dashboard() {
     } catch (error: any) {
       if ((window as any).debugLog) {
         const errorMsg = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
-        (window as any).debugLog('error', `❌ Ошибка теста: ${errorMsg}`);
+        (window as any).debugLog('error', `❌ Test error: ${errorMsg}`);
       }
     }
   };

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
+import { useTranslation } from 'react-i18next';
 
 interface CurvePoint {
   x: number;
@@ -16,6 +17,7 @@ export interface VibrationNodeData {
 }
 
 export function VibrationNode({ data, id }: { data: VibrationNodeData; id: string }) {
+  const { t } = useTranslation();
   const [duration, setDuration] = useState(data.duration || 1.0);
   const [curve, setCurve] = useState<CurvePoint[]>(data.curve || [
     { x: 0.4, y: 0.6 },
@@ -31,11 +33,11 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
   const [draggedPointIndex, setDraggedPointIndex] = useState<number | null>(null);
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
   
-  // Константы для отрисовки
+  // Drawing constants
   const POINT_RADIUS = 6;
   const HOVER_RADIUS = 8;
   
-  // Синхронизация с data при изменении (загрузка сохраненного паттерна)
+  // Sync with data prop when changed (loading saved pattern)
   useEffect(() => {
     if (data.duration !== undefined) setDuration(data.duration);
     if (data.curve) setCurve(data.curve);
@@ -48,7 +50,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     if (data.randomMax !== undefined) setRandomMax(data.randomMax);
   }, [data]);
   
-  // Обновляем data при изменении локальных состояний
+  // Update data prop when local state changes
   useEffect(() => {
     data.duration = duration;
     data.curve = curve;
@@ -287,13 +289,13 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     <div className="node-vibration" onClick={(e) => e.stopPropagation()}>
       <Handle type="target" position={Position.Left} id="trigger" />
       
-      <div className="node-header">💥 Вибрация</div>
+      <div className="node-header">💥 {t('nodes.vibration.title')}</div>
       
       <div className="node-body" onClick={(e) => e.stopPropagation()}>
         <div className="vibration-controls">
           <div className="mode-controls">
             <label>
-              Режим:
+              {t('nodes.vibration.mode')}:
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as 'once' | 'continuous' | 'repeat')}
@@ -301,15 +303,15 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <option value="once">Разовая</option>
-                <option value="continuous">Постоянная (пока условие)</option>
-                <option value="repeat">Циклическая</option>
+                <option value="once">{t('nodes.vibration.mode_once')}</option>
+                <option value="continuous">{t('nodes.vibration.mode_continuous')}</option>
+                <option value="repeat">{t('nodes.vibration.mode_repeat')}</option>
               </select>
             </label>
             
             {mode === 'repeat' && (
               <label>
-                Повторений:
+                {t('nodes.vibration.repeat_count')}:
                 <input
                   type="number"
                   value={repeatCount}
@@ -325,7 +327,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
           </div>
           
           <label>
-            Длительность (сек):
+            {t('nodes.vibration.duration')} ({t('nodes.vibration.seconds')}):
             <input
               type="number"
               value={duration}
@@ -342,20 +344,20 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
           <div className="curve-editor">
             <div className="curve-header">
               <span className="curve-hint">
-                Клик = добавить • Перетащи = двигать • 2× клик = удалить
+                Click = add • Drag = move • 2× click = delete
               </span>
               <button 
                 className="btn-clear-curve" 
                 onClick={(e) => { e.stopPropagation(); clearCurve(); }}
               >
-                Сбросить
+                Reset
               </button>
             </div>
             
-            {/* График с подписями осей */}
+            {/* Intensity curve editor */}
             <div className="curve-graph-container">
               <div className="curve-y-axis">
-                <span className="axis-label">Интенсивность</span>
+                <span className="axis-label">{t('nodes.vibration.intensity')}</span>
                 <span className="axis-value">100%</span>
                 <span className="axis-value" style={{ position: 'absolute', top: '50%' }}>50%</span>
                 <span className="axis-value" style={{ position: 'absolute', bottom: '0' }}>0%</span>
@@ -389,14 +391,14 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
                 
                 <div className="curve-x-axis">
                   <span className="axis-value">0s</span>
-                  <span className="axis-label">Время</span>
+                  <span className="axis-label">{t('nodes.vibration.time')}</span>
                   <span className="axis-value">{duration.toFixed(1)}s</span>
                 </div>
               </div>
             </div>
             
             <div className="curve-legend">
-              <span>Точек: {curve.length}</span>
+              <span>Points: {curve.length}</span>
             </div>
           </div>
           
@@ -409,7 +411,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               />
-              Рандомная интенсивность
+              {t('nodes.vibration.random')}
             </label>
             
             {enableRandom && (

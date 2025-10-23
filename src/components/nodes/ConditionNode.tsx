@@ -12,7 +12,7 @@ export function ConditionNode({ data, id }: { data: ConditionNodeData; id: strin
   
   return (
     <div className="node-condition" onClick={(e) => e.stopPropagation()}>
-      <div className="node-header">🔍 Условие</div>
+      <div className="node-header">🔍 Condition</div>
       <div className="node-body">
         <Handle type="target" position={Position.Left} id="input" />
         
