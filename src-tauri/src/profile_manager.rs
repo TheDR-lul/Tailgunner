@@ -45,14 +45,22 @@ impl ProfileManager {
     fn load_default_profiles(&mut self) {
         // Tank RB Profile (Immersive)
         let mut tank_rb_mappings = HashMap::new();
+        // Combat
         tank_rb_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         tank_rb_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
         tank_rb_mappings.insert(GameEvent::PenetrationHit, VibrationPattern::preset_critical_hit());
+        // Engine and damage
         tank_rb_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
         tank_rb_mappings.insert(GameEvent::EngineDestroyed, VibrationPattern::preset_fire());
+        tank_rb_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_simple_hit());
         tank_rb_mappings.insert(GameEvent::EngineRunning, VibrationPattern::preset_engine_rumble());
         tank_rb_mappings.insert(GameEvent::TrackBroken, VibrationPattern::preset_simple_hit());
+        // Ammo
         tank_rb_mappings.insert(GameEvent::AmmunitionExploded, VibrationPattern::preset_critical_hit());
+        tank_rb_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
+        // Fuel
+        tank_rb_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
+        tank_rb_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
 
         self.profiles.push(Profile {
             id: "tank_rb".to_string(),
@@ -65,17 +73,21 @@ impl ProfileManager {
 
         // Aircraft Profile (Universal)
         let mut aircraft_mappings = HashMap::new();
+        // Combat
         aircraft_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
+        // Flight dynamics
         aircraft_mappings.insert(GameEvent::Stall, VibrationPattern::preset_fire());
         aircraft_mappings.insert(GameEvent::Spin, VibrationPattern::preset_fire());
         aircraft_mappings.insert(GameEvent::Overspeed, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::OverG, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::HighAOA, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalAOA, VibrationPattern::preset_fire());
+        aircraft_mappings.insert(GameEvent::Mach1, VibrationPattern::preset_critical_hit());
+        // Fuel and altitude warnings
         aircraft_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
-        aircraft_mappings.insert(GameEvent::Mach1, VibrationPattern::preset_critical_hit());
+        aircraft_mappings.insert(GameEvent::LowAltitude, VibrationPattern::preset_simple_hit());
 
         self.profiles.push(Profile {
             id: "aircraft_any".to_string(),

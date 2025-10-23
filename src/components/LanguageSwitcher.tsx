@@ -20,7 +20,7 @@ export function LanguageSwitcher() {
         gap: '0.5rem',
         padding: '0.5rem 1rem',
       }}
-      title={i18n.language === 'ru' ? 'Switch to English' : 'Переключить на русский'}
+      title={i18n.language === 'en' ? 'Switch to Russian' : 'Switch to English'}
     >
       <Globe size={18} />
       {i18n.language === 'ru' ? 'EN' : 'RU'}

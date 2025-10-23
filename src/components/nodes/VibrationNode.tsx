@@ -62,7 +62,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     }
   }, [duration, curve, mode, repeatCount, enableRandom, randomMin, randomMax, data]);
   
-  // Отрисовка графика
+  // Draw graph
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -73,14 +73,14 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     const width = canvas.width;
     const height = canvas.height;
     
-    // Очистка
+    // Clear
     ctx.clearRect(0, 0, width, height);
     
-    // Фон
+    // Background
     ctx.fillStyle = '#1a1d29';
     ctx.fillRect(0, 0, width, height);
     
-    // Сетка
+    // Grid
     ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 10; i++) {
@@ -98,7 +98,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
       ctx.stroke();
     }
     
-    // Центральная линия
+    // Center line
     ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -106,7 +106,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     ctx.lineTo(width, height / 2);
     ctx.stroke();
     
-    // Кривая
+    // Curve
     if (curve.length > 0) {
       ctx.strokeStyle = '#00d4ff';
       ctx.lineWidth = 3;
@@ -128,18 +128,18 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
       });
       ctx.stroke();
       
-      // Сброс shadow для точек
+      // Reset shadow for points
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur = 0;
       
-      // Точки
+      // Points
       curve.forEach((point, index) => {
         const canvasX = point.x * width;
         const canvasY = (1 - point.y) * height;
         const isHovered = index === hoveredPointIndex;
         const isDragged = index === draggedPointIndex;
         
-        // Внешний круг (hover)
+        // Outer circle (hover)
         if (isHovered || isDragged) {
           ctx.fillStyle = 'rgba(0, 212, 255, 0.2)';
           ctx.beginPath();
@@ -147,7 +147,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
           ctx.fill();
         }
         
-        // Основная точка
+        // Main point
         ctx.fillStyle = isDragged ? '#8b5cf6' : (isHovered ? '#00d4ff' : 'white');
         ctx.strokeStyle = isDragged ? '#a78bfa' : '#00d4ff';
         ctx.lineWidth = 2;
@@ -159,26 +159,26 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     }
   }, [curve, hoveredPointIndex, draggedPointIndex]);
   
-  // Получить координаты точки из события мыши
+  // Get point coordinates from mouse event
   const getPointFromEvent = (e: React.MouseEvent<HTMLCanvasElement>): CurvePoint => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     
     const rect = canvas.getBoundingClientRect();
-    // Используем реальный размер в браузере (с учетом зума)
+    // Use real browser size (with zoom)
     const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const y = Math.max(0, Math.min(1, 1 - ((e.clientY - rect.top) / rect.height)));
     
     return { x, y };
   };
   
-  // Найти ближайшую точку к клику
+  // Find nearest point to click
   const findNearestPoint = (clickPoint: CurvePoint): number | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     
     const rect = canvas.getBoundingClientRect();
-    const threshold = 15; // пиксели
+    const threshold = 15; // pixels
     const width = rect.width;
     const height = rect.height;
     
@@ -205,7 +205,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     return nearestIndex;
   };
   
-  // Mouse down - начало перетаскивания или добавление точки
+  // Mouse down - start dragging or add point
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -214,16 +214,16 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     const nearestIndex = findNearestPoint(clickPoint);
     
     if (nearestIndex !== null) {
-      // Начинаем перетаскивание существующей точки
+      // Start dragging existing point
       setDraggedPointIndex(nearestIndex);
     } else {
-      // Добавляем новую точку
+      // Add new point
       const newCurve = [...curve, clickPoint].sort((a, b) => a.x - b.x);
       setCurve(newCurve);
     }
   };
   
-  // Mouse move - перетаскивание точки или hover
+  // Mouse move - drag point or hover
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -231,39 +231,39 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     const movePoint = getPointFromEvent(e);
     
     if (draggedPointIndex !== null) {
-      // Перетаскиваем точку
+      // Drag point
       const newCurve = [...curve];
       newCurve[draggedPointIndex] = movePoint;
       
-      // Пересортировываем по X
+      // Re-sort by X
       newCurve.sort((a, b) => a.x - b.x);
       
-      // Находим новый индекс перетаскиваемой точки после сортировки
+      // Find new index of dragged point after sorting
       const newIndex = newCurve.findIndex(p => p.x === movePoint.x && p.y === movePoint.y);
       setDraggedPointIndex(newIndex);
       
       setCurve(newCurve);
     } else {
-      // Определяем hover
+      // Detect hover
       const nearestIndex = findNearestPoint(movePoint);
       setHoveredPointIndex(nearestIndex);
     }
   };
   
-  // Mouse up - конец перетаскивания
+  // Mouse up - end dragging
   const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setDraggedPointIndex(null);
   };
   
-  // Mouse leave - сброс hover
+  // Mouse leave - reset hover
   const handleMouseLeave = () => {
     setDraggedPointIndex(null);
     setHoveredPointIndex(null);
   };
   
-  // Двойной клик - удаление точки
+  // Double click - delete point
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -277,7 +277,7 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     }
   };
   
-  // Сброс кривой
+  // Reset curve
   const clearCurve = () => {
     setCurve([
       { x: 0.4, y: 0.6 },

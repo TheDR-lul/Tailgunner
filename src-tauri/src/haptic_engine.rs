@@ -1,5 +1,5 @@
-/// Haptic Engine - Главный координатор системы
-/// Связывает все модули и управляет потоком данных
+/// Haptic Engine - Main system coordinator
+/// Binds all modules and manages data flow
 
 use crate::{
     device_manager::DeviceManager,
@@ -69,12 +69,12 @@ impl HapticEngine {
         }
     }
 
-    /// Инициализация устройств
+    /// Initialize devices
     pub async fn init_devices(&self) -> Result<()> {
         self.device_manager.init_buttplug().await?;
         self.device_manager.scan_devices().await?;
         
-        // Даем время на обнаружение устройств
+        // Give time for device discovery
         tokio::time::sleep(Duration::from_secs(3)).await;
         self.device_manager.stop_scanning().await?;
         
@@ -82,7 +82,7 @@ impl HapticEngine {
         Ok(())
     }
 
-    /// Запуск главного цикла
+    /// Start main loop
     pub async fn start(&self) -> Result<()> {
         *self.running.write().await = true;
         
@@ -102,14 +102,14 @@ impl HapticEngine {
             while *running.read().await {
                 tick_interval.tick().await;
 
-                // Проверяем подключение к игре
+                // Check game connection
                 let game_state = {
                     let mut telem = telemetry.write().await;
                     match telem.get_state().await {
                         Ok(state) => {
                             log::debug!("[WT] Vehicle: {:?}, Speed: {:.0} km/h, Alt: {:.0}m, Fuel: {:.0}/{:.0} kg", 
                                 state.type_, 
-                                state.indicators.speed,  // Уже в км/ч из API
+                                state.indicators.speed,  // Already in km/h from API
                                 state.indicators.altitude,
                                 state.indicators.fuel,
                                 state.indicators.fuel_max
@@ -117,7 +117,7 @@ impl HapticEngine {
                             state
                         },
                         Err(e) => {
-                            // Игра не запущена или не доступна
+                            // Game not running or not available
                             log::warn!("[WT] Game not connected: {}", e);
                             drop(telem);
                             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -126,44 +126,44 @@ impl HapticEngine {
                     }
                 };
 
-                // Автоматический выбор профиля
+                // Automatic profile selection
                 {
                     let mut pm = profile_manager.write().await;
                     pm.auto_select_profile(&game_state.type_);
                 }
 
-                // Детектируем события из state
+                // Detect events from state
                 let basic_events = {
                     let mut ee = event_engine.write().await;
                     ee.detect_events(&game_state)
                 };
                 
-                // Проверяем кастомные триггеры (превышение скорости, G, и т.п.)
+                // Check custom triggers (overspeed, over-G, etc.)
                 let trigger_events = {
                     let mut tm = trigger_manager.write().await;
                     tm.check_triggers(&game_state)
                 };
                 
-                // Проверяем динамические триггеры (на основе данных о технике)
+                // Check dynamic triggers (based on vehicle data)
                 let dynamic_events = dynamic_trigger_manager.check_dynamic_triggers(&game_state).await;
                 
-                // Объединяем события: базовые, динамические и триггеры (триггеры могут иметь кастомные паттерны)
+                // Combine events: basic, dynamic, and triggers (triggers may have custom patterns)
                 let mut all_events: Vec<(GameEvent, Option<VibrationPattern>)> = trigger_events;
                 all_events.extend(basic_events.into_iter().map(|e| (e, None)));
                 all_events.extend(dynamic_events.into_iter().map(|e| (e, None)));
                 
-                // Обрабатываем каждое событие
+                // Process each event
                 if !all_events.is_empty() {
                     log::info!("[Events] Detected {} events", all_events.len());
                 }
                 
                 for (event, custom_pattern) in all_events {
-                    // Сначала проверяем кастомный паттерн из триггера
+                    // First check for custom pattern from trigger
                     let pattern = if let Some(p) = custom_pattern {
                         log::info!("[Pattern] Using custom pattern from UI trigger");
                         Some(p)
                     } else {
-                        // Иначе ищем в профиле
+                        // Otherwise look in profile
                         let pm = profile_manager.read().await;
                         pm.get_pattern_for_event(&event).cloned()
                     };
@@ -182,14 +182,14 @@ impl HapticEngine {
                     }
                 }
 
-                // Проверяем непрерывные события (двигатель и т.д.)
+                // Check continuous events (engine, etc.)
                 let continuous = {
                     let ee = event_engine.read().await;
                     ee.check_continuous_events(&game_state)
                 };
                 
                 for _event in continuous {
-                    // Для непрерывных событий не спамим, а обновляем плавно
+                    // For continuous events don't spam, update smoothly
                     if rate_limiter.should_send() {
                         let intensity = *current_intensity.read().await;
                         if let Err(e) = device_manager.send_vibration(intensity * 0.3).await {
@@ -200,7 +200,7 @@ impl HapticEngine {
                 }
             }
 
-            // Fail-safe: останавливаем все вибрации при выходе
+            // Fail-safe: stop all vibrations on exit
             let _ = device_manager.stop_all().await;
         });
 
@@ -208,7 +208,7 @@ impl HapticEngine {
         Ok(())
     }
 
-    /// Остановка главного цикла
+    /// Stop main loop
     pub async fn stop(&self) -> Result<()> {
         *self.running.write().await = false;
         self.device_manager.stop_all().await?;
@@ -216,7 +216,7 @@ impl HapticEngine {
         Ok(())
     }
 
-    /// Выполнение паттерна асинхронно
+    /// Execute pattern asynchronously
     fn execute_pattern_async(
         device_manager: Arc<DeviceManager>,
         rate_limiter: Arc<RateLimiter>,
@@ -239,7 +239,7 @@ impl HapticEngine {
                 }
             }
             
-            // Плавное затухание в конце
+            // Smooth fade out at the end
             *current_intensity.write().await = 0.0;
             if rate_limiter.try_send() {
                 let _ = device_manager.send_vibration(0.0).await;
@@ -247,12 +247,12 @@ impl HapticEngine {
         });
     }
 
-    /// Получить текущее состояние игры
+    /// Get current game status
     pub async fn get_game_status(&self) -> Result<GameStatusInfo> {
         let mut telem = self.telemetry.write().await;
         match telem.get_state().await {
             Ok(state) => {
-                // Рассчитываем топливо в процентах (fuel в кг, fuel_max в кг)
+                // Calculate fuel in percent (fuel in kg, fuel_max in kg)
                 let fuel_percent = if state.indicators.fuel_max > 0.0 {
                     ((state.indicators.fuel / state.indicators.fuel_max * 100.0) as i32).min(100)
                 } else {
@@ -262,7 +262,7 @@ impl HapticEngine {
                 Ok(GameStatusInfo {
                     connected: true,
                     vehicle_name: format!("{:?}", state.type_),
-                    speed_kmh: state.indicators.speed as i32, // Уже в км/ч
+                    speed_kmh: state.indicators.speed as i32, // Already in km/h
                     altitude_m: state.indicators.altitude as i32,
                     g_load: state.indicators.g_load,
                     engine_rpm: state.indicators.engine_rpm as i32,
@@ -273,12 +273,12 @@ impl HapticEngine {
         }
     }
 
-    /// Проверка статуса
+    /// Check running status
     pub async fn is_running(&self) -> bool {
         *self.running.read().await
     }
 
-    /// Получение менеджеров (для UI)
+    /// Get managers (for UI)
     pub fn get_profile_manager(&self) -> Arc<RwLock<ProfileManager>> {
         Arc::clone(&self.profile_manager)
     }
@@ -287,7 +287,7 @@ impl HapticEngine {
         Arc::clone(&self.device_manager)
     }
 
-    /// Тестовая вибрация
+    /// Test vibration
     pub async fn test_vibration(&self, intensity: f32, duration_ms: u64) -> Result<()> {
         self.device_manager.send_vibration(intensity).await?;
         tokio::time::sleep(Duration::from_millis(duration_ms)).await;

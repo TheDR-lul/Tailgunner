@@ -58,6 +58,9 @@
     "description": "Автоматические пресеты для разных типов техники",
     "loading": "Загрузка профилей...",
     "patterns_count": "паттернов",
+    "tank_rb": "Танк RB - Иммерсивный",
+    "aircraft_any": "Самолет - Универсальный",
+    "light_background": "Легкий Фон",
     "game_mode_arcade": "Аркада",
     "game_mode_realistic": "Реалистика",
     "game_mode_simulator": "Симулятор",
@@ -68,6 +71,13 @@
     "description": "Автоматические события на основе показателей игры",
     "no_triggers": "Нет триггеров",
     "cooldown": "{{time}}s cooldown"
+  },
+  "events": {
+    "title": "Игровые События",
+    "description": "Профили и триггеры",
+    "active_profiles": "Активные Профили",
+    "event_triggers": "Триггеры Событий",
+    "assigned_events": "Назначенные события"
   },
   "pattern_manager": {
     "title": "Менеджер паттернов",

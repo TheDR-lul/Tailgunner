@@ -17,12 +17,12 @@ use device_manager::DeviceInfo;
 use tokio::sync::Mutex;
 use std::sync::Arc;
 
-// Глобальное состояние приложения
+// Global application state
 pub struct AppState {
     engine: Arc<Mutex<HapticEngine>>,
 }
 
-// Tauri команды
+// Tauri commands
 #[tauri::command]
 async fn init_devices(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let engine = state.engine.lock().await;
@@ -149,13 +149,13 @@ async fn add_pattern(
 ) -> Result<String, String> {
     log::info!("[UI Patterns] Received pattern: {}", pattern.name);
     
-    // Конвертируем UIPattern → EventTrigger
+    // Convert UIPattern → EventTrigger
     let trigger = pattern.to_trigger()
         .ok_or_else(|| "Failed to convert pattern to trigger".to_string())?;
     
     log::info!("[UI Patterns] Converted to trigger: {:?}", trigger.name);
     
-    // Добавляем в TriggerManager
+    // Add to TriggerManager
     let engine = state.engine.lock().await;
     let mut manager = engine.trigger_manager.write().await;
     manager.add_trigger(trigger);
@@ -171,7 +171,7 @@ async fn remove_pattern(
 ) -> Result<String, String> {
     log::info!("[UI Patterns] Removing pattern: {}", id);
     
-    // TODO: Добавить метод remove_trigger в TriggerManager
+    // TODO: Add remove_trigger method to TriggerManager
     Ok(format!("Pattern '{}' removed", id))
 }
 
@@ -181,13 +181,13 @@ async fn toggle_pattern(
     id: String,
     enabled: bool
 ) -> Result<String, String> {
-    // Паттерны это триггеры, используем toggle_trigger
+    // Patterns are triggers, use toggle_trigger
     toggle_trigger(state, id, enabled).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Инициализация логгера
+    // Initialize logger
     env_logger::init();
 
     let engine = Arc::new(Mutex::new(HapticEngine::new()));

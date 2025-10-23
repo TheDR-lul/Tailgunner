@@ -95,9 +95,9 @@ export function EventConfiguration() {
         <div>
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Zap size={20} />
-            Game Events
+            {t('events.title')}
           </h2>
-          <p>Profiles and triggers configuration</p>
+          <p>{t('events.description')}</p>
         </div>
       </div>
 
@@ -106,7 +106,7 @@ export function EventConfiguration() {
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             <Layers size={16} style={{ display: 'inline', marginRight: '6px' }} />
-            Active Profiles
+            {t('events.active_profiles')}
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -124,7 +124,7 @@ export function EventConfiguration() {
                   <div className="profile-header">
                     <div className="profile-name">
                       <span style={{ fontSize: '18px' }}>{vehicleIcons[profile.vehicle_type]}</span>
-                      <span>{profile.name}</span>
+                      <span>{t(`profiles.${profile.id}`)}</span>
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -140,7 +140,7 @@ export function EventConfiguration() {
                   {isExpanded && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                        Assigned events for this profile:
+                        {t('events.assigned_events')}:
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                         {patterns.map(([eventName]) => (
@@ -171,7 +171,7 @@ export function EventConfiguration() {
         <div>
           <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             <Zap size={16} style={{ display: 'inline', marginRight: '6px' }} />
-            Event Triggers
+            {t('events.event_triggers')}
           </h3>
 
           {triggers.length === 0 ? (

@@ -58,6 +58,9 @@
     "description": "Automatic presets for different vehicle types",
     "loading": "Loading profiles...",
     "patterns_count": "patterns",
+    "tank_rb": "Tank RB - Immersive",
+    "aircraft_any": "Aircraft - Universal",
+    "light_background": "Light Background",
     "game_mode_arcade": "Arcade",
     "game_mode_realistic": "Realistic",
     "game_mode_simulator": "Simulator",
@@ -68,6 +71,13 @@
     "description": "Automatic events based on game indicators",
     "no_triggers": "No triggers",
     "cooldown": "{{time}}s cooldown"
+  },
+  "events": {
+    "title": "Game Events",
+    "description": "Profiles and triggers configuration",
+    "active_profiles": "Active Profiles",
+    "event_triggers": "Event Triggers",
+    "assigned_events": "Assigned events"
   },
   "pattern_manager": {
     "title": "Pattern Manager",

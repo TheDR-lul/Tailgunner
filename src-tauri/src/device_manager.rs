@@ -36,12 +36,12 @@ impl DeviceManager {
         }
     }
 
-    /// Инициализация Buttplug клиента
+    /// Initialize Buttplug client
     pub async fn init_buttplug(&self) -> Result<()> {
         use buttplug::core::connector::ButtplugWebsocketClientTransport;
         use buttplug::core::connector::ButtplugRemoteClientConnector;
         
-        // Проверяем, не подключен ли уже клиент
+        // Check if client is already connected
         if self.buttplug_client.read().await.is_some() {
             log::info!("Buttplug client already initialized");
             return Ok(());
@@ -49,50 +49,50 @@ impl DeviceManager {
         
         let client = ButtplugClient::new("Butt Thunder");
         
-        // Пытаемся подключиться к Intiface Central через WebSocket
+        // Try to connect to Intiface Central via WebSocket
         let ws_url = "ws://127.0.0.1:12345";
-        log::info!("🔌 Подключение к Intiface Central: {}", ws_url);
+        log::info!("🔌 Connecting to Intiface Central: {}", ws_url);
         
         let transport = ButtplugWebsocketClientTransport::new_insecure_connector(ws_url);
         let connector = ButtplugRemoteClientConnector::<ButtplugWebsocketClientTransport>::new(transport);
         
         match client.connect(connector).await {
             Ok(_) => {
-                log::info!("✅ Подключено к Intiface Central");
+                log::info!("✅ Connected to Intiface Central");
                 
-                // Автоматически запускаем сканирование устройств
+                // Automatically start device scanning
                 match client.start_scanning().await {
                     Ok(_) => {
-                        log::info!("🔍 Начато сканирование устройств...");
+                        log::info!("🔍 Started device scanning...");
                         
-                        // Ждем 2 секунды чтобы устройства успели подключиться
+                        // Wait 2 seconds for devices to connect
                         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                         
                         let device_count = client.devices().len();
-                        log::info!("📱 Обнаружено устройств: {}", device_count);
+                        log::info!("📱 Devices found: {}", device_count);
                         
                         for device in client.devices() {
                             log::info!("  ✓ {} (index: {})", device.name(), device.index());
                         }
                     }
-                    Err(e) => log::warn!("⚠️ Не удалось запустить сканирование: {}", e),
+                    Err(e) => log::warn!("⚠️ Failed to start device scanning: {}", e),
                 }
                 
                 *self.buttplug_client.write().await = Some(client);
                 Ok(())
             }
             Err(e) => {
-                log::error!("❌ Не удалось подключиться к Intiface Central: {}", e);
-                log::info!("💡 Убедитесь что:");
-                log::info!("   1. Intiface Central запущен");
-                log::info!("   2. WebSocket сервер активен на ws://127.0.0.1:12345");
-                log::info!("   3. В настройках Intiface включен 'Start Server Automatically'");
+                log::error!("❌ Failed to connect to Intiface Central: {}", e);
+                log::info!("💡 Make sure that:");
+                log::info!("   1. Intiface Central is running");
+                log::info!("   2. WebSocket server is active on ws://127.0.0.1:12345");
+                log::info!("   3. 'Start Server Automatically' is enabled in Intiface settings");
                 Err(anyhow::anyhow!("Buttplug connection failed: {}", e))
             }
         }
     }
 
-    /// Сканирование устройств
+    /// Scan for devices
     pub async fn scan_devices(&self) -> Result<()> {
         if let Some(client) = self.buttplug_client.read().await.as_ref() {
             client.start_scanning().await
@@ -105,7 +105,7 @@ impl DeviceManager {
         }
     }
 
-    /// Остановка сканирования
+    /// Stop device scanning
     pub async fn stop_scanning(&self) -> Result<()> {
         if let Some(client) = self.buttplug_client.read().await.as_ref() {
             client.stop_scanning().await
@@ -116,13 +116,13 @@ impl DeviceManager {
         }
     }
 
-    /// Получение списка подключенных устройств
+    /// Get list of connected devices
     pub async fn get_devices(&self) -> Vec<DeviceInfo> {
         let mut devices = Vec::new();
         
         if let Some(client) = self.buttplug_client.read().await.as_ref() {
             let client_devices = client.devices();
-            log::info!("📱 Найдено устройств: {}", client_devices.len());
+            log::info!("📱 Devices found: {}", client_devices.len());
             
             for device in client_devices {
                 log::info!("  → {} (index: {}, type: {})", 
@@ -144,7 +144,7 @@ impl DeviceManager {
         devices
     }
 
-    /// Отправка команды вибрации на все устройства
+    /// Send vibration command to all devices
     pub async fn send_vibration(&self, intensity: f32) -> Result<()> {
         let intensity = intensity.clamp(0.0, 1.0);
 
@@ -153,34 +153,34 @@ impl DeviceManager {
             let devices = client.devices();
             
             if devices.is_empty() {
-                log::warn!("⚠️ Нет подключенных устройств! Запустите сканирование.");
+                log::warn!("⚠️ No connected devices! Start scanning.");
                 return Ok(());
             }
             
-            log::info!("🎮 Отправка вибрации {} на {} устройств", intensity, devices.len());
+            log::info!("🎮 Sending vibration {} to {} devices", intensity, devices.len());
             
             for device in devices {
                 log::info!("  → {} (index: {})", device.name(), device.index());
                 
                 match device.vibrate(&buttplug::client::ScalarValueCommand::ScalarValue(intensity.into())).await {
-                    Ok(_) => log::info!("    ✅ Успешно"),
-                    Err(e) => log::error!("    ❌ Ошибка: {}", e),
+                    Ok(_) => log::info!("    ✅ Success"),
+                    Err(e) => log::error!("    ❌ Error: {}", e),
                 }
             }
         } else {
-            log::error!("❌ Buttplug клиент не инициализирован!");
+            log::error!("❌ Buttplug client not initialized!");
             return Err(anyhow::anyhow!("Buttplug client not initialized"));
         }
 
         Ok(())
     }
 
-    /// Остановка всех вибраций (Fail-Safe)
+    /// Stop all vibrations (Fail-Safe)
     pub async fn stop_all(&self) -> Result<()> {
         self.send_vibration(0.0).await
     }
 
-    /// Проверка подключения
+    /// Check connection status
     pub async fn is_connected(&self) -> bool {
         self.buttplug_client.read().await.is_some()
     }
@@ -194,7 +194,7 @@ impl Default for DeviceManager {
 
 impl Drop for DeviceManager {
     fn drop(&mut self) {
-        // Fail-safe: останавливаем все вибрации при выходе
+        // Fail-safe: stop all vibrations on exit
         let client_lock = Arc::clone(&self.buttplug_client);
         tokio::spawn(async move {
             if let Some(client) = client_lock.write().await.take() {

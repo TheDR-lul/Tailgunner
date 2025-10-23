@@ -136,7 +136,7 @@ pub struct VehicleLimits {
 }
 
 impl VehicleLimits {
-    /// Создать из полных данных
+    /// Create from full vehicle data
     pub fn from_vehicle_data(data: &VehicleData) -> Option<Self> {
         Some(Self {
             identifier: data.identifier.clone(),
