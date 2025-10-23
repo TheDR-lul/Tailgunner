@@ -1,0 +1,93 @@
+{
+  "app": {
+    "title": "Haptic Feedback System",
+    "subtitle": "Tactile Feedback for War Thunder"
+  },
+  "header": {
+    "status_active": "Active",
+    "status_stopped": "Stopped"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "enable": "Enable",
+    "disable": "Disable",
+    "close": "Close"
+  },
+  "dashboard": {
+    "title": "Control Panel",
+    "description": "Feedback system control",
+    "status_active": "System is active",
+    "status_stopped": "System is stopped",
+    "btn_start": "Start",
+    "btn_stop": "Stop",
+    "btn_test": "Test",
+    "eac_safe_title": "✓ Safe",
+    "eac_safe_desc": "Uses only public game API (localhost:8111). No file or memory modification."
+  },
+  "devices": {
+    "title": "Devices",
+    "description": "Connected devices",
+    "btn_init": "Initialize",
+    "btn_refresh": "Refresh",
+    "initializing": "Initializing...",
+    "empty_init": "Intiface initialization required",
+    "empty_devices": "No devices detected",
+    "empty_hint": "Launch Intiface Central and connect devices"
+  },
+  "profiles": {
+    "title": "Profiles",
+    "description": "Presets for different vehicle types",
+    "loading": "Loading profiles...",
+    "patterns_count": "patterns"
+  },
+  "pattern_manager": {
+    "title": "Pattern Manager",
+    "description": "Manage custom patterns",
+    "create_new": "Create Pattern",
+    "create_first": "Create First Pattern",
+    "empty": "No patterns created",
+    "delete_confirm": "Delete this pattern?",
+    "nodes_count": "{{count}} nodes"
+  },
+  "pattern_editor": {
+    "title": "Pattern Editor",
+    "create_title": "Create Pattern",
+    "edit_title": "Edit Pattern",
+    "name_placeholder": "Pattern name",
+    "name_required": "Enter pattern name",
+    "import": "Import",
+    "export": "Export",
+    "import_error": "Import error. Check the file."
+  },
+  "nodes": {
+    "input": {
+      "title": "Input",
+      "default_label": "Indicator"
+    },
+    "condition": {
+      "title": "Condition"
+    },
+    "vibration": {
+      "title": "Vibration"
+    },
+    "output": {
+      "title": "Output"
+    }
+  },
+  "debug": {
+    "title": "Debug Console",
+    "initialized": "System initialized"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "language_ru": "Русский",
+    "language_en": "English",
+    "intiface_auto": "Auto-connect to Intiface",
+    "save_config": "Auto-save configuration"
+  }
+}
+

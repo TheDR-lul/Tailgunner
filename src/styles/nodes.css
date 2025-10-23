@@ -1,0 +1,294 @@
+/* Node Base Styles */
+.react-flow__node {
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: var(--bg-secondary);
+  padding: 0;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.react-flow__node:hover {
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.react-flow__node.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Node Headers */
+.node-header {
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: white;
+  padding: 8px 12px;
+  font-weight: 600;
+  border-radius: 6px 6px 0 0;
+  font-size: 14px;
+}
+
+.node-body {
+  padding: 12px;
+}
+
+/* Input Node */
+.node-input {
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+}
+
+.node-indicator {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 4px;
+}
+
+.node-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  font-family: 'Courier New', monospace;
+}
+
+/* Condition Node */
+.node-condition {
+  background: var(--bg-secondary);
+}
+
+.condition-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.node-select {
+  padding: 6px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: bold;
+  width: 60px;
+}
+
+.node-input-field {
+  padding: 6px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 14px;
+  width: 100px;
+}
+
+.node-input-field:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Vibration Node */
+.node-vibration {
+  background: var(--bg-secondary);
+  min-width: 250px;
+}
+
+.vibration-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vibration-controls label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.curve-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.curve-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.curve-editor canvas {
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  width: 100%;
+  background: rgba(30, 30, 40, 0.8);
+  transition: border-color 0.2s;
+}
+
+.curve-editor canvas:hover {
+  border-color: var(--accent);
+}
+
+.curve-hint {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.btn-clear-curve {
+  padding: 2px 8px;
+  font-size: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-clear-curve:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.random-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.random-controls label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.random-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.random-range input {
+  width: 70px;
+}
+
+/* Output Node */
+.node-output {
+  background: linear-gradient(135deg, #065f46, #10b981);
+}
+
+.output-icon {
+  font-size: 32px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.output-text {
+  font-size: 12px;
+  color: white;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Handles */
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent);
+  background: var(--bg);
+}
+
+.react-flow__handle:hover {
+  background: var(--accent);
+}
+
+.react-flow__handle-left {
+  left: -6px;
+}
+
+.react-flow__handle-right {
+  right: -6px;
+}
+
+/* Edges */
+.react-flow__edge-path {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #ec4899;
+  stroke-width: 3;
+}
+
+/* Toolbar */
+.node-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.node-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.node-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* MiniMap */
+.react-flow__minimap {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+}
+
+/* Controls */
+.react-flow__controls {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+}
+
+.react-flow__controls-button {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--accent);
+  color: white;
+}
+
+/* Background */
+.react-flow__background {
+  background: var(--bg);
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.node-vibration.active {
+  animation: pulse 1s infinite;
+}
+

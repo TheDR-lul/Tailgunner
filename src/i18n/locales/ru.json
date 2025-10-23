@@ -1,0 +1,93 @@
+{
+  "app": {
+    "title": "Haptic Feedback System",
+    "subtitle": "Тактильная обратная связь для War Thunder"
+  },
+  "header": {
+    "status_active": "Активно",
+    "status_stopped": "Остановлено"
+  },
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "edit": "Редактировать",
+    "delete": "Удалить",
+    "enable": "Включить",
+    "disable": "Выключить",
+    "close": "Закрыть"
+  },
+  "dashboard": {
+    "title": "Панель управления",
+    "description": "Управление системой обратной связи",
+    "status_active": "Система активна",
+    "status_stopped": "Система остановлена",
+    "btn_start": "Запустить",
+    "btn_stop": "Остановить",
+    "btn_test": "Тест",
+    "eac_safe_title": "✓ Безопасно",
+    "eac_safe_desc": "Приложение использует только публичный API игры (localhost:8111). Без модификации файлов или памяти."
+  },
+  "devices": {
+    "title": "Устройства",
+    "description": "Подключенные устройства",
+    "btn_init": "Инициализировать",
+    "btn_refresh": "Обновить",
+    "initializing": "Инициализация...",
+    "empty_init": "Требуется инициализация Intiface",
+    "empty_devices": "Устройства не обнаружены",
+    "empty_hint": "Запустите Intiface Central и подключите устройства"
+  },
+  "profiles": {
+    "title": "Профили",
+    "description": "Пресеты для разных типов техники",
+    "loading": "Загрузка профилей...",
+    "patterns_count": "паттернов"
+  },
+  "pattern_manager": {
+    "title": "Менеджер паттернов",
+    "description": "Управление пользовательскими паттернами",
+    "create_new": "Создать паттерн",
+    "create_first": "Создать первый паттерн",
+    "empty": "Нет созданных паттернов",
+    "delete_confirm": "Удалить этот паттерн?",
+    "nodes_count": "{{count}} нод"
+  },
+  "pattern_editor": {
+    "title": "Редактор паттернов",
+    "create_title": "Создание паттерна",
+    "edit_title": "Редактирование паттерна",
+    "name_placeholder": "Название паттерна",
+    "name_required": "Введите название паттерна",
+    "import": "Импорт",
+    "export": "Экспорт",
+    "import_error": "Ошибка импорта. Проверьте файл."
+  },
+  "nodes": {
+    "input": {
+      "title": "Индикатор",
+      "default_label": "Индикатор"
+    },
+    "condition": {
+      "title": "Условие"
+    },
+    "vibration": {
+      "title": "Вибрация"
+    },
+    "output": {
+      "title": "Устройство"
+    }
+  },
+  "debug": {
+    "title": "Консоль отладки",
+    "initialized": "Система инициализирована"
+  },
+  "settings": {
+    "title": "Настройки",
+    "language": "Язык",
+    "language_ru": "Русский",
+    "language_en": "English",
+    "intiface_auto": "Автоподключение к Intiface",
+    "save_config": "Автосохранение конфигурации"
+  }
+}
+
