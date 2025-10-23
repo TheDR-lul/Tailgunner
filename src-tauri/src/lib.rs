@@ -66,15 +66,20 @@ async fn get_profiles(state: tauri::State<'_, AppState>) -> Result<Vec<Profile>,
     Ok(profiles.get_all_profiles().to_vec())
 }
 
-#[tauri::command]
-async fn test_vibration(
-    state: tauri::State<'_, AppState>,
+#[derive(serde::Deserialize)]
+struct TestVibrationParams {
     intensity: f32,
     #[serde(rename = "durationMs")]
     duration_ms: u64,
+}
+
+#[tauri::command]
+async fn test_vibration(
+    state: tauri::State<'_, AppState>,
+    params: TestVibrationParams,
 ) -> Result<String, String> {
     let engine = state.engine.lock().await;
-    engine.test_vibration(intensity, duration_ms).await
+    engine.test_vibration(params.intensity, params.duration_ms).await
         .map(|_| "Test completed".to_string())
         .map_err(|e| e.to_string())
 }
