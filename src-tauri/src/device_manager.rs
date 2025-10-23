@@ -38,7 +38,8 @@ impl DeviceManager {
 
     /// Инициализация Buttplug клиента
     pub async fn init_buttplug(&self) -> Result<()> {
-        use buttplug::core::connector::ButtplugInProcessClientConnector;
+        use buttplug::core::connector::ButtplugWebsocketClientTransport;
+        use buttplug::core::connector::ButtplugRemoteClientConnector;
         
         // Проверяем, не подключен ли уже клиент
         if self.buttplug_client.read().await.is_some() {
@@ -46,18 +47,34 @@ impl DeviceManager {
             return Ok(());
         }
         
-        let client = ButtplugClient::new("Haptic Feedback System");
-        let connector = ButtplugInProcessClientConnector::default();
+        let client = ButtplugClient::new("Butt Thunder");
+        
+        // Пытаемся подключиться к Intiface Central через WebSocket
+        let ws_url = "ws://127.0.0.1:12345";
+        log::info!("🔌 Подключение к Intiface Central: {}", ws_url);
+        
+        let transport = ButtplugWebsocketClientTransport::new_insecure_connector(ws_url);
+        let connector = ButtplugRemoteClientConnector::<ButtplugWebsocketClientTransport>::new(transport);
         
         match client.connect(connector).await {
             Ok(_) => {
-                log::info!("✅ Buttplug client connected successfully");
+                log::info!("✅ Подключено к Intiface Central");
+                
+                // Автоматически запускаем сканирование устройств
+                match client.start_scanning().await {
+                    Ok(_) => log::info!("🔍 Начато сканирование устройств..."),
+                    Err(e) => log::warn!("⚠️ Не удалось запустить сканирование: {}", e),
+                }
+                
                 *self.buttplug_client.write().await = Some(client);
                 Ok(())
             }
             Err(e) => {
-                log::warn!("⚠️ Buttplug connection failed: {}", e);
-                log::info!("💡 Запустите Intiface Central для подключения устройств");
+                log::error!("❌ Не удалось подключиться к Intiface Central: {}", e);
+                log::info!("💡 Убедитесь что:");
+                log::info!("   1. Intiface Central запущен");
+                log::info!("   2. WebSocket сервер активен на ws://127.0.0.1:12345");
+                log::info!("   3. В настройках Intiface включен 'Start Server Automatically'");
                 Err(anyhow::anyhow!("Buttplug connection failed: {}", e))
             }
         }
@@ -92,7 +109,16 @@ impl DeviceManager {
         let mut devices = Vec::new();
         
         if let Some(client) = self.buttplug_client.read().await.as_ref() {
-            for device in client.devices() {
+            let client_devices = client.devices();
+            log::info!("📱 Найдено устройств: {}", client_devices.len());
+            
+            for device in client_devices {
+                log::info!("  → {} (index: {}, type: {})", 
+                    device.name(), 
+                    device.index(),
+                    if device.vibrate_attributes().is_empty() { "no vibrate" } else { "vibrate OK" }
+                );
+                
                 devices.push(DeviceInfo {
                     id: device.index(),
                     name: device.name().to_string(),
@@ -112,11 +138,26 @@ impl DeviceManager {
 
         let guard = self.buttplug_client.read().await;
         if let Some(client) = guard.as_ref() {
-            for device in client.devices() {
-                if let Err(e) = device.vibrate(&buttplug::client::ScalarValueCommand::ScalarValue(intensity.into())).await {
-                    log::warn!("Failed to send vibration to {}: {}", device.name(), e);
+            let devices = client.devices();
+            
+            if devices.is_empty() {
+                log::warn!("⚠️ Нет подключенных устройств! Запустите сканирование.");
+                return Ok(());
+            }
+            
+            log::info!("🎮 Отправка вибрации {} на {} устройств", intensity, devices.len());
+            
+            for device in devices {
+                log::info!("  → {} (index: {})", device.name(), device.index());
+                
+                match device.vibrate(&buttplug::client::ScalarValueCommand::ScalarValue(intensity.into())).await {
+                    Ok(_) => log::info!("    ✅ Успешно"),
+                    Err(e) => log::error!("    ❌ Ошибка: {}", e),
                 }
             }
+        } else {
+            log::error!("❌ Buttplug клиент не инициализирован!");
+            return Err(anyhow::anyhow!("Buttplug client not initialized"));
         }
 
         Ok(())
