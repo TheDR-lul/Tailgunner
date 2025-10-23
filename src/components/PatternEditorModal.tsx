@@ -68,10 +68,11 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
       case 'vibration':
         return {
           duration: 1.0,
+          mode: 'once',
+          repeatCount: 3,
           curve: [
-            { x: 0, y: 0 },
-            { x: 0.5, y: 1.0 },
-            { x: 1.0, y: 0 },
+            { x: 0.4, y: 0.6 },
+            { x: 0.6, y: 0.8 },
           ],
         };
       case 'output':

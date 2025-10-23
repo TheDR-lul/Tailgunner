@@ -11,15 +11,18 @@ export interface VibrationNodeData {
   curve: CurvePoint[];
   randomMin?: number;
   randomMax?: number;
+  mode?: 'once' | 'continuous' | 'repeat';
+  repeatCount?: number;
 }
 
 export function VibrationNode({ data, id }: { data: VibrationNodeData; id: string }) {
   const [duration, setDuration] = useState(data.duration || 1.0);
   const [curve, setCurve] = useState<CurvePoint[]>(data.curve || [
-    { x: 0, y: 0 },
-    { x: 0.5, y: 1.0 },
-    { x: 1.0, y: 0 }
+    { x: 0.4, y: 0.6 },
+    { x: 0.6, y: 0.8 }
   ]);
+  const [mode, setMode] = useState<'once' | 'continuous' | 'repeat'>(data.mode || 'once');
+  const [repeatCount, setRepeatCount] = useState(data.repeatCount || 3);
   const [enableRandom, setEnableRandom] = useState(!!data.randomMin);
   const [randomMin, setRandomMin] = useState(data.randomMin || 0.3);
   const [randomMax, setRandomMax] = useState(data.randomMax || 0.8);
@@ -135,8 +138,9 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     if (!canvas) return { x: 0, y: 0 };
     
     const rect = canvas.getBoundingClientRect();
-    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / canvas.width));
-    const y = Math.max(0, Math.min(1, 1 - ((e.clientY - rect.top) / canvas.height)));
+    // Используем реальный размер в браузере (с учетом зума)
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, 1 - ((e.clientY - rect.top) / rect.height)));
     
     return { x, y };
   };
@@ -146,9 +150,10 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
     const canvas = canvasRef.current;
     if (!canvas) return null;
     
+    const rect = canvas.getBoundingClientRect();
     const threshold = 15; // пиксели
-    const width = canvas.width;
-    const height = canvas.height;
+    const width = rect.width;
+    const height = rect.height;
     
     let nearestIndex: number | null = null;
     let minDistance = threshold;
@@ -248,9 +253,8 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
   // Сброс кривой
   const clearCurve = () => {
     setCurve([
-      { x: 0, y: 0 },
-      { x: 0.5, y: 1.0 },
-      { x: 1.0, y: 0 }
+      { x: 0.4, y: 0.6 },
+      { x: 0.6, y: 0.8 }
     ]);
   };
   
@@ -262,6 +266,39 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
       
       <div className="node-body" onClick={(e) => e.stopPropagation()}>
         <div className="vibration-controls">
+          <div className="mode-controls">
+            <label>
+              Режим:
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as 'once' | 'continuous' | 'repeat')}
+                className="node-input-field"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <option value="once">Разовая</option>
+                <option value="continuous">Постоянная (пока условие)</option>
+                <option value="repeat">Циклическая</option>
+              </select>
+            </label>
+            
+            {mode === 'repeat' && (
+              <label>
+                Повторений:
+                <input
+                  type="number"
+                  value={repeatCount}
+                  onChange={(e) => setRepeatCount(parseInt(e.target.value))}
+                  className="node-input-field"
+                  min="1"
+                  max="100"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+              </label>
+            )}
+          </div>
+          
           <label>
             Длительность (сек):
             <input
@@ -289,30 +326,50 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
                 Сбросить
               </button>
             </div>
-            <div 
-              className="canvas-wrapper"
-              onMouseDown={(e) => e.stopPropagation()}
-              onMouseMove={(e) => e.stopPropagation()}
-              onMouseUp={(e) => e.stopPropagation()}
-            >
-              <canvas
-                ref={canvasRef}
-                width={280}
-                height={140}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
-                onDoubleClick={handleDoubleClick}
-                onContextMenu={(e) => e.preventDefault()}
-                draggable={false}
-                style={{ 
-                  cursor: draggedPointIndex !== null ? 'grabbing' : 
-                          hoveredPointIndex !== null ? 'grab' : 'crosshair',
-                  pointerEvents: 'auto'
-                }}
-              />
+            
+            {/* График с подписями осей */}
+            <div className="curve-graph-container">
+              <div className="curve-y-axis">
+                <span className="axis-label">Интенсивность</span>
+                <span className="axis-value">100%</span>
+                <span className="axis-value" style={{ position: 'absolute', top: '50%' }}>50%</span>
+                <span className="axis-value" style={{ position: 'absolute', bottom: '0' }}>0%</span>
+              </div>
+              
+              <div className="curve-graph-area">
+                <div 
+                  className="canvas-wrapper"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseMove={(e) => e.stopPropagation()}
+                  onMouseUp={(e) => e.stopPropagation()}
+                >
+                  <canvas
+                    ref={canvasRef}
+                    width={280}
+                    height={140}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseLeave}
+                    onDoubleClick={handleDoubleClick}
+                    onContextMenu={(e) => e.preventDefault()}
+                    draggable={false}
+                    style={{ 
+                      cursor: draggedPointIndex !== null ? 'grabbing' : 
+                              hoveredPointIndex !== null ? 'grab' : 'crosshair',
+                      pointerEvents: 'auto'
+                    }}
+                  />
+                </div>
+                
+                <div className="curve-x-axis">
+                  <span className="axis-value">0s</span>
+                  <span className="axis-label">Время</span>
+                  <span className="axis-value">{duration.toFixed(1)}s</span>
+                </div>
+              </div>
             </div>
+            
             <div className="curve-legend">
               <span>Точек: {curve.length}</span>
             </div>
