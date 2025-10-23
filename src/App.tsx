@@ -6,13 +6,12 @@ import "./styles/modal.css";
 import "./styles/scrollbar.css";
 import { Dashboard } from "./components/Dashboard";
 import { DeviceList } from "./components/DeviceList";
-import { ProfileList } from "./components/ProfileList";
 import { PatternManager } from "./components/PatternManager";
 import { PatternEditorModal } from "./components/PatternEditorModal";
 import { DebugConsole } from "./components/DebugConsole";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { GameStatus } from "./components/GameStatus";
-import { BuiltinTriggers } from "./components/BuiltinTriggers";
+import { EventConfiguration } from "./components/EventConfiguration";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
 
@@ -24,14 +23,14 @@ function App() {
   
   const { addPattern, updatePattern } = usePatterns();
 
-  // Проверка статуса системы (НЕ автоподключение!)
+  // Check system status (NOT auto-connect!)
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const running = await api.isRunning();
         setIsRunning(running);
       } catch (error) {
-        // Тихо игнорируем
+        // Silently ignore
       }
     }, 3000);
 
@@ -53,7 +52,7 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* Современный хедер */}
+      {/* Modern header */}
       <header className="app-header">
         <div className="header-content">
           <div className="header-brand">
@@ -76,29 +75,28 @@ function App() {
         </div>
       </header>
 
-      {/* Контент с сеткой */}
+      {/* Content grid */}
       <main className="app-main">
         <div className="content-grid">
-          {/* Левая панель - управление */}
+          {/* Left panel - controls */}
           <aside className="sidebar-left">
             <Dashboard />
             <DeviceList />
             <GameStatus />
           </aside>
 
-              {/* Центральная область - паттерны, триггеры и профили */}
+              {/* Main area - patterns and events */}
               <section className="main-area">
                 <PatternManager onEditPattern={handleEditPattern} />
-                <BuiltinTriggers />
-                <ProfileList />
+                <EventConfiguration />
               </section>
             </div>
           </main>
 
-      {/* Консоль отладки */}
+      {/* Debug console */}
       <DebugConsole />
 
-      {/* Модальное окно редактора */}
+      {/* Pattern editor modal */}
       <PatternEditorModal
         isOpen={isEditorOpen}
         onClose={() => {

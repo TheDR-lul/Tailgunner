@@ -1,5 +1,5 @@
 /// Profile Manager
-/// Автоматическое определение типа техники и переключение профилей
+/// Automatic vehicle type detection and profile switching
 
 use crate::pattern_engine::{GameEvent, VibrationPattern};
 use crate::wt_telemetry::VehicleType;
@@ -36,14 +36,14 @@ impl ProfileManager {
             active_profile: None,
         };
         
-        // Загрузка дефолтных профилей
+        // Load default profiles
         manager.load_default_profiles();
         manager
     }
 
-    /// Загрузка готовых пресетов
+    /// Load ready-made presets
     fn load_default_profiles(&mut self) {
-        // Профиль для танков в RB (расширенный)
+        // Tank RB Profile (Immersive)
         let mut tank_rb_mappings = HashMap::new();
         tank_rb_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         tank_rb_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
@@ -56,14 +56,14 @@ impl ProfileManager {
 
         self.profiles.push(Profile {
             id: "tank_rb".to_string(),
-            name: "Танк RB - Иммерсивный".to_string(),
+            name: "Tank RB - Immersive".to_string(),
             vehicle_type: VehicleType::Tank,
             game_mode: GameMode::Realistic,
             event_mappings: tank_rb_mappings,
             enabled: true,
         });
 
-        // Профиль для самолетов (расширенный с новыми событиями)
+        // Aircraft Profile (Universal)
         let mut aircraft_mappings = HashMap::new();
         aircraft_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
@@ -79,14 +79,14 @@ impl ProfileManager {
 
         self.profiles.push(Profile {
             id: "aircraft_any".to_string(),
-            name: "Самолет - Универсальный".to_string(),
+            name: "Aircraft - Universal".to_string(),
             vehicle_type: VehicleType::Aircraft,
             game_mode: GameMode::Any,
             event_mappings: aircraft_mappings,
             enabled: true,
         });
 
-        // Легкий фоновый профиль
+        // Light Background Profile (Universal)
         let mut light_mappings = HashMap::new();
         let light_hit = VibrationPattern {
             name: "Light Hit".to_string(),
@@ -116,27 +116,27 @@ impl ProfileManager {
         light_mappings.insert(GameEvent::Hit, light_hit.clone());
         light_mappings.insert(GameEvent::CriticalHit, light_hit.clone());
         
-        // Аэродинамические события
+        // Aerodynamic events
         light_mappings.insert(GameEvent::Overspeed, light_hit.clone());
         light_mappings.insert(GameEvent::OverG, light_hit.clone());
         light_mappings.insert(GameEvent::HighAOA, light_hit.clone());
         light_mappings.insert(GameEvent::CriticalAOA, light_hit.clone());
         light_mappings.insert(GameEvent::Mach1, light_hit.clone());
         
-        // Топливо и боезапас
+        // Fuel and ammo
         light_mappings.insert(GameEvent::LowFuel, light_hit.clone());
         light_mappings.insert(GameEvent::CriticalFuel, light_hit.clone());
         light_mappings.insert(GameEvent::LowAmmo, light_hit.clone());
         
-        // Окружение
+        // Environment
         light_mappings.insert(GameEvent::LowAltitude, light_hit.clone());
         
-        // Повреждения
+        // Damage
         light_mappings.insert(GameEvent::EngineDamaged, light_hit);
 
         self.profiles.push(Profile {
             id: "light_background".to_string(),
-            name: "Легкий Фон (для всех)".to_string(),
+            name: "Light Background (Universal)".to_string(),
             vehicle_type: VehicleType::Unknown,
             game_mode: GameMode::Any,
             event_mappings: light_mappings,
@@ -144,15 +144,15 @@ impl ProfileManager {
         });
     }
 
-    /// Автоматический выбор профиля на основе типа техники
+    /// Automatic profile selection based on vehicle type
     pub fn auto_select_profile(&mut self, vehicle_type: &VehicleType) -> Option<&Profile> {
-        // Ищем наиболее подходящий профиль
+        // Find the best matching profile
         let best_match = self.profiles
             .iter()
             .filter(|p| p.enabled)
             .filter(|p| p.vehicle_type == *vehicle_type || p.vehicle_type == VehicleType::Unknown)
             .max_by_key(|p| {
-                // Приоритет: точное совпадение > Any
+                // Priority: exact match > Any
                 if p.vehicle_type == *vehicle_type { 2 } else { 1 }
             });
 
@@ -164,29 +164,29 @@ impl ProfileManager {
         best_match
     }
 
-    /// Получение активного профиля
+    /// Get active profile
     pub fn get_active_profile(&self) -> Option<&Profile> {
         self.active_profile.as_ref()
             .and_then(|id| self.profiles.iter().find(|p| &p.id == id))
     }
 
-    /// Получение паттерна для события
+    /// Get pattern for event
     pub fn get_pattern_for_event(&self, event: &GameEvent) -> Option<&VibrationPattern> {
         self.get_active_profile()
             .and_then(|profile| profile.event_mappings.get(event))
     }
 
-    /// Список всех профилей
+    /// List all profiles
     pub fn get_all_profiles(&self) -> &[Profile] {
         &self.profiles
     }
 
-    /// Добавление кастомного профиля
+    /// Add custom profile
     pub fn add_profile(&mut self, profile: Profile) {
         self.profiles.push(profile);
     }
 
-    /// Удаление профиля
+    /// Remove profile
     pub fn remove_profile(&mut self, id: &str) {
         self.profiles.retain(|p| p.id != id);
         if self.active_profile.as_deref() == Some(id) {
@@ -194,7 +194,7 @@ impl ProfileManager {
         }
     }
 
-    /// Включение/выключение профиля
+    /// Toggle profile on/off
     pub fn toggle_profile(&mut self, id: &str, enabled: bool) {
         if let Some(profile) = self.profiles.iter_mut().find(|p| p.id == id) {
             profile.enabled = enabled;
