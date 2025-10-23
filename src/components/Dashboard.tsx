@@ -52,13 +52,14 @@ export function Dashboard() {
 
   const handleTest = async () => {
     try {
-      await api.testVibration(0.8, 500);
+      const result = await api.testVibration(0.8, 500);
       if ((window as any).debugLog) {
-        (window as any).debugLog('info', '⚡ Тест вибрации выполнен');
+        (window as any).debugLog('success', `⚡ ${result}`);
       }
     } catch (error: any) {
       if ((window as any).debugLog) {
-        (window as any).debugLog('error', `❌ Ошибка теста: ${error.message}`);
+        const errorMsg = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
+        (window as any).debugLog('error', `❌ Ошибка теста: ${errorMsg}`);
       }
     }
   };

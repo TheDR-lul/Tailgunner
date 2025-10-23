@@ -70,6 +70,7 @@ async fn get_profiles(state: tauri::State<'_, AppState>) -> Result<Vec<Profile>,
 async fn test_vibration(
     state: tauri::State<'_, AppState>,
     intensity: f32,
+    #[serde(rename = "durationMs")]
     duration_ms: u64,
 ) -> Result<String, String> {
     let engine = state.engine.lock().await;

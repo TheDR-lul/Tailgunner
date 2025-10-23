@@ -51,7 +51,10 @@ export const api = {
 
   // Тестовая вибрация
   async testVibration(intensity: number, durationMs: number): Promise<string> {
-    return invoke<string>('test_vibration', { intensity, duration_ms: durationMs });
+    return invoke<string>('test_vibration', { 
+      intensity, 
+      durationMs  // Tauri expects camelCase!
+    });
   },
 
   // Получение пресетов паттернов
