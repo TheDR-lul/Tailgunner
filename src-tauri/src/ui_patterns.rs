@@ -40,7 +40,7 @@ impl UIPattern {
         
         log::debug!("[UI Pattern] Found InputNode: {:?}", input_node.data);
         
-        // 2. Парсинг условия
+        // 2. Parse condition
         let indicator = input_node.data.get("indicator")?.as_str()?;
         let operator = input_node.data.get("operator")?.as_str()?;
         let value = input_node.data.get("value")?.as_f64()? as f32;
@@ -48,68 +48,68 @@ impl UIPattern {
         let condition = Self::parse_condition(indicator, operator, value)?;
         log::debug!("[UI Pattern] Parsed condition: {:?}", condition);
         
-        // 3. Найти VibrationNode (паттерн вибрации)
+        // 3. Find VibrationNode (vibration pattern)
         let vibration_node = self.nodes.iter()
             .find(|n| n.type_ == "vibration")?;
         
         log::debug!("[UI Pattern] Found VibrationNode: {:?}", vibration_node.data);
         
-        // 4. Парсинг паттерна вибрации
+        // 4. Parse vibration pattern
         let pattern = Self::parse_vibration_pattern(&vibration_node.data)?;
         log::debug!("[UI Pattern] Parsed pattern: {:?}", pattern);
         
-        // 5. Создать EventTrigger
+        // 5. Create EventTrigger
         Some(EventTrigger {
             id: self.id.clone(),
             name: self.name.clone(),
-            description: format!("Пользовательский паттерн: {}", self.name),
+            description: format!("User pattern: {}", self.name),
             condition,
-            event: GameEvent::UserTriggered,  // Универсальное событие для UI триггеров
-            cooldown_ms: 1000, // По умолчанию 1 секунда
+            event: GameEvent::UserTriggered,  // Universal event for UI triggers
+            cooldown_ms: 1000, // Default 1 second
             enabled: self.enabled,
             is_builtin: false,
-            pattern: Some(pattern),  // Кастомный паттерн напрямую в триггере
+            pattern: Some(pattern),  // Custom pattern directly in trigger
         })
     }
     
-    /// Парсинг условия триггера из UI
+    /// Parse trigger condition from UI
     fn parse_condition(indicator: &str, operator: &str, value: f32) -> Option<TriggerCondition> {
         match (indicator, operator) {
-            // Скорость
+            // Speed
             ("speed", ">") => Some(TriggerCondition::SpeedAbove(value)),
             ("speed", "<") => Some(TriggerCondition::SpeedBelow(value)),
             
-            // Высота
+            // Altitude
             ("altitude", ">") => Some(TriggerCondition::AltitudeAbove(value)),
             ("altitude", "<") => Some(TriggerCondition::AltitudeBelow(value)),
             
-            // Обороты двигателя
+            // Engine RPM
             ("rpm", ">") => Some(TriggerCondition::RPMAbove(value)),
             
-            // Температура
+            // Temperature
             ("temperature", ">") => Some(TriggerCondition::TempAbove(value)),
             
-            // G-перегрузка
+            // G-load
             ("g_load", ">") => Some(TriggerCondition::GLoadAbove(value)),
             ("g_load", "<") => Some(TriggerCondition::GLoadBelow(value)),
             
-            // Угол атаки
+            // Angle of attack
             ("aoa", ">") => Some(TriggerCondition::AOAAbove(value)),
             ("aoa", "<") => Some(TriggerCondition::AOABelow(value)),
             
-            // IAS (приборная скорость)
+            // IAS (indicated airspeed)
             ("ias", ">") => Some(TriggerCondition::IASAbove(value)),
             
-            // TAS (истинная скорость)
+            // TAS (true airspeed)
             ("tas", ">") => Some(TriggerCondition::TASAbove(value)),
             
             // Mach
             ("mach", ">") => Some(TriggerCondition::MachAbove(value)),
             
-            // Топливо (в процентах)
+            // Fuel (percentage)
             ("fuel", "<") => Some(TriggerCondition::FuelBelow(value)),
             
-            // Боезапас (в процентах)
+            // Ammo (percentage)
             ("ammo", "<") => Some(TriggerCondition::AmmoBelow(value)),
             
             _ => {
@@ -119,18 +119,18 @@ impl UIPattern {
         }
     }
     
-    /// Парсинг паттерна вибрации из UI
+    /// Parse vibration pattern from UI
     fn parse_vibration_pattern(data: &serde_json::Value) -> Option<VibrationPattern> {
-        // Длительность в секундах
+        // Duration in seconds
         let duration = data.get("duration")?.as_f64()? as u64;
         let duration_ms = duration * 1000;
         
-        // Кривая интенсивности
+        // Intensity curve
         let curve = data.get("curve")?.as_array()?;
         
-        // Берем среднюю интенсивность из всех точек
+        // Get average intensity from all points
         let intensity = if curve.is_empty() {
-            0.5 // По умолчанию средняя
+            0.5 // Default average
         } else {
             let sum: f64 = curve.iter()
                 .filter_map(|p| p.get("y")?.as_f64())
@@ -138,7 +138,7 @@ impl UIPattern {
             (sum / curve.len() as f64) as f32
         };
         
-        // Режим вибрации
+        // Vibration mode
         let mode = data.get("mode")?.as_str().unwrap_or("once");
         let repeat_count = data.get("repeatCount")
             .and_then(|v| v.as_u64())

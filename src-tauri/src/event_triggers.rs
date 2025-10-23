@@ -113,146 +113,146 @@ impl TriggerManager {
         manager
     }
     
-    /// Загрузка встроенных триггеров
+    /// Load built-in triggers
     fn load_default_triggers(&mut self) {
-        // Превышение макс скорости (для самолетов)
+        // Overspeed (for aircraft)
         self.triggers.push(EventTrigger {
             id: "overspeed_800".to_string(),
-            name: "Превышение 800 км/ч".to_string(),
-            description: "Срабатывает когда приборная скорость превышает 800 км/ч. Используется для предупреждения о критической скорости.".to_string(),
+            name: "Overspeed 800 km/h".to_string(),
+            description: "Triggers when indicated airspeed exceeds 800 km/h. Used for critical speed warning.".to_string(),
             condition: TriggerCondition::IASAbove(800.0),
             event: GameEvent::Overspeed,
             cooldown_ms: 5000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Критическая G-перегрузка
+        // Critical G-overload
         self.triggers.push(EventTrigger {
             id: "over_g_10".to_string(),
-            name: "G-перегрузка >10G".to_string(),
-            description: "Срабатывает при экстремальной перегрузке (>10G положительная или >5G отрицательная). Предупреждение о риске срыва потока или повреждения конструкции.".to_string(),
+            name: "G-Overload >10G".to_string(),
+            description: "Triggers at extreme G-load (>10G positive or >5G negative). Warning of stall risk or structural damage.".to_string(),
             condition: TriggerCondition::Or(
                 Box::new(TriggerCondition::GLoadAbove(10.0)),
                 Box::new(TriggerCondition::GLoadBelow(-5.0)),
             ),
             event: GameEvent::OverG,
             cooldown_ms: 2000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Высокий угол атаки
+        // High angle of attack
         self.triggers.push(EventTrigger {
             id: "high_aoa_15".to_string(),
-            name: "Угол атаки >15°".to_string(),
-            description: "Срабатывает при высоком угле атаки (>15°). Предупреждение о приближении к срыву потока.".to_string(),
+            name: "Angle of Attack >15°".to_string(),
+            description: "Triggers at high angle of attack (>15°). Warning of approaching stall.".to_string(),
             condition: TriggerCondition::AOAAbove(15.0),
             event: GameEvent::HighAOA,
             cooldown_ms: 3000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Критический угол атаки
+        // Critical angle of attack
         self.triggers.push(EventTrigger {
             id: "critical_aoa_20".to_string(),
-            name: "Критический угол атаки >20°".to_string(),
-            description: "Срабатывает при критическом угле атаки (>20°). Высокий риск сваливания!".to_string(),
+            name: "Critical Angle of Attack >20°".to_string(),
+            description: "Triggers at critical angle of attack (>20°). High risk of stall!".to_string(),
             condition: TriggerCondition::AOAAbove(20.0),
             event: GameEvent::CriticalAOA,
             cooldown_ms: 2000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Преодоление звукового барьера
+        // Breaking the sound barrier
         self.triggers.push(EventTrigger {
             id: "mach_1".to_string(),
-            name: "Преодоление Mach 1.0".to_string(),
-            description: "Срабатывает при достижении скорости звука (Mach >0.98). Чувствуй звуковой барьер!".to_string(),
+            name: "Breaking Mach 1.0".to_string(),
+            description: "Triggers when reaching sound speed (Mach >0.98). Feel the sonic boom!".to_string(),
             condition: TriggerCondition::MachAbove(0.98),
             event: GameEvent::Mach1,
             cooldown_ms: 10000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Низкое топливо
+        // Low fuel
         self.triggers.push(EventTrigger {
             id: "low_fuel_10".to_string(),
-            name: "Топливо <10%".to_string(),
-            description: "Срабатывает когда остается меньше 10% топлива. Пора возвращаться на базу!".to_string(),
+            name: "Fuel <10%".to_string(),
+            description: "Triggers when less than 10% fuel remains. Time to return to base!".to_string(),
             condition: TriggerCondition::FuelBelow(10.0),
             event: GameEvent::LowFuel,
             cooldown_ms: 30000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Критическое топливо
+        // Critical fuel
         self.triggers.push(EventTrigger {
             id: "critical_fuel_5".to_string(),
-            name: "Топливо <5%".to_string(),
-            description: "Срабатывает когда остается меньше 5% топлива. КРИТИЧЕСКИ МАЛО ТОПЛИВА!".to_string(),
+            name: "Fuel <5%".to_string(),
+            description: "Triggers when less than 5% fuel remains. CRITICALLY LOW FUEL!".to_string(),
             condition: TriggerCondition::FuelBelow(5.0),
             event: GameEvent::CriticalFuel,
             cooldown_ms: 15000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Низкая высота
+        // Low altitude
         self.triggers.push(EventTrigger {
             id: "low_altitude_100".to_string(),
-            name: "Низкая высота <100м".to_string(),
-            description: "Срабатывает на опасно малой высоте (<100м) при скорости >200 км/ч. Осторожно, земля близко!".to_string(),
+            name: "Low Altitude <100m".to_string(),
+            description: "Triggers at dangerously low altitude (<100m) at speed >200 km/h. Watch out, ground is close!".to_string(),
             condition: TriggerCondition::And(
                 Box::new(TriggerCondition::AltitudeBelow(100.0)),
                 Box::new(TriggerCondition::SpeedAbove(200.0)),
             ),
             event: GameEvent::LowAltitude,
             cooldown_ms: 5000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Перегрев двигателя
+        // Engine overheat
         self.triggers.push(EventTrigger {
             id: "engine_overheat_250".to_string(),
-            name: "Перегрев двигателя >250°".to_string(),
-            description: "Срабатывает при температуре двигателя выше 250°C. Риск повреждения двигателя!".to_string(),
+            name: "Engine Overheat >250°".to_string(),
+            description: "Triggers when engine temperature exceeds 250°C. Risk of engine damage!".to_string(),
             condition: TriggerCondition::TempAbove(250.0),
             event: GameEvent::EngineOverheat,
             cooldown_ms: 10000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
         
-        // Низкий боезапас
+        // Low ammo
         self.triggers.push(EventTrigger {
             id: "low_ammo_20".to_string(),
-            name: "Боезапас <20%".to_string(),
-            description: "Срабатывает когда остается меньше 20% боезапаса. Экономь патроны!".to_string(),
+            name: "Ammo <20%".to_string(),
+            description: "Triggers when less than 20% ammo remains. Conserve ammunition!".to_string(),
             condition: TriggerCondition::AmmoBelow(20.0),
             event: GameEvent::LowAmmo,
             cooldown_ms: 30000,
-            enabled: false,  // По умолчанию отключен
+            enabled: false,  // Disabled by default
             is_builtin: true,
-            pattern: None,   // Встроенные триггеры используют паттерны из ProfileManager
+            pattern: None,   // Built-in triggers use patterns from ProfileManager
         });
     }
     
-    /// Проверка всех триггеров
+    /// Check all triggers
     pub fn check_triggers(&mut self, state: &GameState) -> Vec<(GameEvent, Option<VibrationPattern>)> {
         let mut events = Vec::new();
         let now = std::time::Instant::now();
