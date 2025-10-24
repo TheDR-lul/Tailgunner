@@ -169,15 +169,15 @@ impl UIPattern {
     fn parse_condition(&self, indicator: &str, operator: &str, value: f32) -> Option<TriggerCondition> {
         match (indicator, operator) {
             // Speed
-            ("speed", ">") => Some(TriggerCondition::SpeedAbove(value)),
-            ("speed", "<") => Some(TriggerCondition::SpeedBelow(value)),
+            ("speed", ">") | ("speed", ">=") => Some(TriggerCondition::SpeedAbove(value)),
+            ("speed", "<") | ("speed", "<=") => Some(TriggerCondition::SpeedBelow(value)),
             
             // Altitude
-            ("altitude", ">") => Some(TriggerCondition::AltitudeAbove(value)),
-            ("altitude", "<") => Some(TriggerCondition::AltitudeBelow(value)),
+            ("altitude", ">") | ("altitude", ">=") => Some(TriggerCondition::AltitudeAbove(value)),
+            ("altitude", "<") | ("altitude", "<=") => Some(TriggerCondition::AltitudeBelow(value)),
             
             // Engine RPM
-            ("rpm", ">") => Some(TriggerCondition::RPMAbove(value)),
+            ("rpm", ">") | ("rpm", ">=") => Some(TriggerCondition::RPMAbove(value)),
             
             // Temperature
             ("temperature", ">") => Some(TriggerCondition::TempAbove(value)),
@@ -204,6 +204,19 @@ impl UIPattern {
             
             // Ammo (percentage)
             ("ammo", "<") => Some(TriggerCondition::AmmoBelow(value)),
+            
+            // Tank-specific
+            ("stabilizer", ">") => Some(if value > 0.5 { TriggerCondition::StabilizerActive } else { TriggerCondition::StabilizerInactive }),
+            ("stabilizer", "==") => Some(if value > 0.5 { TriggerCondition::StabilizerActive } else { TriggerCondition::StabilizerInactive }),
+            ("crew_current", "<") => Some(TriggerCondition::CrewLost),
+            ("gunner_state", ">") => Some(TriggerCondition::CrewMemberDead("gunner".to_string())),
+            ("driver_state", ">") => Some(TriggerCondition::CrewMemberDead("driver".to_string())),
+            ("cruise_control", ">") => Some(TriggerCondition::CruiseControlAbove(value)),
+            ("cruise_control", "<") => Some(TriggerCondition::CruiseControlBelow(value)),
+            ("driving_direction_mode", "==") => Some(if value == 0.0 { TriggerCondition::DrivingForward } else { TriggerCondition::DrivingBackward }),
+            ("gear", ">") => Some(TriggerCondition::GearAbove(value)),
+            ("gear", "<") => Some(TriggerCondition::GearBelow(value)),
+            ("gear", "==") => Some(TriggerCondition::GearEquals(value)),
             
             _ => {
                 log::warn!("[UI Pattern] Unknown indicator/operator: {} {}", indicator, operator);

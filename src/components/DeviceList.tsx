@@ -31,7 +31,19 @@ export function DeviceList() {
   };
 
   const handleRefresh = async () => {
+    setIsLoading(true);
     try {
+      // Start device scanning
+      await api.scanDevices();
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('info', '🔍 Scanning for devices...');
+      }
+      
+      // Wait 2 seconds for devices to connect
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Get device list
       const deviceList = await api.getDevices();
       setDevices(deviceList);
       
@@ -42,6 +54,8 @@ export function DeviceList() {
       if ((window as any).debugLog) {
         (window as any).debugLog('error', '❌ Failed to refresh devices');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -78,9 +92,13 @@ export function DeviceList() {
           </div>
         ) : (
           <>
-            <button className="btn btn-secondary btn-sm" onClick={handleRefresh}>
-              <RefreshCw size={16} />
-              {t('devices.btn_refresh')}
+            <button 
+              className="btn btn-secondary btn-sm" 
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              <RefreshCw size={16} className={isLoading ? 'spin' : ''} />
+              {isLoading ? t('devices.scanning') : t('devices.btn_refresh')}
             </button>
             
             {devices.length === 0 ? (

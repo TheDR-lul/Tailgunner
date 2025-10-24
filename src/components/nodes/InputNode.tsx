@@ -39,7 +39,7 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
     { id: 'pedals', label: 'Rudder Pedals', unit: '', icon: Navigation, color: '#8b5cf6', category: 'Raw Input' },
     
     // Engine
-    { id: 'engine_rpm', label: 'RPM', unit: 'RPM', icon: Gauge, color: '#ef4444', category: 'Engine' },
+    { id: 'rpm', label: 'RPM', unit: 'RPM', icon: Gauge, color: '#ef4444', category: 'Engine' },
     { id: 'engine_temp', label: 'Engine Temp', unit: '°C', icon: Thermometer, color: '#dc2626', category: 'Engine' },
     { id: 'oil_temp', label: 'Oil Temp', unit: '°C', icon: Thermometer, color: '#f87171', category: 'Engine' },
     { id: 'water_temp', label: 'Water Temp', unit: '°C', icon: Thermometer, color: '#fca5a5', category: 'Engine' },
@@ -47,7 +47,7 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
     { id: 'throttle', label: 'Throttle', unit: '%', icon: Gauge, color: '#f59e0b', category: 'Engine' },
     
     // Weapons
-    { id: 'ammo_count', label: 'Ammo', unit: 'pcs', icon: Crosshair, color: '#fbbf24', category: 'Weapons' },
+    { id: 'ammo', label: 'Ammo Count', unit: 'pcs', icon: Crosshair, color: '#fbbf24', category: 'Weapons' },
     { id: 'cannon_ready', label: 'Cannon Ready', unit: '', icon: Crosshair, color: '#ef4444', category: 'Weapons' },
     
     // Resources

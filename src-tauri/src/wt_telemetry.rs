@@ -29,12 +29,12 @@ pub enum VehicleType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Indicators {
-    // Базовые
-    pub speed: f32,           // IAS км/ч
-    pub altitude: f32,        // м
-    pub climb: f32,           // м/с
+    // Basic
+    pub speed: f32,           // IAS km/h
+    pub altitude: f32,        // m
+    pub climb: f32,           // m/s
     
-    // Двигатель
+    // Engine
     pub engine_rpm: f32,
     pub engine_temp: f32,
     pub oil_temp: f32,
@@ -46,7 +46,7 @@ pub struct Indicators {
     pub compressor_stage: i32,
     pub magneto: i32,
     
-    // Управление
+    // Controls
     pub pitch: f32,
     pub roll: f32,
     pub yaw: f32,
@@ -57,36 +57,45 @@ pub struct Indicators {
     pub gear: f32,
     pub airbrake: f32,
     
-    // Аэродинамика
-    pub aoa: f32,             // Угол атаки
-    pub slip: f32,            // Скольжение
-    pub g_load: f32,          // G-перегрузка
-    pub mach: f32,            // Число Маха
-    pub tas: f32,             // TAS км/ч
-    pub ias: f32,             // IAS км/ч
+    // Aerodynamics
+    pub aoa: f32,             // Angle of Attack
+    pub slip: f32,            // Sideslip
+    pub g_load: f32,          // G-load
+    pub mach: f32,            // Mach number
+    pub tas: f32,             // TAS km/h
+    pub ias: f32,             // IAS km/h
     
-    // Вооружение
+    // Weapons
     pub cannon_ready: bool,
     pub machine_gun_ready: bool,
     pub rockets_ready: i32,
     pub bombs_ready: i32,
     pub torpedoes_ready: i32,
     
-    // Боезапас
+    // Ammo
     pub ammo_count: i32,
     pub rocket_count: i32,
     pub bomb_count: i32,
     
-    // Топливо
-    pub fuel: f32,            // кг
+    // Fuel
+    pub fuel: f32,            // kg
     pub fuel_max: f32,
-    pub fuel_time: f32,       // минуты
+    pub fuel_time: f32,       // minutes
     
-    // Повреждения
+    // Damage
     pub engine_damage: f32,   // 0.0-1.0
     pub controls_damage: f32,
     pub gear_damage: f32,
     pub flaps_damage: f32,
+    
+    // Tank-specific
+    pub stabilizer: f32,      // 0.0 or 1.0
+    pub crew_total: i32,
+    pub crew_current: i32,
+    pub gunner_state: i32,    // 0=alive, 1=wounded, 2=dead
+    pub driver_state: i32,
+    pub cruise_control: f32,  // Speed setpoint
+    pub driving_direction: i32, // 0=forward, 1=backward
 }
 
 pub struct WTTelemetryReader {
@@ -201,7 +210,7 @@ impl WTTelemetryReader {
         // Detect vehicle type from army and type string
         let type_ = match army_str {
             "air" => VehicleType::Aircraft,
-            "ground" => VehicleType::Tank,
+            "ground" | "tank" => VehicleType::Tank,  // API uses both "ground" and "tank"
             "ship" => VehicleType::Ship,
             "helicopter" => VehicleType::Helicopter,
             _ => {
@@ -225,8 +234,14 @@ impl WTTelemetryReader {
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default();
 
-        // 2. Parse indicators from /state
-        let indicators = self.parse_indicators(state_json);
+        // 2. Parse indicators from correct source
+        // TANKS: all data in /indicators
+        // AIRCRAFT: flight data in /state
+        let indicators = if matches!(type_, VehicleType::Tank) {
+            self.parse_indicators(indicators_json.clone())
+        } else {
+            self.parse_indicators(state_json.clone())
+        };
 
         // Reduced log spam - only log on vehicle change
         use std::sync::Mutex;
@@ -312,27 +327,72 @@ impl WTTelemetryReader {
 
     /// Parse indicators from JSON
     /// WT API field names contain commas, spaces, and units!
+    /// Supports BOTH aircraft and ground vehicle formats
     fn parse_indicators(&self, json: serde_json::Value) -> Indicators {
         let get_f32 = |key: &str| json.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
         let get_i32 = |key: &str| json.get(key).and_then(|v| v.as_i64()).unwrap_or(0) as i32;
         let get_bool = |key: &str| json.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
 
-        let ias = get_f32("IAS, km/h");
-        let tas = get_f32("TAS, km/h");
+        // AIRCRAFT vs TANK detection: 
+        // - Tanks have "speed" field (no commas, no units)
+        // - Aircraft have "IAS, km/h" field (with commas and units)
+        // - Tanks have "army": "tank" or "army": "ground"
+        let is_tank = json.get("speed").is_some() || 
+                      json.get("army").and_then(|v| v.as_str())
+                          .map(|s| s == "tank" || s == "ground")
+                          .unwrap_or(false);
+        
+        let (speed, ias, tas) = if is_tank {
+            // TANK: direct "speed" field
+            let spd = get_f32("speed");
+            (spd, spd, spd)
+        } else {
+            // AIRCRAFT: "IAS, km/h" and "TAS, km/h"
+            let ias_val = get_f32("IAS, km/h");
+            let tas_val = get_f32("TAS, km/h");
+            (ias_val.max(tas_val), ias_val, tas_val)
+        };
+        
         let altitude = get_f32("H, m");
         let fuel = get_f32("Mfuel, kg");
         let fuel_max = get_f32("Mfuel0, kg");
         
-        log::debug!("[WT Parser] IAS={}, TAS={}, H={}, Fuel={}/{}", ias, tas, altitude, fuel, fuel_max);
+        // ENGINE RPM: tanks use "rpm", aircraft use "RPM 1"/"RPM 2"
+        let engine_rpm = if is_tank {
+            get_f32("rpm")
+        } else {
+            get_f32("RPM 1").max(get_f32("RPM 2"))
+        };
+        
+        // GEAR: tanks use "gear" (gear number), aircraft use "gear, %" (percentage)
+        let gear_value = if is_tank {
+            get_f32("gear") // Gear number (1-7)
+        } else {
+            get_f32("gear, %") // Percentage
+        };
+        
+        // Only log if in battle (crew > 0 or speed > 0)
+        let in_battle = (is_tank && get_i32("crew_total") > 0) || (!is_tank && speed > 1.0);
+        
+        if in_battle {
+            log::debug!("[WT Parser] 🎮 Type={}, Speed={:.0} km/h, RPM={:.0}, Gear={:.0}", 
+                if is_tank { "TANK" } else { "AIRCRAFT" }, speed, engine_rpm, gear_value);
+            
+            if is_tank {
+                log::debug!("[WT Parser] 🚜 Tank data: Crew={}/{}, Ammo={}, Stabilizer={}", 
+                    get_i32("crew_current"), get_i32("crew_total"), 
+                    get_i32("first_stage_ammo"), get_f32("stabilizer"));
+            }
+        }
 
         Indicators {
-            // Базовые (используем реальные названия из WT API!)
-            speed: ias.max(tas), // Берем больше из IAS/TAS
+            // Basic
+            speed,
             altitude,
             climb: get_f32("Vy, m/s"),
             
-            // Двигатель
-            engine_rpm: get_f32("RPM 1").max(get_f32("RPM 2")),
+            // Engine
+            engine_rpm,
             engine_temp: get_f32("engine temp 1, C").max(get_f32("engine temp 2, C")),
             oil_temp: get_f32("oil temp 1, C").max(get_f32("oil temp 2, C")),
             water_temp: get_f32("water temp 1, C").max(get_f32("water temp 2, C")),
@@ -343,7 +403,7 @@ impl WTTelemetryReader {
             compressor_stage: get_i32("compressor stage 1").max(get_i32("compressor stage 2")),
             magneto: get_i32("magneto 1").max(get_i32("magneto 2")),
             
-            // Управление (в процентах)
+            // Controls (percentage)
             pitch: get_f32("stick_elevator"),
             roll: get_f32("stick_ailerons"),
             yaw: get_f32("pedals1"),
@@ -351,39 +411,48 @@ impl WTTelemetryReader {
             elevator: get_f32("elevator, %"),
             rudder: get_f32("rudder, %"),
             flaps: get_f32("flaps, %"),
-            gear: get_f32("gear, %"),
+            gear: gear_value,
             airbrake: get_f32("airbrake, %"),
             
-            // Аэродинамика
+            // Aerodynamics
             aoa: get_f32("AoA, deg"),
             slip: get_f32("AoS, deg"),
-            g_load: get_f32("Ny"),  // Вертикальная перегрузка (G)
+            g_load: get_f32("Ny"),  // Vertical G-load
             mach: get_f32("M"),
-            tas: get_f32("TAS, km/h"),
-            ias: get_f32("IAS, km/h"),
+            tas,
+            ias,
             
-            // Вооружение (пока не используем, так как названия сложнее)
+            // Weapons
             cannon_ready: get_bool("cannon_ready"),
             machine_gun_ready: get_bool("machine_gun_ready"),
-            rockets_ready: 0, // TODO
+            rockets_ready: 0,
             bombs_ready: 0,
             torpedoes_ready: 0,
             
-            // Боезапас (пока не используем)
-            ammo_count: 0, // TODO
+            // Ammo
+            ammo_count: get_i32("first_stage_ammo"),  // Tank ammo in ready rack
             rocket_count: 0,
             bomb_count: 0,
             
-            // Топливо (в кг!)
-            fuel: get_f32("Mfuel, kg"),
-            fuel_max: get_f32("Mfuel0, kg"),
-            fuel_time: 0.0, // TODO: вычислить из Mfuel / расход
+            // Fuel (kg)
+            fuel,
+            fuel_max,
+            fuel_time: 0.0,
             
-            // Повреждения (пока не используем, нужно смотреть /state)
-            engine_damage: 0.0, // TODO: из /state
+            // Damage
+            engine_damage: 0.0,
             controls_damage: 0.0,
             gear_damage: 0.0,
             flaps_damage: 0.0,
+            
+            // Tank-specific
+            stabilizer: get_f32("stabilizer"),
+            crew_total: get_i32("crew_total"),
+            crew_current: get_i32("crew_current"),
+            gunner_state: get_i32("gunner_state"),
+            driver_state: get_i32("driver_state"),
+            cruise_control: get_f32("cruise_control"),
+            driving_direction: get_i32("driving_direction_mode"),
         }
     }
 

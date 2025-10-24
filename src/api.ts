@@ -1,25 +1,25 @@
-// API для работы с Tauri backend
+// API for working with Tauri backend
 
 import { invoke } from '@tauri-apps/api/core';
 import type { DeviceInfo, Profile, VibrationPattern, GameStatusInfo } from './types';
 
 export const api = {
-  // Инициализация устройств
+  // Initialize devices
   async initDevices(): Promise<string> {
     return invoke<string>('init_devices');
   },
 
-  // Запуск движка
+  // Start engine
   async startEngine(): Promise<string> {
     return invoke<string>('start_engine');
   },
 
-  // Остановка движка
+  // Stop engine
   async stopEngine(): Promise<string> {
     return invoke<string>('stop_engine');
   },
 
-  // Проверка статуса
+  // Check status
   async isRunning(): Promise<boolean> {
     try {
       return await invoke<boolean>('is_running');
@@ -29,7 +29,7 @@ export const api = {
     }
   },
 
-  // Получение устройств
+  // Get devices
   async getDevices(): Promise<DeviceInfo[]> {
     try {
       return await invoke<DeviceInfo[]>('get_devices');
@@ -39,7 +39,12 @@ export const api = {
     }
   },
 
-  // Получение профилей
+  // Scan for devices
+  async scanDevices(): Promise<string> {
+    return invoke<string>('scan_devices');
+  },
+
+  // Get profiles
   async getProfiles(): Promise<Profile[]> {
     try {
       return await invoke<Profile[]>('get_profiles');
@@ -49,19 +54,19 @@ export const api = {
     }
   },
 
-  // Тестовая вибрация
+  // Test vibration
   async testVibration(intensity: number, durationMs: number): Promise<string> {
     return invoke<string>('test_vibration', { 
       params: { intensity, durationMs }
     });
   },
 
-  // Получение пресетов паттернов
+  // Get preset patterns
   async getPresetPatterns(): Promise<VibrationPattern[]> {
     return invoke<VibrationPattern[]>('get_preset_patterns');
   },
 
-  // Получение статуса игры
+  // Get game status
   async getGameStatus(): Promise<GameStatusInfo> {
     try {
       return await invoke<GameStatusInfo>('get_game_status');

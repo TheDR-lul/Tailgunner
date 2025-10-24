@@ -37,6 +37,7 @@
     "btn_init": "Инициализировать",
     "btn_refresh": "Обновить",
     "initializing": "Инициализация...",
+    "scanning": "Сканирование...",
     "empty_init": "Требуется инициализация Intiface",
     "empty_devices": "Устройства не обнаружены",
     "empty_hint": "Запустите Intiface Central и подключите устройства"

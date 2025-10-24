@@ -39,6 +39,19 @@ pub enum TriggerCondition {
     EngineDamageAbove(f32),
     ControlsDamageAbove(f32),
     
+    // Tank-specific
+    StabilizerActive,
+    StabilizerInactive,
+    CrewLost,                  // crew_current < crew_total
+    CrewMemberDead(String),    // "gunner" or "driver"
+    GearAbove(f32),
+    GearBelow(f32),
+    GearEquals(f32),
+    CruiseControlAbove(f32),
+    CruiseControlBelow(f32),
+    DrivingForward,
+    DrivingBackward,
+    
     // Logical
     And(Box<TriggerCondition>, Box<TriggerCondition>),
     Or(Box<TriggerCondition>, Box<TriggerCondition>),
@@ -46,7 +59,7 @@ pub enum TriggerCondition {
 }
 
 impl TriggerCondition {
-    /// Проверяет, выполняется ли условие на основе текущего GameState
+    /// Check if condition is met based on current GameState
     pub fn evaluate(&self, state: &GameState) -> bool {
         match self {
             TriggerCondition::SpeedAbove(threshold) => state.indicators.speed > *threshold,
@@ -73,6 +86,25 @@ impl TriggerCondition {
             
             TriggerCondition::EngineDamageAbove(threshold) => state.indicators.engine_damage > *threshold,
             TriggerCondition::ControlsDamageAbove(threshold) => state.indicators.controls_damage > *threshold,
+            
+            // Tank-specific
+            TriggerCondition::StabilizerActive => state.indicators.stabilizer > 0.5,
+            TriggerCondition::StabilizerInactive => state.indicators.stabilizer < 0.5,
+            TriggerCondition::CrewLost => state.indicators.crew_current < state.indicators.crew_total,
+            TriggerCondition::CrewMemberDead(member) => {
+                match member.as_str() {
+                    "gunner" => state.indicators.gunner_state > 0,
+                    "driver" => state.indicators.driver_state > 0,
+                    _ => false,
+                }
+            },
+            TriggerCondition::GearAbove(threshold) => state.indicators.gear > *threshold,
+            TriggerCondition::GearBelow(threshold) => state.indicators.gear < *threshold,
+            TriggerCondition::GearEquals(value) => (state.indicators.gear - *value).abs() < 0.1,
+            TriggerCondition::CruiseControlAbove(threshold) => state.indicators.cruise_control > *threshold,
+            TriggerCondition::CruiseControlBelow(threshold) => state.indicators.cruise_control < *threshold,
+            TriggerCondition::DrivingForward => state.indicators.driving_direction == 0,
+            TriggerCondition::DrivingBackward => state.indicators.driving_direction != 0,
             
             TriggerCondition::And(a, b) => a.evaluate(state) && b.evaluate(state),
             TriggerCondition::Or(a, b) => a.evaluate(state) || b.evaluate(state),
@@ -311,7 +343,7 @@ impl TriggerManager {
         events
     }
     
-    /// Оценка условия триггера
+    /// Evaluate trigger condition
     fn evaluate_condition(&self, condition: &TriggerCondition, state: &GameState) -> bool {
         let ind = &state.indicators;
         
@@ -364,12 +396,31 @@ impl TriggerManager {
             TriggerCondition::FuelTimeBelow(minutes) => ind.fuel_time < *minutes,
             
             TriggerCondition::AmmoBelow(percent) => {
-                // Упрощенная проверка, нужно знать максимум
+                // Simplified check, max ammo should be known
                 (ind.ammo_count as f32) < (*percent / 100.0 * 1000.0)
             },
             
             TriggerCondition::EngineDamageAbove(val) => ind.engine_damage > *val,
             TriggerCondition::ControlsDamageAbove(val) => ind.controls_damage > *val,
+            
+            // Tank-specific
+            TriggerCondition::StabilizerActive => ind.stabilizer > 0.5,
+            TriggerCondition::StabilizerInactive => ind.stabilizer < 0.5,
+            TriggerCondition::CrewLost => ind.crew_current < ind.crew_total,
+            TriggerCondition::CrewMemberDead(member) => {
+                match member.as_str() {
+                    "gunner" => ind.gunner_state > 0,
+                    "driver" => ind.driver_state > 0,
+                    _ => false,
+                }
+            },
+            TriggerCondition::GearAbove(val) => ind.gear > *val,
+            TriggerCondition::GearBelow(val) => ind.gear < *val,
+            TriggerCondition::GearEquals(val) => (ind.gear - *val).abs() < 0.1,
+            TriggerCondition::CruiseControlAbove(val) => ind.cruise_control > *val,
+            TriggerCondition::CruiseControlBelow(val) => ind.cruise_control < *val,
+            TriggerCondition::DrivingForward => ind.driving_direction == 0,
+            TriggerCondition::DrivingBackward => ind.driving_direction != 0,
             
             TriggerCondition::And(left, right) => {
                 self.evaluate_condition(left, state) && self.evaluate_condition(right, state)
@@ -385,7 +436,7 @@ impl TriggerManager {
         }
     }
     
-    /// Добавление кастомного триггера
+    /// Add custom trigger
     pub fn add_trigger(&mut self, trigger: EventTrigger) {
         log::error!("[Triggers] ➕ Adding trigger: '{}' (enabled: {}, condition: {:?})", 
             trigger.name, trigger.enabled, trigger.condition);
@@ -393,12 +444,16 @@ impl TriggerManager {
         log::error!("[Triggers] 📊 Total triggers now: {}", self.triggers.len());
     }
     
-    /// Получение всех триггеров
+    /// Get all triggers
     pub fn get_triggers(&self) -> &[EventTrigger] {
         &self.triggers
     }
     
-    /// Включение/выключение триггера
+    pub fn get_triggers_mut(&mut self) -> &mut Vec<EventTrigger> {
+        &mut self.triggers
+    }
+    
+    /// Toggle trigger on/off
     pub fn toggle_trigger(&mut self, id: &str, enabled: bool) {
         if let Some(trigger) = self.triggers.iter_mut().find(|t| t.id == id) {
             trigger.enabled = enabled;

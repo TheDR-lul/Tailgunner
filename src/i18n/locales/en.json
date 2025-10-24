@@ -37,6 +37,7 @@
     "btn_init": "Initialize",
     "btn_refresh": "Refresh",
     "initializing": "Initializing...",
+    "scanning": "Scanning...",
     "empty_init": "Intiface initialization required",
     "empty_devices": "No devices detected",
     "empty_hint": "Launch Intiface Central and connect devices"

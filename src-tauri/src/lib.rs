@@ -9,6 +9,7 @@ mod event_triggers;
 mod wt_vehicles_api;
 mod dynamic_triggers;
 mod ui_patterns;
+mod vehicle_limits;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -57,6 +58,14 @@ async fn is_running(state: tauri::State<'_, AppState>) -> Result<bool, String> {
 async fn get_devices(state: tauri::State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
     let engine = state.engine.lock().await;
     Ok(engine.get_device_manager().get_devices().await)
+}
+
+#[tauri::command]
+async fn scan_devices(state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.get_device_manager().scan_devices().await
+        .map(|_| "Device scan started".to_string())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -212,6 +221,7 @@ pub fn run() {
             stop_engine,
             is_running,
             get_devices,
+            scan_devices,
             get_profiles,
             test_vibration,
             get_preset_patterns,

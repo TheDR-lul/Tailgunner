@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 const WT_VEHICLES_API_BASE: &str = "https://www.wtvehiclesapi.sgambe.serv00.net";
 
-/// Информация о технике из WT Vehicles API
+/// Vehicle information from WT Vehicles API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VehicleData {
     pub identifier: String,
@@ -19,23 +19,23 @@ pub struct VehicleData {
     pub rank: i32,
     pub battle_rating: HashMap<String, f32>,
     
-    // Характеристики двигателя
+    // Engine characteristics
     pub max_speed_kmh: Option<f32>,
     pub max_altitude_meters: Option<f32>,
     pub engine_power_hp: Option<f32>,
     
-    // Пределы G-перегрузки
+    // G-load limits
     pub max_positive_g: Option<f32>,
     pub max_negative_g: Option<f32>,
     
-    // Топливо
+    // Fuel
     pub fuel_capacity_kg: Option<f32>,
     
-    // Вооружение
+    // Weapons
     pub weapons: Option<Vec<String>>,
 }
 
-/// Клиент для WT Vehicles API
+/// Client for WT Vehicles API
 pub struct WTVehiclesAPI {
     client: reqwest::Client,
     cache: std::sync::Arc<tokio::sync::RwLock<HashMap<String, VehicleData>>>,

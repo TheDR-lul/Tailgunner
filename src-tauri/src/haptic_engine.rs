@@ -6,6 +6,7 @@ use crate::{
     event_engine::EventEngine,
     event_triggers::TriggerManager,
     dynamic_triggers::DynamicTriggerManager,
+    vehicle_limits::VehicleLimitsManager,
     pattern_engine::{VibrationPattern, GameEvent},
     profile_manager::ProfileManager,
     rate_limiter::RateLimiter,
@@ -47,11 +48,13 @@ pub struct HapticEngine {
     device_manager: Arc<DeviceManager>,
     event_engine: Arc<RwLock<EventEngine>>,
     profile_manager: Arc<RwLock<ProfileManager>>,
-    pub trigger_manager: Arc<RwLock<TriggerManager>>,  // pub для доступа из lib.rs
+    pub trigger_manager: Arc<RwLock<TriggerManager>>,  // pub for access from lib.rs
     dynamic_trigger_manager: Arc<DynamicTriggerManager>,
+    vehicle_limits_manager: Arc<VehicleLimitsManager>,
     rate_limiter: Arc<RateLimiter>,
     running: Arc<RwLock<bool>>,
     current_intensity: Arc<RwLock<f32>>,
+    last_vehicle_name: Arc<RwLock<String>>,
 }
 
 impl HapticEngine {
@@ -63,9 +66,11 @@ impl HapticEngine {
             profile_manager: Arc::new(RwLock::new(ProfileManager::new())),
             trigger_manager: Arc::new(RwLock::new(TriggerManager::new())),
             dynamic_trigger_manager: Arc::new(DynamicTriggerManager::new()),
+            vehicle_limits_manager: Arc::new(VehicleLimitsManager::new()),
             rate_limiter: Arc::new(RateLimiter::new()),
             running: Arc::new(RwLock::new(false)),
             current_intensity: Arc::new(RwLock::new(0.0)),
+            last_vehicle_name: Arc::new(RwLock::new(String::new())),
         }
     }
 
@@ -95,6 +100,8 @@ impl HapticEngine {
         let rate_limiter = Arc::clone(&self.rate_limiter);
         let running = Arc::clone(&self.running);
         let current_intensity = Arc::clone(&self.current_intensity);
+        let vehicle_limits_manager = Arc::clone(&self.vehicle_limits_manager);
+        let last_vehicle_name = Arc::clone(&self.last_vehicle_name);
 
         tokio::spawn(async move {
             let mut tick_interval = interval(WTTelemetryReader::get_poll_interval());
@@ -130,6 +137,37 @@ impl HapticEngine {
                 {
                     let mut pm = profile_manager.write().await;
                     pm.auto_select_profile(&game_state.type_);
+                }
+                
+                // Check if vehicle changed and update dynamic triggers
+                {
+                    let last_vehicle = last_vehicle_name.read().await;
+                    if game_state.vehicle_name != "unknown" && *last_vehicle != game_state.vehicle_name {
+                        drop(last_vehicle);
+                        log::info!("[Vehicle Limits] 🔄 Vehicle changed: {}", game_state.vehicle_name);
+                        
+                        // Update vehicle limits
+                        if let Err(e) = vehicle_limits_manager.update_vehicle(&game_state.vehicle_name).await {
+                            log::warn!("[Vehicle Limits] ⚠️ Failed to update vehicle: {}", e);
+                        }
+                        
+                        // Generate dynamic triggers based on limits
+                        let limit_triggers = vehicle_limits_manager.generate_limit_triggers().await;
+                        if !limit_triggers.is_empty() {
+                            let mut tm = trigger_manager.write().await;
+                            
+                            // Remove old dynamic triggers
+                            tm.get_triggers_mut().retain(|t| !t.id.starts_with("dynamic_"));
+                            
+                            // Add new dynamic triggers
+                            for trigger in limit_triggers {
+                                tm.add_trigger(trigger);
+                            }
+                        }
+                        
+                        // Update last vehicle name
+                        *last_vehicle_name.write().await = game_state.vehicle_name.clone();
+                    }
                 }
 
                 // Detect events from state
