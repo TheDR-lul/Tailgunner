@@ -1,303 +1,304 @@
-# 🎮 Butt Thunder - Тактильный "Сабвуфер" для War Thunder
+# 🎯 Tailgunner
+## powered by A.S.S. (Adaptive Sensory System)
 
-**Премиальный, безопасный и глубоко кастомизируемый haptic feedback для War Thunder**
+**Transform your War Thunder experience into a full-body immersion system!**
 
----
-
-## 🚀 Концепция
-
-**Butt Thunder** — это десктопное приложение, которое превращает игровые события War Thunder в сложные тактильные ощущения на вибро-устройствах.
-
-### ✨ Ключевые фичи:
-
-- **🛡️ 100% EAC-Safe** — читает только публичные данные с `localhost:8111`, никакой инъекции в память
-- **🎯 75+ игровых событий** — полная интеграция с War Thunder localhost API
-- **⚡ Кастомные триггеры** — превышение скорости, G-перегрузки, угол атаки, и многое другое
-- **✈️ Аэродинамические события** — Overspeed, OverG, Stall, Mach1, HighAOA
-- **🎯 Автоматические профили** — автоопределение типа техники (танк/самолет/вертолет)
-- **🎛️ Визуальный редактор паттернов** — ADSR синтезатор для создания уникальных тактильных текстур
-- **📦 Готовые пресеты** — расширенные профили с новыми событиями
-- **🔌 Широкая совместимость** — поддержка Buttplug.io (Lovense, Kiiroo, We-Vibe и др.)
-- **⚡ Rate Limiting & Fail-Safe** — умное управление без перегрузки устройств
+Tailgunner is a revolutionary haptic feedback application that bridges War Thunder's telemetry API with advanced haptic devices, translating every game event into physical sensations. Feel every hit, every G-force, every critical moment through adaptive sensory feedback.
 
 ---
 
-## 🏗️ Технологии
+## 🚀 Key Features
 
-- **Frontend:** React + TypeScript + Vite
-- **Backend:** Rust (Tauri 2)
-- **Haptics:** Buttplug.io
-- **HTTP Client:** Reqwest
-- **Async Runtime:** Tokio
+### 🎮 **Full War Thunder Integration**
+- ✅ **100% EAC-Safe** - Reads data only from `127.0.0.1:8111` (official API)
+- ✅ **Real-time telemetry** - 10 updates per second
+- ✅ **50+ Game Parameters** including:
+  - **Flight**: IAS, TAS, Altitude, Mach, AoA, G-Load
+  - **Controls**: Aileron, Elevator, Rudder, Flaps, Gear, Airbrake
+  - **Engine**: RPM, Temperature, Oil Temp, Manifold Pressure, Throttle
+  - **Weapons**: Ammo count, Cannon ready status
+  - **Resources**: Fuel (kg & %), Low fuel warnings
+  - **Tank-specific**: Stabilizer, Gear ratio, Cruise control, Driving direction
+  - **Crew**: Total/alive crew, Gunner/Driver state
+  - **Advanced**: Blisters, Gear lamps, Speed warnings
+
+### 🎨 **Visual Pattern Constructor**
+Node-based editor (similar to Blender/Unreal) for creating complex haptic patterns:
+
+#### **Input Nodes:**
+- **📊 Sensor Input** - 50+ game parameters grouped by category
+- **⚡ Event Trigger** - Game events (Hit, Overspeed, LowFuel, etc.)
+
+#### **Logic Nodes:**
+- **🔍 Condition** - Single comparisons (>, <, =, ≥, ≤, ≠, between, outside)
+- **🎯 Multi-Condition** - Complex conditions with AND/OR logic
+- **⚙️ Logic Gates** - AND, OR, NOT, XOR operations
+
+#### **Output Nodes:**
+- **💥 Vibration** - Classic vibration patterns with ADSR curves
+- **📏 Linear Motion** - For strokers/thrusters (position control)
+- **🔄 Rotation** - For rotary devices (speed & direction)
+- **📡 Output** - Send to devices
+
+### 🎯 **Smart Profiles**
+Automatic profile switching based on vehicle type:
+- **🛡️ Tank RB** - Immersive realism with engine rumble, hit feedback
+- **✈️ Aircraft** - G-force simulation, overspeed warnings, stall alerts
+- **🎮 Light Background** - Subtle feedback for all vehicle types
+
+### 🔧 **Advanced Device Support**
+- **Buttplug.io Integration** - Universal device support via Intiface Central
+- **Multiple Device Types:**
+  - Vibration (classic haptics)
+  - Linear actuators (strokers, thrusters)
+  - Rotary devices (rotating toys)
+- **Smart QoS** - Rate limiting (5-8 cmd/s) to prevent device overload
+- **Fail-Safe** - Smooth fade-out on crash/disconnect
+
+### 🌍 **Multilingual**
+- 🇬🇧 English (primary)
+- 🇷🇺 Russian
+- Easy to add more languages
 
 ---
 
-## 📋 Требования
+## 📦 Installation
 
-### Системные требования:
-- **OS:** Windows 10/11 (основная поддержка)
-- **War Thunder** с включенным `localhost:8111` API
-- **Intiface Desktop** (для Buttplug устройств) — [скачать](https://intiface.com/desktop/)
+### Prerequisites
+1. **War Thunder** with localhost API enabled
+2. **Intiface Central** ([Download](https://intiface.com/central/))
+3. **Compatible haptic devices**
 
-### Для разработки:
-- **Rust** 1.70+ — [установить](https://www.rust-lang.org/)
-- **Node.js** 18+ — [установить](https://nodejs.org/)
-- **Tauri CLI** — устанавливается автоматически
-
----
-
-## 🔧 Установка и запуск
-
-### 1. Клонируйте репозиторий
-
+### Quick Start
 ```bash
-git clone https://github.com/yourusername/butt_thunder.git
-cd butt_thunder
-```
+# Clone repository
+git clone https://github.com/yourusername/tailgunner.git
+cd tailgunner
 
-### 2. Установите зависимости
-
-```bash
+# Install dependencies
 npm install
-```
 
-### 3. Запустите в режиме разработки
-
-```bash
+# Run in development mode
 npm run tauri dev
-```
 
-### 4. Сборка production версии
-
-```bash
+# Build production version
 npm run tauri build
 ```
 
-Собранное приложение будет в `src-tauri/target/release/`
+---
+
+## 🎮 How to Use
+
+### 1. **Connect Devices**
+- Launch **Intiface Central**
+- Start server (default: `ws://localhost:12345`)
+- Connect your haptic devices
+- Launch **Tailgunner**
+- Click "Initialize Devices"
+
+### 2. **Start War Thunder**
+- Enable localhost API in game settings
+- Launch any battle (tank, aircraft, ship)
+- Tailgunner will auto-detect vehicle type
+
+### 3. **Create Custom Patterns**
+- Open **Pattern Manager**
+- Click **"Create Pattern"**
+- Build your haptic flow:
+  ```
+  [Speed Sensor] → [Condition: > 800] → [Vibration Pattern] → [Output]
+  ```
+- Save and enable pattern
+
+### 4. **Configure Triggers**
+- Go to **Game Events** tab
+- Expand any profile (Tank RB, Aircraft, etc.)
+- Enable/disable triggers per event
+- Adjust cooldowns and thresholds
 
 ---
 
-## 🎮 Как использовать
+## 🛠️ Architecture
 
-### Шаг 1: Включите War Thunder API
+### **Technology Stack**
+- **Frontend**: React + TypeScript + Vite
+- **Backend**: Rust + Tauri 2.0
+- **UI**: React Flow (node editor)
+- **Haptics**: Buttplug.io via WebSocket
+- **I18n**: react-i18next
 
-В War Thunder включите локальный сервер:
+### **Core Systems**
 
-1. Откройте настройки игры
-2. Включите опцию "Localhost API" или создайте файл конфигурации
-3. Перезапустите игру
+#### **A.S.S. (Adaptive Sensory System)**
+The engine that powers Tailgunner:
+- **Telemetry Reader** - Polls WT API at 100ms intervals
+- **Event Engine** - Detects game events (hits, damage, state changes)
+- **Trigger Manager** - Evaluates custom conditions
+- **Profile Manager** - Switches haptic profiles based on vehicle
+- **Rate Limiter** - QoS to prevent device spam
+- **Device Manager** - Communicates with Buttplug.io
 
-Проверьте доступность: откройте в браузере `http://localhost:8111/state`
-
-### Шаг 2: Запустите Intiface Desktop
-
-1. Скачайте и установите [Intiface Desktop](https://intiface.com/desktop/)
-2. Запустите приложение
-3. Нажмите "Start Server"
-4. Подключите ваши Bluetooth устройства
-
-### Шаг 3: Запустите Butt Thunder
-
-1. Откройте **Butt Thunder**
-2. Нажмите **"Инициализировать"** в разделе "Устройства"
-3. Выберите нужный профиль (или используйте автоматический)
-4. Нажмите **"Запустить"**
-5. Запустите War Thunder и начните бой! 🎯
-
----
-
-## 🎛️ Структура модулей
-
-### Rust Backend (`src-tauri/src/`)
-
-```
-wt_telemetry.rs     → Чтение данных с War Thunder API
-pattern_engine.rs   → ADSR синтезатор паттернов
-device_manager.rs   → Управление Buttplug устройствами
-rate_limiter.rs     → QoS для предотвращения спама
-event_engine.rs     → Детектор игровых событий
-profile_manager.rs  → Автоматические профили
-haptic_engine.rs    → Главный координатор
-```
-
-### React Frontend (`src/`)
-
-```
-components/
-  Dashboard.tsx       → Управление системой
-  DeviceList.tsx      → Список подключенных устройств
-  ProfileList.tsx     → Профили и пресеты
-  PatternEditor.tsx   → Визуальный редактор паттернов
-api.ts                → Tauri API wrapper
-types.ts              → TypeScript типы
-```
+#### **Pattern System**
+Visual node-based patterns are converted to Rust `EventTrigger` structures:
+- **Condition evaluation** - Real-time checks against game state
+- **Pattern execution** - ADSR envelopes, curves, continuous modes
+- **Multi-device support** - Different patterns for different device types
 
 ---
 
-## 🎨 Визуальный редактор паттернов
+## 🎯 Pattern Examples
 
-**"Синтезатор Ощущений"** — это уникальная фича Butt Thunder.
-
-### ADSR Envelope:
-
-- **Attack** — мгновенный удар (0-100% за X мс)
-- **Hold** — удержание интенсивности
-- **Decay** — плавное затухание
-- **Burst** — количество повторений
-
-### Примеры паттернов:
-
-**Критическое попадание:**
+### **Example 1: Speed Warning**
 ```
-Attack:  80ms  (0 → 100%)
-Hold:    250ms (100%)
-Decay:   400ms (100% → 0%)
-Burst:   2x повтора
+[IAS Sensor] → [Condition: > 800 km/h] → [Vibration: Pulsing] → [Output]
 ```
+*Triggers when airspeed exceeds 800 km/h*
 
-**Работающий двигатель:**
+### **Example 2: Critical G-Load**
 ```
-Attack:  100ms (0 → 30%)
-Hold:    2000ms (30-35% пульсация)
-Decay:   150ms
-Burst:   0x (непрерывный)
+[G-Load Sensor] → [Multi-Condition: > 8G OR < -3G] → [Vibration: Sharp] → [Output]
 ```
+*Triggers on extreme G-forces*
+
+### **Example 3: Low Fuel + Enemy Hit**
+```
+[Fuel % Sensor] → [Condition: < 20%] ─┐
+[Hit Event] ─────────────────────────┼→ [Logic: AND] → [Vibration: Critical] → [Output]
+```
+*Intense feedback when hit while low on fuel*
+
+### **Example 4: Rotation on Engine Speed**
+```
+[RPM Sensor] → [Condition: > 2000] → [Rotate: Continuous] → [Output]
+```
+*Rotary device spins proportionally to engine RPM*
 
 ---
 
-## 🔒 Безопасность (EAC-Safe)
+## 📊 Supported Parameters
 
-### Почему это безопасно:
+### **Flight Dynamics**
+- IAS, TAS, Altitude, Mach, AoA, G-Load (Ny)
 
-1. **Только HTTP запросы** — приложение использует официальный API War Thunder (`localhost:8111`)
-2. **Никакой инъекции** — нет доступа к памяти игры
-3. **Нет изменения файлов** — игра остается нетронутой
-4. **Публичный API** — Gaijin сами предоставляют эти данные для внешних приложений
+### **Aircraft Controls**
+- Aileron, Elevator, Rudder, Flaps, Gear, Airbrake
+- Stick/Pedal raw inputs
 
-⚠️ **Важно:** Мы НЕ можем дать 100% гарантию от бана (это зависит от политики Gaijin), но архитектура приложения спроектирована так, чтобы быть максимально безопасной.
+### **Engine Telemetry**
+- RPM (multi-engine support)
+- Engine, Oil, Water temps
+- Manifold pressure, Throttle position
 
----
+### **Tank-Specific**
+- Stabilizer state, Gear ratio
+- Cruise control, Driving direction
+- Speed warning indicators
 
-## 📦 Готовые профили
+### **Weapons & Resources**
+- Ammo count, Cannon ready status
+- Fuel (kg & percentage)
+- Low fuel/ammo warnings
 
-### 1. **Танк RB - Иммерсивный реализм** (расширенный)
-- Сильные удары от попаданий (Hit, CriticalHit, PenetrationHit)
-- Глубокий рокот двигателя (EngineRunning)
-- Интенсивная вибрация при пожаре (EngineFire, EngineDestroyed)
-- Взрыв боекомплекта (AmmunitionExploded)
-- Повреждения гусениц (TrackBroken)
+### **Crew Status**
+- Total/Current crew count
+- Crew distance, Gunner/Driver state
 
-### 2. **Самолет - Универсальный** (10 новых событий!)
-- **Аэродинамика:** Overspeed, OverG, HighAOA, CriticalAOA, Mach1
-- **Топливо:** LowFuel, CriticalFuel
-- **Классика:** Stall, Spin, Hit, CriticalHit
-
-### 3. **Легкий Фон**
-- Ненавязчивая вибрация
-- Подходит для длительных сессий
-- Минимальная интенсивность
-
-## 🎯 Кастомные триггеры (НОВОЕ!)
-
-### Встроенные триггеры:
-- **Overspeed** — IAS > 800 км/ч
-- **OverG** — G-перегрузка > 10g
-- **HighAOA** — Угол атаки > 15°
-- **CriticalAOA** — Угол атаки > 20°
-- **Mach1** — Mach > 0.98
-- **LowFuel** — Топливо < 10%
-- **CriticalFuel** — Топливо < 5%
-- **LowAltitude** — Высота < 100м (на скорости)
-- **EngineOverheat** — Температура > 250°
-- **LowAmmo** — Боезапас < 20%
-
-См. [EVENTS_DOCUMENTATION.md](EVENTS_DOCUMENTATION.md) для полного списка 75+ событий!
+### **Advanced**
+- Blisters (1-4), Gear lamps (up/down/off)
+- Roll indicators available
 
 ---
 
-## 🛠️ Разработка
+## 🔐 Safety & Ethics
 
-### Структура проекта:
+### **EAC-Safe Guarantee**
+Tailgunner **ONLY** reads from War Thunder's official localhost API (`127.0.0.1:8111`). It does not:
+- ❌ Inject code into game memory
+- ❌ Modify game files
+- ❌ Hook into DirectX/OpenGL
+- ❌ Use any anti-cheat bypass techniques
 
-```
-butt_thunder/
-├── src/              # React frontend
-├── src-tauri/        # Rust backend
-│   ├── src/          # Исходники
-│   └── Cargo.toml    # Зависимости
-├── public/           # Статика
-└── package.json      # NPM зависимости
-```
-
-### Добавление нового события:
-
-1. Добавьте вариант в `GameEvent` enum (`pattern_engine.rs`)
-2. Добавьте маппинг в `EventEngine::map_wt_state_to_event()`
-3. Создайте паттерн в `VibrationPattern::preset_your_event()`
-4. Добавьте в профиль в `ProfileManager::load_default_profiles()`
-
-### Тестирование без War Thunder:
-
-Запустите mock сервер:
-
-```bash
-# TODO: Добавить mock server для тестирования
-```
+### **Device Safety**
+- **Rate Limiting**: Max 8 commands/second to prevent overheating
+- **Fail-Safe Mode**: Devices stop smoothly if game crashes
+- **Manual Override**: Emergency stop button in UI
 
 ---
 
 ## 🤝 Contributing
 
-Мы приветствуем вклад в проект!
+We welcome contributions! Areas of interest:
+- **New node types** (e.g., Constrict, Inflate)
+- **Additional game parameters**
+- **Community pattern library**
+- **Translations** (add your language!)
+- **Device profiles** (optimize for specific hardware)
 
-1. Fork репозиторий
-2. Создайте ветку (`git checkout -b feature/AmazingFeature`)
-3. Commit изменения (`git commit -m 'Add some AmazingFeature'`)
-4. Push в ветку (`git push origin feature/AmazingFeature`)
-5. Откройте Pull Request
-
----
-
-## 📚 Документация
-
-- [README.md](README.md) — основная информация
-- [ARCHITECTURE.md](ARCHITECTURE.md) — архитектура системы
-- [EVENTS_DOCUMENTATION.md](EVENTS_DOCUMENTATION.md) — **НОВОЕ!** Полный список 75+ событий
-- [CONTRIBUTING.md](CONTRIBUTING.md) — гайд для разработчиков
-- [CHANGELOG.md](CHANGELOG.md) — история изменений
+### **How to Contribute**
+1. Fork repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open Pull Request
 
 ---
 
-## 🔗 Источники данных
+## 📝 License
 
-Проект использует официальные источники:
-- [War Thunder localhost API docs](https://github.com/lucasvmx/WarThunder-localhost-documentation) ✅
-- [WarThunder Vehicles API](https://github.com/Sgambe33/WarThunder-Vehicles-API) 🔄
+MIT License - see [LICENSE](LICENSE) for details
 
 ---
 
-## 📄 Лицензия
+## 🎖️ Credits
 
-MIT License - см. [LICENSE](LICENSE)
+**Tailgunner** is powered by:
+- [Tauri](https://tauri.app/) - Cross-platform framework
+- [Buttplug.io](https://buttplug.io/) - Haptic device control
+- [React Flow](https://reactflow.dev/) - Node editor
+- [War Thunder API](https://github.com/lucasvmx/WarThunder-localhost-documentation) - Telemetry documentation
+
+---
+
+## 💬 Community
+
+- **Discord**: [Join our server](#) *(coming soon)*
+- **Reddit**: [r/Tailgunner](#) *(coming soon)*
+- **Pattern Library**: [Share your patterns](#) *(coming soon)*
+
+---
+
+## 🚀 Roadmap
+
+### **v0.2.0** *(Current)*
+- ✅ 50+ game parameters
+- ✅ Multi-condition nodes
+- ✅ Linear & Rotate devices
+- ✅ Full localization (EN/RU)
+
+### **v0.3.0** *(Planned)*
+- 🔄 Lovense direct API support
+- 🔄 Community pattern library
+- 🔄 AI pattern generator
+- 🔄 VR headset integration
+
+### **v1.0.0** *(Future)*
+- 🔮 Multi-game support (DCS, IL-2, etc.)
+- 🔮 Voice alerts & TTS
+- 🔮 Discord Rich Presence
+- 🔮 Tournament/Esports mode
 
 ---
 
 ## ⚠️ Disclaimer
 
-Этот проект не аффилирован с Gaijin Entertainment. Используйте на свой риск.
-
-**War Thunder** — торговая марка Gaijin Entertainment.
+Tailgunner is an **unofficial** third-party application and is **not affiliated with, endorsed by, or sponsored by Gaijin Entertainment**. War Thunder® is a registered trademark of Gaijin Entertainment. Use at your own risk.
 
 ---
 
-## 💬 Поддержка
+<div align="center">
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/butt_thunder/issues)
-- **Discord:** [Присоединиться](#) (TODO)
-- **Email:** support@buttthunder.app (TODO)
+**Developed with ❤️ for the War Thunder community**
 
----
+*Feel the Thunder. Be the Thunder.*
 
-**Сделано с ❤️ для War Thunder комьюнити**
-
-🎮 Играй. Чувствуй. Побеждай.
+</div>

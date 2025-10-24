@@ -19,12 +19,22 @@ import { InputNode } from './nodes/InputNode';
 import { ConditionNode } from './nodes/ConditionNode';
 import { VibrationNode } from './nodes/VibrationNode';
 import { OutputNode } from './nodes/OutputNode';
+import { LogicNode } from './nodes/LogicNode';
+import { EventNode } from './nodes/EventNode';
+import { LinearNode } from './nodes/LinearNode';
+import { RotateNode } from './nodes/RotateNode';
+import { MultiConditionNode } from './nodes/MultiConditionNode';
 
 const nodeTypes = {
   input: InputNode,
   condition: ConditionNode,
+  multiCondition: MultiConditionNode,
   vibration: VibrationNode,
+  linear: LinearNode,
+  rotate: RotateNode,
   output: OutputNode,
+  logic: LogicNode,
+  event: EventNode,
 };
 
 interface PatternEditorModalProps {
@@ -65,6 +75,12 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
         return { label: t('nodes.input.default_label'), indicator: 'speed', value: 0 };
       case 'condition':
         return { operator: '>', threshold: 100 };
+      case 'multiCondition':
+        return { logic: 'AND', conditions: [{ id: '1', operator: '>', value: 100 }] };
+      case 'logic':
+        return { operation: 'AND' };
+      case 'event':
+        return { event: 'Hit' };
       case 'vibration':
         return {
           duration: 1.0,
@@ -75,8 +91,12 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
             { x: 0.6, y: 0.8 },
           ],
         };
+      case 'linear':
+        return { duration: 1.0, position: 0.5, mode: 'once' };
+      case 'rotate':
+        return { duration: 1.0, speed: 0.5, clockwise: true, mode: 'once' };
       case 'output':
-        return {};
+        return { deviceMode: 'all', deviceType: 'vibrator', selectedDevices: [] };
       default:
         return {};
     }
@@ -148,18 +168,91 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
 
         <div className="modal-toolbar">
           <div className="node-buttons">
-            <button className="btn btn-sm" onClick={() => addNode('input')}>
-              ➕ {t('nodes.input.title')}
-            </button>
-            <button className="btn btn-sm" onClick={() => addNode('condition')}>
-              ➕ {t('nodes.condition.title')}
-            </button>
-            <button className="btn btn-sm" onClick={() => addNode('vibration')}>
-              ➕ {t('nodes.vibration.title')}
-            </button>
-            <button className="btn btn-sm" onClick={() => addNode('output')}>
-              ➕ {t('nodes.output.title')}
-            </button>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {/* Inputs */}
+              <button 
+                className="btn btn-sm node-btn-input" 
+                onClick={() => addNode('input')}
+                title="Add input sensor (Speed, G-Load, Fuel, etc.)"
+              >
+                📊 Input
+              </button>
+              <button 
+                className="btn btn-sm node-btn-event" 
+                onClick={() => addNode('event')}
+                title="Add game event trigger (Hit, Overspeed, etc.)"
+              >
+                ⚡ Event
+              </button>
+              
+              {/* Conditions */}
+              <button 
+                className="btn btn-sm node-btn-condition" 
+                onClick={() => addNode('condition')}
+                title="Add single condition (>, <, =, between)"
+              >
+                🔍 Condition
+              </button>
+              <button 
+                className="btn btn-sm" 
+                onClick={() => addNode('multiCondition')}
+                title="Add multiple conditions (AND/OR)"
+                style={{
+                  background: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 100%)',
+                  border: '1px solid #f97316',
+                  color: '#fff'
+                }}
+              >
+                🎯 Multi
+              </button>
+              <button 
+                className="btn btn-sm node-btn-logic" 
+                onClick={() => addNode('logic')}
+                title="Add logic gate (AND/OR/NOT/XOR)"
+              >
+                ⚙️ Logic
+              </button>
+              
+              {/* Outputs */}
+              <button 
+                className="btn btn-sm node-btn-vibration" 
+                onClick={() => addNode('vibration')}
+                title="Add vibration pattern"
+              >
+                💥 Vibro
+              </button>
+              <button 
+                className="btn btn-sm" 
+                onClick={() => addNode('linear')}
+                title="Add linear motion (strokers, thrusters)"
+                style={{
+                  background: 'linear-gradient(135deg, #065f46 0%, #059669 100%)',
+                  border: '1px solid #10b981',
+                  color: '#fff'
+                }}
+              >
+                📏 Linear
+              </button>
+              <button 
+                className="btn btn-sm" 
+                onClick={() => addNode('rotate')}
+                title="Add rotation (rotating toys)"
+                style={{
+                  background: 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)',
+                  border: '1px solid #8b5cf6',
+                  color: '#fff'
+                }}
+              >
+                🔄 Rotate
+              </button>
+              <button 
+                className="btn btn-sm node-btn-output" 
+                onClick={() => addNode('output')}
+                title="Add output to device"
+              >
+                📡 Output
+              </button>
+            </div>
           </div>
           
           <div className="node-actions">
@@ -188,13 +281,22 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
               nodeColor={(node) => {
                 switch (node.type) {
                   case 'input': return '#3b82f6';
-                  case 'condition': return '#8b5cf6';
+                  case 'event': return '#f59e0b';
+                  case 'condition': return '#a855f7';
+                  case 'multiCondition': return '#f97316';
+                  case 'logic': return '#6366f1';
                   case 'vibration': return '#ec4899';
+                  case 'linear': return '#10b981';
+                  case 'rotate': return '#8b5cf6';
                   case 'output': return '#10b981';
                   default: return '#6b7280';
                 }
               }}
-              maskColor="rgba(0, 0, 0, 0.2)"
+              maskColor="rgba(0, 0, 0, 0.3)"
+              style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px solid rgba(255, 153, 51, 0.3)'
+              }}
             />
           </ReactFlow>
         </div>

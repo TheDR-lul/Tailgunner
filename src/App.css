@@ -1,6 +1,7 @@
 /* ============================================
-   Современный UI для Butt Thunder
-   Дизайн: темная тема, градиенты, анимации
+   Modern UI for Tailgunner
+   powered by A.S.S. (Adaptive Sensory System)
+   Design: dark theme, gradients, animations
 ============================================ */
 
 :root {
@@ -864,4 +865,205 @@ textarea:focus {
 
 .stat-value.text-warning {
   color: #f59e0b;
+}
+
+/* ============================================
+   Pattern Editor Nodes - War Thunder Style
+============================================ */
+
+.custom-node {
+  min-width: 160px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.custom-node:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6),
+              0 0 20px rgba(255, 153, 51, 0.2);
+  transform: translateY(-2px);
+}
+
+.custom-node .node-header {
+  padding: 8px 12px;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.custom-node .node-body {
+  padding: 10px;
+  position: relative;
+}
+
+.node-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.node-select:hover {
+  filter: brightness(1.2);
+}
+
+.node-select:focus {
+  box-shadow: 0 0 0 2px rgba(255, 153, 51, 0.3);
+}
+
+.node-value {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.node-input-field {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 11px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.node-input-field:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(255, 153, 51, 0.2);
+}
+
+.node-input-field:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Node Button Styles */
+.node-btn-input {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  border: 1px solid #3b82f6;
+  color: #fff;
+}
+
+.node-btn-input:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.node-btn-event {
+  background: linear-gradient(135deg, #92400e 0%, #f59e0b 100%);
+  border: 1px solid #f59e0b;
+  color: #fff;
+}
+
+.node-btn-event:hover {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.node-btn-condition {
+  background: linear-gradient(135deg, #581c87 0%, #a855f7 100%);
+  border: 1px solid #a855f7;
+  color: #fff;
+}
+
+.node-btn-condition:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #c084fc 100%);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.node-btn-logic {
+  background: linear-gradient(135deg, #3730a3 0%, #6366f1 100%);
+  border: 1px solid #6366f1;
+  color: #fff;
+}
+
+.node-btn-logic:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #818cf8 100%);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.node-btn-vibration {
+  background: linear-gradient(135deg, #9f1239 0%, #ec4899 100%);
+  border: 1px solid #ec4899;
+  color: #fff;
+}
+
+.node-btn-vibration:hover {
+  background: linear-gradient(135deg, #db2777 0%, #f472b6 100%);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+}
+
+.node-btn-output {
+  background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
+  border: 1px solid #10b981;
+  color: #fff;
+}
+
+.node-btn-output:hover {
+  background: linear-gradient(135deg, #059669 0%, #34d399 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* React Flow Edge Styles */
+.react-flow__edge-path {
+  stroke-width: 2px;
+  stroke: rgba(255, 153, 51, 0.5);
+  transition: all 0.2s ease;
+}
+
+.react-flow__edge-path:hover {
+  stroke: rgba(255, 153, 51, 0.8);
+  stroke-width: 3px;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--primary);
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 4px var(--primary-glow));
+}
+
+/* React Flow Controls */
+.react-flow__controls {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.react-flow__controls-button {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-hover);
+  color: var(--primary);
+}
+
+/* React Flow Background */
+.react-flow__background {
+  background-color: var(--bg-primary);
+}
+
+.react-flow__background-pattern {
+  stroke: rgba(255, 153, 51, 0.08);
 }
