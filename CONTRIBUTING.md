@@ -319,7 +319,15 @@ tailgunner/
 
 ## ⚖️ License
 
-By contributing to this project, you agree that your code will be licensed under the MIT License.
+By contributing to this project, you agree that your contributions will be licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)** license.
+
+This means your contributions:
+- ✅ Will be freely available for non-commercial use
+- ✅ Can be modified and shared by others
+- ✅ Must maintain the same license terms
+- ❌ Cannot be used commercially without explicit permission
+
+All contributors retain their copyright while granting the project rights to use their contributions under the CC BY-NC-SA 4.0 license.
 
 ---
 

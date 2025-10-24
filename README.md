@@ -287,7 +287,26 @@ We welcome contributions! Areas of interest:
 
 ## 📝 License
 
-MIT License - see [LICENSE](LICENSE) for details
+**Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**
+
+This project is **free and open source** for personal, educational, and non-commercial use.
+
+✅ **You CAN:**
+- Use the software for personal gaming and entertainment
+- Modify and customize for your own use
+- Share modifications with the community
+- Use in educational settings
+- Contribute improvements back to the project
+
+❌ **You CANNOT:**
+- Use in commercial products or services
+- Sell the software or derivative works
+- Offer as a paid service
+- Use to generate revenue in any form
+
+See [LICENSE](LICENSE) for full details.
+
+For commercial licensing inquiries, please contact the maintainers.
 
 ---
 

@@ -1,0 +1,136 @@
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+
+Copyright (c) 2025 Tailgunner Contributors
+
+This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+
+===================================================================================
+
+TERMS AND CONDITIONS
+
+1. Definitions
+
+   a. "Licensed Material" means the software, documentation, and any other materials made available under this License.
+   
+   b. "NonCommercial" means not primarily intended for or directed towards commercial advantage or monetary compensation.
+   
+   c. "Share" means to provide material to the public by any means or process that requires permission under the Licensed Rights.
+   
+   d. "Adapted Material" means material derived from or based upon the Licensed Material.
+
+2. License Grant
+
+   Subject to the terms and conditions of this License, the Licensor hereby grants You a worldwide, royalty-free, non-sublicensable, non-exclusive, irrevocable license to:
+   
+   a. Reproduce and Share the Licensed Material, in whole or in part, for NonCommercial purposes only;
+   
+   b. Produce, reproduce, and Share Adapted Material for NonCommercial purposes only.
+
+3. License Conditions
+
+   Your exercise of the Licensed Rights is expressly made subject to the following conditions:
+   
+   a. Attribution
+      - You must give appropriate credit to the original author(s)
+      - Provide a link to this license
+      - Indicate if changes were made
+      - You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use
+   
+   b. NonCommercial
+      - You may not use the material for commercial purposes
+      - You may not sell or profit from the software or derivative works
+      - You may not use the software in a commercial product or service
+   
+   c. ShareAlike
+      - If you remix, transform, or build upon the material, you must distribute your contributions under the same license as the original
+
+4. Restrictions
+
+   You may NOT:
+   
+   a. Use this software for commercial purposes, including but not limited to:
+      - Selling the software or derivative works
+      - Using the software in a paid product or service
+      - Monetizing the software through advertising or subscriptions
+      - Using the software in a commercial organization's internal systems for profit-generating activities
+   
+   b. Sublicense the software
+   
+   c. Hold the Licensor liable for damages
+   
+   d. Remove or alter any copyright notices
+
+5. Patent Claims
+
+   This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Licensed Material.
+
+6. Disclaimer of Warranties
+
+   THE LICENSED MATERIAL IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. Limitation of Liability
+
+   TO THE EXTENT POSSIBLE UNDER APPLICABLE LAW, THE LICENSOR WILL NOT BE LIABLE TO YOU ON ANY LEGAL THEORY (INCLUDING, WITHOUT LIMITATION, NEGLIGENCE) OR OTHERWISE FOR ANY DIRECT, SPECIAL, INDIRECT, INCIDENTAL, CONSEQUENTIAL, PUNITIVE, EXEMPLARY, OR OTHER LOSSES, COSTS, EXPENSES, OR DAMAGES ARISING OUT OF THIS LICENSE OR USE OF THE LICENSED MATERIAL.
+
+8. Termination
+
+   a. This License and the rights granted hereunder will terminate automatically upon any breach by You of the terms of this License.
+   
+   b. Where Your right to use the Licensed Material has terminated, it reinstates:
+      - Automatically as of the date the violation is cured, provided it is cured within 30 days of Your discovery of the violation; or
+      - Upon express reinstatement by the Licensor
+
+9. Other Terms
+
+   a. The Licensor shall not be bound by any additional or different terms or conditions communicated by You unless expressly agreed.
+   
+   b. Any arrangements, understandings, or agreements regarding the Licensed Material not stated herein are separate from and independent of the terms and conditions of this License.
+
+10. Interpretation
+
+    a. For the avoidance of doubt, this License does not, and shall not be interpreted to, reduce, limit, restrict, or impose conditions on any use of the Licensed Material that could lawfully be made without permission under this License.
+    
+    b. To the extent possible, if any provision of this License is deemed unenforceable, it shall be automatically reformed to the minimum extent necessary to make it enforceable. If the provision cannot be reformed, it shall be severed from this License without affecting the enforceability of the remaining terms and conditions.
+    
+    c. No term or condition of this License will be waived and no failure to comply consented to unless expressly agreed to by the Licensor.
+
+===================================================================================
+
+For the full legal text, see: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+To view a copy of this license, visit:
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+===================================================================================
+
+ADDITIONAL CLARIFICATIONS FOR TAILGUNNER
+
+1. Personal Use: You are free to use this software for personal, non-commercial purposes, including:
+   - Playing War Thunder with haptic feedback
+   - Modifying the software for your own use
+   - Sharing your modifications with friends (non-commercially)
+
+2. Community Contributions: You may contribute improvements back to the project under the same license terms.
+
+3. Educational Use: Use in educational settings (schools, universities) is permitted as long as no fees are charged specifically for the software.
+
+4. Commercial Use Prohibited: You may NOT:
+   - Include this software in a paid product
+   - Offer this software as a paid service
+   - Use this software in a business to generate revenue
+   - Sell modified versions or derivative works
+
+5. Contact: For commercial licensing inquiries, please contact the project maintainers.
+
+===================================================================================
+
+THIRD-PARTY COMPONENTS
+
+This software uses third-party components that are licensed under their own terms:
+- Tauri (Apache-2.0 or MIT)
+- React (MIT)
+- Buttplug.io (BSD-3-Clause)
+- Rust dependencies (various open source licenses)
+
+Please refer to the respective licenses of these components.
+

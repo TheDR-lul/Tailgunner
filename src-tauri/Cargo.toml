@@ -1,8 +1,9 @@
 [package]
 name = "butt_thunder"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Haptic feedback system for War Thunder via Buttplug.io"
+authors = ["Tailgunner Contributors"]
+license = "CC-BY-NC-SA-4.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
