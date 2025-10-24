@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import { Activity, Gauge, Zap, Wind, Droplet, Crosshair, Fuel, Thermometer, Settings, Users, Navigation } from 'lucide-react';
 
@@ -9,7 +9,7 @@ interface InputNodeData {
   value?: number;
 }
 
-export function InputNode({ data, id }: { data: InputNodeData; id: string }) {
+export function InputNode({ data, id, selected }: { data: InputNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [indicator, setIndicator] = useState(data.indicator || 'speed');
   
@@ -95,9 +95,17 @@ export function InputNode({ data, id }: { data: InputNodeData; id: string }) {
       onClick={(e) => e.stopPropagation()}
       style={{
         background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
-        border: '2px solid rgba(255, 153, 51, 0.3)',
+        border: '1px solid rgba(255, 153, 51, 0.2)',
+        outline: 'none',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
       }}
     >
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={180} 
+        minHeight={120}
+        color="rgba(255, 153, 51, 0.8)"
+      />
       <div className="node-header" style={{ background: 'rgba(255, 153, 51, 0.15)' }}>
         <Icon size={16} color="#ff9933" />
         <span style={{ color: '#ff9933' }}>{t('nodes.input.title')}</span>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import { GitBranch, Check, X } from 'lucide-react';
 
@@ -9,7 +9,7 @@ interface ConditionNodeData {
   threshold2?: number;
 }
 
-export function ConditionNode({ data, id }: { data: ConditionNodeData; id: string }) {
+export function ConditionNode({ data, id, selected }: { data: ConditionNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [operator, setOperator] = useState(data.operator || '>');
   const [threshold, setThreshold] = useState(data.threshold || 0);
@@ -48,6 +48,12 @@ export function ConditionNode({ data, id }: { data: ConditionNodeData; id: strin
         minWidth: '200px'
       }}
     >
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={200} 
+        minHeight={140}
+        color="rgba(255, 153, 51, 0.8)"
+      />
       <div className="node-header" style={{ background: 'rgba(93, 138, 168, 0.2)' }}>
         <GitBranch size={16} color="#5d8aa8" />
         <span style={{ color: '#5d8aa8' }}>{t('nodes.condition.title')}</span>

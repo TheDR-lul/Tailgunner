@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -53,6 +53,16 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
   const [patternName, setPatternName] = useState(initialData?.name || '');
   const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
+
+  // Update nodes and edges when initialData changes (e.g., when editing a pattern)
+  useEffect(() => {
+    if (initialData) {
+      setPatternName(initialData.name || '');
+      setNodes(initialData.nodes || []);
+      setEdges(initialData.edges || []);
+      console.log('[Pattern Editor] Loaded pattern:', initialData.name, 'Nodes:', initialData.nodes?.length, 'Edges:', initialData.edges?.length);
+    }
+  }, [initialData, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -135,14 +145,16 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
             setPatternName(config.name || '');
             setNodes(config.nodes || []);
             setEdges(config.edges || []);
+            console.log('[Pattern Editor] Imported pattern:', config.name, 'Nodes:', config.nodes?.length);
           } catch (error) {
-            alert(t('pattern_editor.import_error'));
+            console.error('[Pattern Editor] Import error:', error);
+            alert(t('pattern_editor.import_error') || 'Failed to import pattern');
           }
         };
         reader.readAsText(file);
       }
     };
-    input.click();
+    input.click(); // ⚠️ ДОБАВЛЕНО! Без этого диалог не открывался!
   };
 
   if (!isOpen) return null;

@@ -168,13 +168,18 @@ impl WTTelemetryReader {
         
         let type_str = json.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
         
+        log::info!("[WT Parser] RAW type from API: '{}', valid: {}", type_str, valid);
+        
         // Extract vehicle name from type string
         // Examples:
         // - "tankModels/sw_cv_90105_tml" -> "sw_cv_90105_tml"
         // - "rafale_c_f3" -> "rafale_c_f3"
         let vehicle_name = if type_str.contains('/') {
-            type_str.split('/').last().unwrap_or(type_str).to_string()
+            let name = type_str.split('/').last().unwrap_or(type_str).to_string();
+            log::info!("[WT Parser] Extracted vehicle name from path: '{}'", name);
+            name
         } else {
+            log::info!("[WT Parser] Using type string as vehicle name: '{}'", type_str);
             type_str.to_string()
         };
         
@@ -198,9 +203,10 @@ impl WTTelemetryReader {
             .unwrap_or_default();
 
         // Парсим indicators из ТОГО ЖЕ JSON (все данные в /state)
-        let indicators = self.parse_indicators(json);
+        let indicators = self.parse_indicators(json.clone());
 
-        log::info!("[WT Parser] Vehicle: '{}', Type: {:?}", vehicle_name, type_);
+        log::info!("[WT Parser] ✅ Final Vehicle: '{}', Type: {:?}, Speed: {:.0} km/h", 
+            vehicle_name, type_, indicators.speed);
 
         Ok(GameState {
             valid,

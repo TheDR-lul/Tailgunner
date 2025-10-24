@@ -13,7 +13,11 @@ export function DebugConsole() {
   const { t } = useTranslation();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [updateInterval, setUpdateInterval] = useState(() => 
+    parseInt(localStorage.getItem('gameStatusUpdateInterval') || '200')
+  );
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const logTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const newLog: LogEntry = {
@@ -23,6 +27,19 @@ export function DebugConsole() {
       message,
     };
     setLogs(prev => [...prev, newLog]);
+  };
+
+  const handleIntervalChange = (value: number) => {
+    setUpdateInterval(value);
+    localStorage.setItem('gameStatusUpdateInterval', value.toString());
+    
+    // Debounce logging - only log after user stops dragging
+    if (logTimeoutRef.current) {
+      clearTimeout(logTimeoutRef.current);
+    }
+    logTimeoutRef.current = setTimeout(() => {
+      addLog('info', `⚙️ Update rate: ${value}ms (${(1000/value).toFixed(1)} Hz)`);
+    }, 500); // Log only after 500ms of no changes
   };
 
   const clearLogs = () => {
@@ -45,6 +62,15 @@ export function DebugConsole() {
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (logTimeoutRef.current) {
+        clearTimeout(logTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Expose addLog globally for debugging
   useEffect(() => {
@@ -95,6 +121,54 @@ export function DebugConsole() {
 
       {isExpanded && (
         <div className="debug-body">
+          {/* Settings Section */}
+          <div style={{ 
+            borderBottom: '1px solid var(--border)', 
+            marginBottom: '12px', 
+            paddingBottom: '12px',
+            background: 'rgba(255, 153, 51, 0.05)',
+            padding: '10px',
+            borderRadius: '4px'
+          }}>
+            <div style={{ 
+              fontSize: '11px', 
+              color: '#ff9933', 
+              fontWeight: 'bold', 
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              ⚙️ Update Rate
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="range"
+                min="50"
+                max="1000"
+                step="50"
+                value={updateInterval}
+                onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
+                style={{ flex: 1 }}
+              />
+              <span style={{ 
+                fontSize: '11px', 
+                color: 'var(--text-secondary)', 
+                minWidth: '100px',
+                textAlign: 'right'
+              }}>
+                {updateInterval}ms ({(1000/updateInterval).toFixed(1)} Hz)
+              </span>
+            </div>
+            <div style={{ 
+              fontSize: '10px', 
+              color: 'var(--text-muted)', 
+              marginTop: '6px'
+            }}>
+              Lower = faster updates, Higher = less CPU usage
+            </div>
+          </div>
+
           <div className="log-entry log-info" style={{ borderBottom: '1px solid var(--border)', marginBottom: '8px', paddingBottom: '8px' }}>
             <span 
               className="log-message"

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import { MoveVertical } from 'lucide-react';
 
@@ -9,7 +9,7 @@ interface LinearNodeData {
   mode: 'once' | 'continuous';
 }
 
-export function LinearNode({ data, id }: { data: LinearNodeData; id: string }) {
+export function LinearNode({ data, id, selected }: { data: LinearNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [duration, setDuration] = useState(data.duration || 1.0);
   const [position, setPosition] = useState(data.position || 0.5);
@@ -26,14 +26,20 @@ export function LinearNode({ data, id }: { data: LinearNodeData; id: string }) {
       className="custom-node linear-node" 
       onClick={(e) => e.stopPropagation()}
       style={{
-        background: 'linear-gradient(135deg, #065f46 0%, #059669 100%)',
-        border: '2px solid #10b981',
+        background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
+        border: '2px solid rgba(93, 138, 168, 0.4)',
         minWidth: '180px'
       }}
     >
-      <div className="node-header" style={{ background: 'rgba(16, 185, 129, 0.2)' }}>
-        <MoveVertical size={16} color="#10b981" />
-        <span style={{ color: '#10b981' }}>Linear Motion</span>
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={180} 
+        minHeight={140}
+        color="rgba(255, 153, 51, 0.8)"
+      />
+      <div className="node-header" style={{ background: 'rgba(93, 138, 168, 0.2)' }}>
+        <MoveVertical size={16} color="#5d8aa8" />
+        <span style={{ color: '#5d8aa8' }}>Linear Motion</span>
       </div>
       <div className="node-body">
         <Handle 
@@ -51,7 +57,7 @@ export function LinearNode({ data, id }: { data: LinearNodeData; id: string }) {
         
         <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div>
-            <label style={{ fontSize: '10px', color: '#10b981', marginBottom: '4px', display: 'block' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
               Mode:
             </label>
             <select 
@@ -60,8 +66,8 @@ export function LinearNode({ data, id }: { data: LinearNodeData; id: string }) {
               className="node-select"
               style={{
                 background: 'rgba(0, 0, 0, 0.3)',
-                border: '1px solid #10b981',
-                color: '#10b981',
+                border: '1px solid rgba(93, 138, 168, 0.5)',
+                color: '#94a3b8',
                 fontSize: '11px'
               }}
             >
@@ -71,7 +77,7 @@ export function LinearNode({ data, id }: { data: LinearNodeData; id: string }) {
           </div>
           
           <div>
-            <label style={{ fontSize: '10px', color: '#10b981', marginBottom: '4px', display: 'block' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
               Duration (s): {duration.toFixed(1)}
             </label>
             <input
@@ -88,7 +94,7 @@ export function LinearNode({ data, id }: { data: LinearNodeData; id: string }) {
           </div>
           
           <div>
-            <label style={{ fontSize: '10px', color: '#10b981', marginBottom: '4px', display: 'block' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
               Position: {(position * 100).toFixed(0)}%
             </label>
             <input
@@ -109,7 +115,7 @@ export function LinearNode({ data, id }: { data: LinearNodeData; id: string }) {
             background: 'rgba(16, 185, 129, 0.2)',
             borderRadius: '4px',
             fontSize: '9px',
-            color: '#10b981',
+            color: '#94a3b8',
             textAlign: 'center'
           }}>
             📏 Linear actuators (strokers, thrusters)

@@ -877,6 +877,19 @@ textarea:focus {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   transition: all 0.2s ease;
   position: relative;
+  outline: none !important;
+}
+
+.custom-node *,
+.custom-node::before,
+.custom-node::after {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.input-node,
+.output-node {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
 }
 
 .custom-node:hover {
@@ -920,6 +933,22 @@ textarea:focus {
 
 .node-select:focus {
   box-shadow: 0 0 0 2px rgba(255, 153, 51, 0.3);
+}
+
+.node-select option,
+.node-select optgroup {
+  background: #1a1f29 !important;
+  color: #e2e8f0 !important;
+  font-weight: normal;
+  padding: 6px 10px;
+}
+
+.node-select optgroup {
+  color: #ff9933 !important;
+  font-weight: bold;
+  font-size: 11px;
+  background: #0d0f14 !important;
+  padding: 8px 10px;
 }
 
 .node-value {
@@ -1021,6 +1050,41 @@ textarea:focus {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
+/* React Flow Node Selection - ABSOLUTELY NO WHITE BORDERS */
+.react-flow__node,
+.react-flow__node.selected,
+.react-flow__node:focus,
+.react-flow__node:focus-visible,
+.react-flow__node.selectable {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.react-flow__node.selected .custom-node {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7),
+              0 0 0 2px rgba(255, 153, 51, 0.6),
+              0 0 20px rgba(255, 153, 51, 0.3) !important;
+}
+
+/* Remove any white borders from React Flow wrapper */
+.react-flow__node > div:not(.custom-node),
+.react-flow__node::before,
+.react-flow__node::after {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Force remove borders on React Flow internal elements */
+.react-flow__node-default,
+.react-flow__node-input,
+.react-flow__node-output {
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
 /* React Flow Edge Styles */
 .react-flow__edge-path {
   stroke-width: 2px;
@@ -1037,6 +1101,40 @@ textarea:focus {
   stroke: var(--primary);
   stroke-width: 3px;
   filter: drop-shadow(0 0 4px var(--primary-glow));
+}
+
+/* Node Resizer - COMPLETELY HIDDEN BORDERS */
+.react-flow__resize-control {
+  border: none !important;
+  background: transparent !important;
+}
+
+.react-flow__resize-control.line {
+  border: none !important;
+  background: transparent !important;
+  opacity: 0 !important;
+  display: none !important;
+}
+
+.react-flow__resize-control.handle {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(255, 153, 51, 0.5);
+  border: none !important;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.react-flow__node:hover .react-flow__resize-control.handle,
+.react-flow__node.selected .react-flow__resize-control.handle {
+  opacity: 0.8;
+}
+
+.react-flow__resize-control.handle:hover {
+  background: rgba(255, 153, 51, 1);
+  box-shadow: 0 0 6px rgba(255, 153, 51, 0.8);
+  opacity: 1 !important;
 }
 
 /* React Flow Controls */

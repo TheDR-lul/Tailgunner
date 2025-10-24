@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import { Radio, Smartphone, Vibrate, Users } from 'lucide-react';
 
@@ -9,7 +9,7 @@ interface OutputNodeData {
   selectedDevices?: string[];
 }
 
-export function OutputNode({ data, id }: { data: OutputNodeData; id: string }) {
+export function OutputNode({ data, id, selected }: { data: OutputNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [deviceMode, setDeviceMode] = useState<'all' | 'specific' | 'type'>(data.deviceMode || 'all');
   const [deviceType, setDeviceType] = useState(data.deviceType || 'vibrator');
@@ -42,10 +42,18 @@ export function OutputNode({ data, id }: { data: OutputNodeData; id: string }) {
       onClick={(e) => e.stopPropagation()}
       style={{
         background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
-        border: '2px solid rgba(255, 153, 51, 0.3)',
+        border: '1px solid rgba(255, 153, 51, 0.2)',
+        outline: 'none',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
         minWidth: '200px'
       }}
     >
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={200} 
+        minHeight={150}
+        color="rgba(255, 153, 51, 0.8)"
+      />
       <div className="node-header" style={{ background: 'rgba(255, 153, 51, 0.15)' }}>
         <Radio size={16} color="#ff9933" />
         <span style={{ color: '#ff9933' }}>{t('nodes.output.title')}</span>

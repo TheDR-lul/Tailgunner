@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 
 interface CurvePoint {
@@ -16,7 +16,7 @@ export interface VibrationNodeData {
   repeatCount?: number;
 }
 
-export function VibrationNode({ data, id }: { data: VibrationNodeData; id: string }) {
+export function VibrationNode({ data, id, selected }: { data: VibrationNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [duration, setDuration] = useState(data.duration || 1.0);
   const [curve, setCurve] = useState<CurvePoint[]>(data.curve || [
@@ -287,6 +287,12 @@ export function VibrationNode({ data, id }: { data: VibrationNodeData; id: strin
   
   return (
     <div className="node-vibration" onClick={(e) => e.stopPropagation()}>
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={250} 
+        minHeight={200}
+        color="rgba(255, 153, 51, 0.8)"
+      />
       <Handle type="target" position={Position.Left} id="trigger" />
       
       <div className="node-header">💥 {t('nodes.vibration.title')}</div>

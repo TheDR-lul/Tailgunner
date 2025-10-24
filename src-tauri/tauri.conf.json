@@ -16,7 +16,9 @@
         "width": 1280,
         "height": 720,
         "minWidth": 1024,
-        "minHeight": 576
+        "minHeight": 576,
+        "decorations": true,
+        "transparent": false
       }
     ],
     "security": {

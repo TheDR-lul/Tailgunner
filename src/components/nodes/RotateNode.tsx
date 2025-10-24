@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import { RotateCw } from 'lucide-react';
 
@@ -10,7 +10,7 @@ interface RotateNodeData {
   mode: 'once' | 'continuous';
 }
 
-export function RotateNode({ data, id }: { data: RotateNodeData; id: string }) {
+export function RotateNode({ data, id, selected }: { data: RotateNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [duration, setDuration] = useState(data.duration || 1.0);
   const [speed, setSpeed] = useState(data.speed || 0.5);
@@ -29,14 +29,20 @@ export function RotateNode({ data, id }: { data: RotateNodeData; id: string }) {
       className="custom-node rotate-node" 
       onClick={(e) => e.stopPropagation()}
       style={{
-        background: 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)',
-        border: '2px solid #8b5cf6',
+        background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
+        border: '2px solid rgba(93, 138, 168, 0.4)',
         minWidth: '180px'
       }}
     >
-      <div className="node-header" style={{ background: 'rgba(139, 92, 246, 0.2)' }}>
-        <RotateCw size={16} color="#8b5cf6" />
-        <span style={{ color: '#8b5cf6' }}>Rotation</span>
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={180} 
+        minHeight={160}
+        color="rgba(255, 153, 51, 0.8)"
+      />
+      <div className="node-header" style={{ background: 'rgba(93, 138, 168, 0.2)' }}>
+        <RotateCw size={16} color="#5d8aa8" />
+        <span style={{ color: '#5d8aa8' }}>Rotation</span>
       </div>
       <div className="node-body">
         <Handle 
@@ -54,7 +60,7 @@ export function RotateNode({ data, id }: { data: RotateNodeData; id: string }) {
         
         <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div>
-            <label style={{ fontSize: '10px', color: '#8b5cf6', marginBottom: '4px', display: 'block' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
               Mode:
             </label>
             <select 
@@ -63,8 +69,8 @@ export function RotateNode({ data, id }: { data: RotateNodeData; id: string }) {
               className="node-select"
               style={{
                 background: 'rgba(0, 0, 0, 0.3)',
-                border: '1px solid #8b5cf6',
-                color: '#8b5cf6',
+                border: '1px solid rgba(93, 138, 168, 0.5)',
+                color: '#94a3b8',
                 fontSize: '11px'
               }}
             >
@@ -74,7 +80,7 @@ export function RotateNode({ data, id }: { data: RotateNodeData; id: string }) {
           </div>
           
           <div>
-            <label style={{ fontSize: '10px', color: '#8b5cf6', marginBottom: '4px', display: 'block' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
               Duration (s): {duration.toFixed(1)}
             </label>
             <input
@@ -91,7 +97,7 @@ export function RotateNode({ data, id }: { data: RotateNodeData; id: string }) {
           </div>
           
           <div>
-            <label style={{ fontSize: '10px', color: '#8b5cf6', marginBottom: '4px', display: 'block' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
               Speed: {(speed * 100).toFixed(0)}%
             </label>
             <input
@@ -113,7 +119,7 @@ export function RotateNode({ data, id }: { data: RotateNodeData; id: string }) {
               alignItems: 'center', 
               gap: '6px',
               fontSize: '11px',
-              color: '#8b5cf6',
+              color: '#94a3b8',
               cursor: 'pointer'
             }}>
               <input
@@ -131,7 +137,7 @@ export function RotateNode({ data, id }: { data: RotateNodeData; id: string }) {
             background: 'rgba(139, 92, 246, 0.2)',
             borderRadius: '4px',
             fontSize: '9px',
-            color: '#8b5cf6',
+            color: '#94a3b8',
             textAlign: 'center'
           }}>
             🔄 Rotary devices (rotating toys)

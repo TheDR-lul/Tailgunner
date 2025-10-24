@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import { Layers } from 'lucide-react';
 
@@ -7,7 +7,7 @@ interface LogicNodeData {
   operation: 'AND' | 'OR' | 'NOT' | 'XOR';
 }
 
-export function LogicNode({ data, id }: { data: LogicNodeData; id: string }) {
+export function LogicNode({ data, id, selected }: { data: LogicNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [operation, setOperation] = useState(data.operation || 'AND');
   
@@ -30,14 +30,20 @@ export function LogicNode({ data, id }: { data: LogicNodeData; id: string }) {
       className="custom-node logic-node" 
       onClick={(e) => e.stopPropagation()}
       style={{
-        background: `linear-gradient(135deg, ${selectedOp.color}22 0%, ${selectedOp.color}44 100%)`,
-        border: `2px solid ${selectedOp.color}`,
+        background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
+        border: '2px solid rgba(93, 138, 168, 0.4)',
         minWidth: '160px'
       }}
     >
-      <div className="node-header" style={{ background: `${selectedOp.color}33` }}>
-        <Layers size={16} color={selectedOp.color} />
-        <span style={{ color: selectedOp.color }}>Logic Gate</span>
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={160} 
+        minHeight={120}
+        color="rgba(255, 153, 51, 0.8)"
+      />
+      <div className="node-header" style={{ background: 'rgba(93, 138, 168, 0.2)' }}>
+        <Layers size={16} color="#5d8aa8" />
+        <span style={{ color: '#5d8aa8' }}>Logic Gate</span>
       </div>
       <div className="node-body">
         {/* Input A */}

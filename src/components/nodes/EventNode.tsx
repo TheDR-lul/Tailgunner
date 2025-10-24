@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import { Zap, Target, AlertTriangle, Flame, Droplet, Wind } from 'lucide-react';
 
@@ -7,7 +7,7 @@ interface EventNodeData {
   event: string;
 }
 
-export function EventNode({ data, id }: { data: EventNodeData; id: string }) {
+export function EventNode({ data, id, selected }: { data: EventNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [event, setEvent] = useState(data.event || 'Hit');
   
@@ -40,14 +40,20 @@ export function EventNode({ data, id }: { data: EventNodeData; id: string }) {
       className="custom-node event-node" 
       onClick={(e) => e.stopPropagation()}
       style={{
-        background: `linear-gradient(135deg, ${selectedEvent.color}22 0%, ${selectedEvent.color}44 100%)`,
-        border: `2px solid ${selectedEvent.color}`,
+        background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
+        border: '2px solid rgba(255, 153, 51, 0.3)',
         minWidth: '180px'
       }}
     >
-      <div className="node-header" style={{ background: `${selectedEvent.color}33` }}>
-        <EventIcon size={16} color={selectedEvent.color} />
-        <span style={{ color: selectedEvent.color }}>Game Event</span>
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={180} 
+        minHeight={100}
+        color="rgba(255, 153, 51, 0.8)"
+      />
+      <div className="node-header" style={{ background: 'rgba(255, 153, 51, 0.15)' }}>
+        <EventIcon size={16} color="#ff9933" />
+        <span style={{ color: '#ff9933' }}>Game Event</span>
       </div>
       <div className="node-body">
         <div style={{ padding: '8px' }}>

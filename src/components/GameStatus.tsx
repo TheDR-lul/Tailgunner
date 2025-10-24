@@ -17,24 +17,38 @@ export function GameStatus() {
   });
 
   useEffect(() => {
+    // Get update interval from localStorage (default: 200ms = 5 times per second)
+    const updateInterval = parseInt(localStorage.getItem('gameStatusUpdateInterval') || '200');
+    
     const interval = setInterval(async () => {
-      const gameStatus = await api.getGameStatus();
-      setStatus(gameStatus);
-      
-      // Log only on connection/disconnection
-      if (gameStatus.connected && !status.connected) {
-        if ((window as any).debugLog) {
-          (window as any).debugLog('success', `WT connected: ${gameStatus.vehicle_name}`);
+      try {
+        const gameStatus = await api.getGameStatus();
+        setStatus(gameStatus);
+        
+        // Log vehicle changes
+        if (gameStatus.connected && gameStatus.vehicle_name !== status.vehicle_name && gameStatus.vehicle_name !== 'N/A') {
+          if ((window as any).debugLog) {
+            (window as any).debugLog('info', `🚗 Vehicle: ${gameStatus.vehicle_name}`);
+          }
         }
-      } else if (!gameStatus.connected && status.connected) {
-        if ((window as any).debugLog) {
-          (window as any).debugLog('warn', 'WT disconnected');
+        
+        // Log only on connection/disconnection
+        if (gameStatus.connected && !status.connected) {
+          if ((window as any).debugLog) {
+            (window as any).debugLog('success', `✅ WT connected: ${gameStatus.vehicle_name}`);
+          }
+        } else if (!gameStatus.connected && status.connected) {
+          if ((window as any).debugLog) {
+            (window as any).debugLog('warn', '⚠️ WT disconnected');
+          }
         }
+      } catch (error) {
+        console.error('[GameStatus] Failed to get game status:', error);
       }
-    }, 1000);
+    }, updateInterval);
 
     return () => clearInterval(interval);
-  }, [status.connected]);
+  }, [status.connected, status.vehicle_name]);
 
   return (
     <div className="card game-status-card">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import { Filter, Plus, X } from 'lucide-react';
 
@@ -14,7 +14,7 @@ interface MultiConditionNodeData {
   conditions: Condition[];
 }
 
-export function MultiConditionNode({ data, id }: { data: MultiConditionNodeData; id: string }) {
+export function MultiConditionNode({ data, id, selected }: { data: MultiConditionNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [logic, setLogic] = useState(data.logic || 'AND');
   const [conditions, setConditions] = useState<Condition[]>(data.conditions || [
@@ -51,15 +51,21 @@ export function MultiConditionNode({ data, id }: { data: MultiConditionNodeData;
       className="custom-node multi-condition-node" 
       onClick={(e) => e.stopPropagation()}
       style={{
-        background: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 100%)',
-        border: '2px solid #f97316',
+        background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
+        border: '2px solid rgba(93, 138, 168, 0.4)',
         minWidth: '220px',
         maxWidth: '280px'
       }}
     >
-      <div className="node-header" style={{ background: 'rgba(249, 115, 22, 0.2)' }}>
-        <Filter size={16} color="#f97316" />
-        <span style={{ color: '#f97316' }}>Multi Condition</span>
+      <NodeResizer 
+        isVisible={selected} 
+        minWidth={220} 
+        minHeight={160}
+        color="rgba(255, 153, 51, 0.8)"
+      />
+      <div className="node-header" style={{ background: 'rgba(93, 138, 168, 0.2)' }}>
+        <Filter size={16} color="#5d8aa8" />
+        <span style={{ color: '#5d8aa8' }}>Multi Condition</span>
       </div>
       <div className="node-body">
         {/* Multiple input handles */}
