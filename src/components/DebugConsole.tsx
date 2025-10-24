@@ -17,7 +17,7 @@ export function DebugConsole() {
     parseInt(localStorage.getItem('gameStatusUpdateInterval') || '200')
   );
   const logsEndRef = useRef<HTMLDivElement>(null);
-  const logTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const logTimeoutRef = useRef<number | null>(null);
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const newLog: LogEntry = {
