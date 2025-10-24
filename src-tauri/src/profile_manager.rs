@@ -60,6 +60,9 @@ impl ProfileManager {
         tank_mappings.insert(GameEvent::TrackBroken, VibrationPattern::preset_simple_hit());
         tank_mappings.insert(GameEvent::AmmunitionExploded, VibrationPattern::preset_critical_hit());
         tank_mappings.insert(GameEvent::PenetrationHit, VibrationPattern::preset_critical_hit());
+        
+        // Combat events from HUD
+        tank_mappings.insert(GameEvent::TargetDestroyed, VibrationPattern::preset_simple_hit());
 
         self.profiles.push(Profile {
             id: "tank_universal".to_string(),
@@ -92,6 +95,11 @@ impl ProfileManager {
         aircraft_mappings.insert(GameEvent::Mach1, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::LowAltitude, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::EngineOverheat, VibrationPattern::preset_fire());
+        aircraft_mappings.insert(GameEvent::OilOverheated, VibrationPattern::preset_fire());
+        aircraft_mappings.insert(GameEvent::Crashed, VibrationPattern::preset_critical_hit());
+        
+        // Combat events from HUD
+        aircraft_mappings.insert(GameEvent::TargetDestroyed, VibrationPattern::preset_simple_hit());
 
         self.profiles.push(Profile {
             id: "aircraft_universal".to_string(),

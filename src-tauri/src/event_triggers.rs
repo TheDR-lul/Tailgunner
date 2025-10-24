@@ -40,10 +40,6 @@ pub enum TriggerCondition {
     EngineDamageAbove(f32),
     ControlsDamageAbove(f32),
     
-    // Combat events (from state changes)
-    HitReceived,        // Detected hit this frame
-    CriticalDamage,     // Critical damage detected this frame
-    
     // Tank-specific
     StabilizerActive,
     StabilizerInactive,
@@ -115,10 +111,6 @@ impl TriggerCondition {
             TriggerCondition::EngineDamageAbove(threshold) => state.indicators.engine_damage > *threshold,
             TriggerCondition::ControlsDamageAbove(threshold) => state.indicators.controls_damage > *threshold,
             
-            // Combat events
-            TriggerCondition::HitReceived => state.hit_received,
-            TriggerCondition::CriticalDamage => state.critical_damage,
-            
             // Tank-specific
             TriggerCondition::StabilizerActive => state.indicators.stabilizer > 0.5,
             TriggerCondition::StabilizerInactive => state.indicators.stabilizer < 0.5,
@@ -171,7 +163,6 @@ impl TriggerCondition {
             TriggerCondition::FuelBelow(_) | TriggerCondition::FuelTimeBelow(_) |
             TriggerCondition::AmmoBelow(_) |
             TriggerCondition::EngineDamageAbove(_) | TriggerCondition::ControlsDamageAbove(_) |
-            TriggerCondition::HitReceived | TriggerCondition::CriticalDamage |
             TriggerCondition::StabilizerActive | TriggerCondition::StabilizerInactive |
             TriggerCondition::CrewLost | TriggerCondition::CrewMemberDead(_) |
             TriggerCondition::GearAbove(_) | TriggerCondition::GearBelow(_) | TriggerCondition::GearEquals(_) |
@@ -294,34 +285,6 @@ impl TriggerManager {
     
     /// Load built-in triggers (common events for all vehicle types)
     fn load_default_triggers(&mut self) {
-        // === COMBAT EVENTS (DETECTED FROM STATE CHANGES) ===
-        
-        // Hit received (detected from new damage entries in state array)
-        self.triggers.push(EventTrigger {
-            id: "hit_received".to_string(),
-            name: "Hit Received".to_string(),
-            description: "Triggers when a hit is detected from War Thunder API state changes.".to_string(),
-            condition: TriggerCondition::HitReceived,
-            event: GameEvent::Hit,
-            cooldown_ms: 500,
-            enabled: false,  // OFF by default
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // Critical hit (engine, controls, fire, or multiple damages)
-        self.triggers.push(EventTrigger {
-            id: "critical_hit".to_string(),
-            name: "Critical Hit".to_string(),
-            description: "Triggers when critical damage is detected (engine, controls, fire, or multiple hits).".to_string(),
-            condition: TriggerCondition::CriticalDamage,
-            event: GameEvent::CriticalHit,
-            cooldown_ms: 1000,
-            enabled: false,  // OFF by default
-            is_builtin: true,
-            pattern: None,
-        });
-        
         // === FUEL WARNINGS (COMMON FOR ALL) ===
         
         // Low fuel (<10%)
@@ -518,10 +481,6 @@ impl TriggerManager {
             TriggerCondition::EngineDamageAbove(val) => ind.engine_damage > *val,
             TriggerCondition::ControlsDamageAbove(val) => ind.controls_damage > *val,
             
-            // Combat events
-            TriggerCondition::HitReceived => state.hit_received,
-            TriggerCondition::CriticalDamage => state.critical_damage,
-            
             // Tank-specific
             TriggerCondition::StabilizerActive => ind.stabilizer > 0.5,
             TriggerCondition::StabilizerInactive => ind.stabilizer < 0.5,
@@ -593,6 +552,73 @@ impl TriggerManager {
         }
     }
     
+    /// Update trigger settings (cooldown, pattern, etc.)
+    pub fn update_trigger(&mut self, id: &str, cooldown_ms: Option<u64>, pattern: Option<Option<VibrationPattern>>) -> Result<(), String> {
+        if let Some(trigger) = self.triggers.iter_mut().find(|t| t.id == id) {
+            if let Some(cooldown) = cooldown_ms {
+                trigger.cooldown_ms = cooldown;
+                log::info!("[Triggers] Updated trigger '{}' cooldown to {}ms", id, cooldown);
+            }
+            
+            if let Some(pattern_opt) = pattern {
+                trigger.pattern = pattern_opt;
+                log::info!("[Triggers] Updated trigger '{}' pattern", id);
+            }
+            
+            Ok(())
+        } else {
+            Err(format!("Trigger not found: {}", id))
+        }
+    }
+    
+    /// Save trigger settings to file
+    pub fn save_settings(&self, path: &std::path::Path) -> Result<(), String> {
+        // Save only customizable settings (enabled, cooldown, pattern)
+        let settings: Vec<TriggerSettings> = self.triggers.iter()
+            .map(|t| TriggerSettings {
+                id: t.id.clone(),
+                enabled: t.enabled,
+                cooldown_ms: t.cooldown_ms,
+                pattern: t.pattern.clone(),
+            })
+            .collect();
+        
+        let json = serde_json::to_string_pretty(&settings)
+            .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+        
+        std::fs::write(path, json)
+            .map_err(|e| format!("Failed to write settings: {}", e))?;
+        
+        log::info!("[Triggers] Saved {} trigger settings to {:?}", settings.len(), path);
+        Ok(())
+    }
+    
+    /// Load trigger settings from file
+    pub fn load_settings(&mut self, path: &std::path::Path) -> Result<(), String> {
+        if !path.exists() {
+            log::info!("[Triggers] Settings file not found, using defaults");
+            return Ok(());
+        }
+        
+        let json = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read settings: {}", e))?;
+        
+        let settings: Vec<TriggerSettings> = serde_json::from_str(&json)
+            .map_err(|e| format!("Failed to parse settings: {}", e))?;
+        
+        // Apply settings to triggers
+        for setting in settings {
+            if let Some(trigger) = self.triggers.iter_mut().find(|t| t.id == setting.id) {
+                trigger.enabled = setting.enabled;
+                trigger.cooldown_ms = setting.cooldown_ms;
+                trigger.pattern = setting.pattern;
+            }
+        }
+        
+        log::info!("[Triggers] Loaded trigger settings from {:?}", path);
+        Ok(())
+    }
+    
     /// Удаление триггера
     pub fn remove_trigger(&mut self, id: &str) -> bool {
         if let Some(pos) = self.triggers.iter().position(|t| t.id == id) {
@@ -604,6 +630,15 @@ impl TriggerManager {
             false
         }
     }
+}
+
+/// Settings for a single trigger (for save/load)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TriggerSettings {
+    id: String,
+    enabled: bool,
+    cooldown_ms: u64,
+    pattern: Option<VibrationPattern>,
 }
 
 impl Default for TriggerManager {

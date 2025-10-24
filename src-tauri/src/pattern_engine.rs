@@ -139,6 +139,8 @@ pub enum GameEvent {
     Touchdown,            // Касание земли
     Landed,
     Takeoff,
+    Crashed,              // Crashed into ground/object
+    OilOverheated,        // Oil temperature critical
     
     // === ЭКИПАЖ И СИСТЕМЫ ===
     FireExtinguished,
@@ -163,6 +165,36 @@ pub enum GameEvent {
 }
 
 impl VibrationPattern {
+    /// Create simple vibration pattern with intensity and duration
+    pub fn simple(intensity: f32, duration_ms: u64) -> Self {
+        let intensity = intensity.clamp(0.0, 1.0);
+        Self {
+            name: "Simple".to_string(),
+            attack: EnvelopeStage {
+                duration_ms: 50,
+                start_intensity: 0.0,
+                end_intensity: intensity,
+                curve: Curve::Linear,
+            },
+            hold: EnvelopeStage {
+                duration_ms: duration_ms.saturating_sub(100),  // Total - attack - decay
+                start_intensity: intensity,
+                end_intensity: intensity,
+                curve: Curve::Linear,
+            },
+            decay: EnvelopeStage {
+                duration_ms: 50,
+                start_intensity: intensity,
+                end_intensity: 0.0,
+                curve: Curve::Linear,
+            },
+            burst: BurstConfig {
+                repeat_count: 1,
+                pause_between_ms: 0,
+            },
+        }
+    }
+
     /// Create standard presets
     pub fn preset_critical_hit() -> Self {
         Self {

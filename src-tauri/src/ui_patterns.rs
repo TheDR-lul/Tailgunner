@@ -77,11 +77,11 @@ impl UIPattern {
         // Check if INPUT connects to LOGIC node or directly to OUTPUT
         let next_nodes = adjacency.get(&input_node.id)?;
         let base_condition = if next_nodes.iter().any(|id| {
-            node_map.get(id.as_str()).map(|n| n.type_ == "condition").unwrap_or(false)
+            node_map.get(id.as_str()).map(|n| n.type_ == "logic").unwrap_or(false)
         }) {
             // INPUT → LOGIC → OUTPUT flow
             let logic_node_id = next_nodes.iter()
-                .find(|id| node_map.get(id.as_str()).map(|n| n.type_ == "condition").unwrap_or(false))?;
+                .find(|id| node_map.get(id.as_str()).map(|n| n.type_ == "logic").unwrap_or(false))?;
             let logic_node = node_map.get(logic_node_id.as_str())?;
             self.parse_logic_node(logic_node, &reverse_adjacency, &node_map)?
         } else {
@@ -192,7 +192,7 @@ impl UIPattern {
                     let source_node = node_map.get(source_id)?;
                     let inner_condition = if source_node.type_ == "input" {
                         self.parse_input_node(source_node)?
-                    } else if source_node.type_ == "condition" {
+                    } else if source_node.type_ == "logic" {
                         self.parse_logic_node(source_node, reverse_adjacency, node_map)?
                     } else {
                         log::error!("[UI Pattern] ❌ Unsupported node type for NOT: {}", source_node.type_);
@@ -220,7 +220,7 @@ impl UIPattern {
                     let node_a = node_map.get(input_a)?;
                     if node_a.type_ == "input" {
                         self.parse_input_node(node_a)?
-                    } else if node_a.type_ == "condition" {
+                    } else if node_a.type_ == "logic" {
                         self.parse_logic_node(node_a, reverse_adjacency, node_map)?
                     } else {
                         log::error!("[UI Pattern] ❌ Unsupported node type for input-a: {}", node_a.type_);
@@ -232,7 +232,7 @@ impl UIPattern {
                     let node_b = node_map.get(input_b)?;
                     if node_b.type_ == "input" {
                         self.parse_input_node(node_b)?
-                    } else if node_b.type_ == "condition" {
+                    } else if node_b.type_ == "logic" {
                         self.parse_logic_node(node_b, reverse_adjacency, node_map)?
                     } else {
                         log::error!("[UI Pattern] ❌ Unsupported node type for input-b: {}", node_b.type_);

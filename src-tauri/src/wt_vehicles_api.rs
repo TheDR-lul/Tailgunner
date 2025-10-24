@@ -12,26 +12,39 @@ const WT_VEHICLES_API_BASE: &str = "https://www.wtvehiclesapi.sgambe.serv00.net"
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VehicleData {
     pub identifier: String,
+    #[serde(default)]
     pub wikiname: String,
+    #[serde(default)]
     pub display_name: String,
+    #[serde(default)]
     pub vehicle_type: String,
+    #[serde(default)]
     pub country: String,
+    #[serde(default)]
     pub rank: i32,
+    #[serde(default)]
     pub battle_rating: HashMap<String, f32>,
     
     // Engine characteristics
+    #[serde(default)]
     pub max_speed_kmh: Option<f32>,
+    #[serde(default)]
     pub max_altitude_meters: Option<f32>,
+    #[serde(default)]
     pub engine_power_hp: Option<f32>,
     
     // G-load limits
+    #[serde(default)]
     pub max_positive_g: Option<f32>,
+    #[serde(default)]
     pub max_negative_g: Option<f32>,
     
     // Fuel
+    #[serde(default)]
     pub fuel_capacity_kg: Option<f32>,
     
     // Weapons
+    #[serde(default)]
     pub weapons: Option<Vec<String>>,
 }
 
@@ -72,15 +85,82 @@ impl WTVehiclesAPI {
             .await?;
         
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("Failed to fetch vehicle data: {}", response.status()));
+            let status = response.status();
+            let body = response.text().await.unwrap_or_else(|_| "Failed to read body".to_string());
+            log::error!("[WT Vehicles API] Error {}: {}", status, body);
+            return Err(anyhow::anyhow!("API returned status {}: {}", status, body));
         }
         
-        let data: VehicleData = response.json().await?;
+        // Get response text first for debugging
+        let body_text = response.text().await?;
+        log::debug!("[WT Vehicles API] Response for '{}': {}", identifier, &body_text[..body_text.len().min(500)]);
+        
+        // Try to parse
+        let data: VehicleData = serde_json::from_str(&body_text)
+            .map_err(|e| {
+                log::error!("[WT Vehicles API] Failed to parse response for '{}': {}", identifier, e);
+                log::error!("[WT Vehicles API] Response body: {}", body_text);
+                anyhow::anyhow!("Failed to parse vehicle data: {}", e)
+            })?;
         
         // Кэшируем
         {
             let mut cache = self.cache.write().await;
             cache.insert(identifier.to_string(), data.clone());
+        }
+        
+        Ok(data)
+    }
+    
+    /// Search for vehicle by name (returns first match)
+    pub async fn search_vehicle(&self, name: &str) -> anyhow::Result<VehicleData> {
+        // Check cache first
+        {
+            let cache = self.cache.read().await;
+            if let Some(data) = cache.get(name) {
+                return Ok(data.clone());
+            }
+        }
+        
+        // Query search endpoint
+        let url = format!("{}/api/vehicles/search/{}", WT_VEHICLES_API_BASE, name);
+        log::info!("[WT Vehicles API] Searching for: '{}' at {}", name, url);
+        
+        let response = self.client
+            .get(&url)
+            .header("User-Agent", "Tailgunner/0.2.0")
+            .send()
+            .await?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_else(|_| "Failed to read body".to_string());
+            log::error!("[WT Vehicles API] Search error {}: {}", status, body);
+            return Err(anyhow::anyhow!("Search failed with status {}: {}", status, body));
+        }
+        
+        // Get response text
+        let body_text = response.text().await?;
+        log::debug!("[WT Vehicles API] Search response: {}", &body_text[..body_text.len().min(200)]);
+        
+        // Parse as array
+        let results: Vec<VehicleData> = serde_json::from_str(&body_text)
+            .map_err(|e| {
+                log::error!("[WT Vehicles API] Failed to parse search results for '{}': {}", name, e);
+                log::error!("[WT Vehicles API] Response: {}", body_text);
+                anyhow::anyhow!("Failed to parse search results: {}", e)
+            })?;
+        
+        // Return first result
+        let data = results.into_iter().next()
+            .ok_or_else(|| anyhow::anyhow!("No vehicles found matching '{}'", name))?;
+        
+        log::info!("[WT Vehicles API] ✅ Found: {} ({})", data.display_name, data.identifier);
+        
+        // Cache it
+        {
+            let mut cache = self.cache.write().await;
+            cache.insert(name.to_string(), data.clone());
         }
         
         Ok(data)

@@ -59,12 +59,23 @@ pub struct HapticEngine {
 
 impl HapticEngine {
     pub fn new() -> Self {
+        let mut trigger_manager = TriggerManager::new();
+        
+        // Try to load saved trigger settings
+        let config_dir = std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let settings_path = config_dir.join("trigger_settings.json");
+        
+        if let Err(e) = trigger_manager.load_settings(&settings_path) {
+            log::warn!("[Triggers] Failed to load settings: {}", e);
+        }
+        
         Self {
             telemetry: Arc::new(RwLock::new(WTTelemetryReader::new())),
             device_manager: Arc::new(DeviceManager::new()),
             event_engine: Arc::new(RwLock::new(EventEngine::new())),
             profile_manager: Arc::new(RwLock::new(ProfileManager::new())),
-            trigger_manager: Arc::new(RwLock::new(TriggerManager::new())),
+            trigger_manager: Arc::new(RwLock::new(trigger_manager)),
             dynamic_trigger_manager: Arc::new(DynamicTriggerManager::new()),
             vehicle_limits_manager: Arc::new(VehicleLimitsManager::new()),
             rate_limiter: Arc::new(RateLimiter::new()),
@@ -178,15 +189,23 @@ impl HapticEngine {
                         // Generate dynamic triggers based on limits
                         let limit_triggers = vehicle_limits_manager.generate_limit_triggers().await;
                         if !limit_triggers.is_empty() {
+                            log::info!("[Dynamic Triggers] 🔧 Generated {} dynamic triggers for {}", 
+                                limit_triggers.len(), game_state.vehicle_name);
+                            
                             let mut tm = trigger_manager.write().await;
                             
                             // Remove old dynamic triggers
                             tm.get_triggers_mut().retain(|t| !t.id.starts_with("dynamic_"));
                             
                             // Add new dynamic triggers
-                            for trigger in limit_triggers {
-                                tm.add_trigger(trigger);
+                            for trigger in &limit_triggers {
+                                log::info!("[Dynamic Triggers] ➕ Adding trigger: {} (enabled: {})", 
+                                    trigger.name, trigger.enabled);
+                                tm.add_trigger(trigger.clone());
                             }
+                        } else {
+                            log::warn!("[Dynamic Triggers] ⚠️ No dynamic triggers generated for {}", 
+                                game_state.vehicle_name);
                         }
                         
                         // Update last vehicle name
@@ -203,16 +222,46 @@ impl HapticEngine {
                 // Check custom triggers (overspeed, over-G, etc.)
                 let trigger_events = {
                     let mut tm = trigger_manager.write().await;
-                    tm.check_triggers(&game_state)
+                    let events = tm.check_triggers(&game_state);
+                    
+                    if !events.is_empty() {
+                        log::info!("[Triggers] 🎯 {} triggers fired", events.len());
+                        for (event, pattern) in &events {
+                            log::info!("[Triggers]   - {:?} (pattern: {})", 
+                                event, pattern.is_some());
+                        }
+                    }
+                    
+                    events
                 };
                 
-                // Check dynamic triggers (based on vehicle data)
-                let dynamic_events = dynamic_trigger_manager.check_dynamic_triggers(&game_state).await;
+                // Process HUD events (kills, crashes, overheats)
+                let hud_events: Vec<GameEvent> = game_state.hud_events.iter().map(|hud_evt| {
+                    use crate::wt_telemetry::HudEvent;
+                    match hud_evt {
+                        HudEvent::Kill(enemy) => {
+                            log::info!("[HUD] 🎯 Kill: {}", enemy);
+                            GameEvent::TargetDestroyed
+                        }
+                        HudEvent::Crashed => {
+                            log::warn!("[HUD] 💥 Crashed!");
+                            GameEvent::Crashed
+                        }
+                        HudEvent::EngineOverheated => {
+                            log::warn!("[HUD] 🔥 Engine overheated!");
+                            GameEvent::EngineOverheat
+                        }
+                        HudEvent::OilOverheated => {
+                            log::warn!("[HUD] 🛢️ Oil overheated!");
+                            GameEvent::OilOverheated
+                        }
+                    }
+                }).collect();
                 
-                // Combine events: basic, dynamic, and triggers (triggers may have custom patterns)
+                // Combine events: basic, triggers (including dynamic), and HUD events
                 let mut all_events: Vec<(GameEvent, Option<VibrationPattern>)> = trigger_events;
                 all_events.extend(basic_events.into_iter().map(|e| (e, None)));
-                all_events.extend(dynamic_events.into_iter().map(|e| (e, None)));
+                all_events.extend(hud_events.into_iter().map(|e| (e, None)));
                 
                 // Process each event
                 if !all_events.is_empty() {

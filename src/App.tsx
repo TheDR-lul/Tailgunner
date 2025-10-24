@@ -12,6 +12,7 @@ import { DebugConsole } from "./components/DebugConsole";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { GameStatus } from "./components/GameStatus";
 import { EventConfiguration } from "./components/EventConfiguration";
+import { VehicleInfoCard } from "./components/VehicleInfoCard";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
 
@@ -84,6 +85,7 @@ function App() {
             <Dashboard />
             <DeviceList />
             <GameStatus />
+            <VehicleInfoCard />
           </aside>
 
               {/* Main area - patterns and events */}

@@ -10,6 +10,21 @@ const WT_TELEMETRY_URL: &str = "http://127.0.0.1:8111";
 const POLL_INTERVAL_MS: u64 = 100; // 10 times per second
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HudMessage {
+    pub id: u32,
+    pub msg: String,
+    pub time: u32,
+}
+
+#[derive(Debug, Clone)]
+pub enum HudEvent {
+    Kill(String),           // Killed enemy vehicle name
+    Crashed,
+    EngineOverheated,
+    OilOverheated,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     pub valid: bool,
     pub type_: VehicleType,
@@ -17,9 +32,9 @@ pub struct GameState {
     pub indicators: Indicators,
     pub state: Vec<String>,
     
-    // Combat events (detected from state changes)
-    pub hit_received: bool,        // Detected hit this frame
-    pub critical_damage: bool,     // Critical damage this frame
+    // HUD events detected this frame
+    #[serde(skip)]
+    pub hud_events: Vec<HudEvent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -107,6 +122,9 @@ pub struct WTTelemetryReader {
     last_state: Option<GameState>,
     last_fetch_time: Option<std::time::Instant>,
     cache_duration_ms: u64,
+    last_hud_evt_id: u32,
+    last_hud_dmg_id: u32,
+    player_name: Option<String>,  // Player name for filtering own events
 }
 
 impl WTTelemetryReader {
@@ -121,6 +139,9 @@ impl WTTelemetryReader {
             last_state: None,
             last_fetch_time: None,
             cache_duration_ms: 50, // Cache for 50ms (20 Hz max poll rate)
+            last_hud_evt_id: 0,
+            last_hud_dmg_id: 0,
+            player_name: None,
         }
     }
 
@@ -179,7 +200,19 @@ impl WTTelemetryReader {
             .context("Failed to parse WT /state")?;
 
         // 3. Combine data from both endpoints
-        let state = self.parse_combined_state(indicators_json, state_json)?;
+        let mut state = self.parse_combined_state(indicators_json, state_json)?;
+        
+        // 4. Get HUD events (non-blocking, errors are logged but don't fail the request)
+        match self.get_hud_events().await {
+            Ok(hud_events) => {
+                state.hud_events = hud_events;
+            }
+            Err(e) => {
+                log::debug!("[WT API] Failed to get HUD events: {}", e);
+                state.hud_events = Vec::new();
+            }
+        }
+        
         self.last_state = Some(state.clone());
         self.last_fetch_time = Some(std::time::Instant::now());
         
@@ -203,6 +236,105 @@ impl WTTelemetryReader {
             .context("Failed to parse indicators")?;
 
         Ok(indicators)
+    }
+    
+    /// Get HUD messages (events and damage) and parse for player events
+    pub async fn get_hud_events(&mut self) -> Result<Vec<HudEvent>> {
+        let url = format!("{}/hudmsg?lastEvt={}&lastDmg={}", 
+            WT_TELEMETRY_URL, self.last_hud_evt_id, self.last_hud_dmg_id);
+        
+        let response = self.client
+            .get(&url)
+            .send()
+            .await
+            .context("Failed to get HUD messages")?;
+        
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .context("Failed to parse HUD messages")?;
+        
+        let mut events = Vec::new();
+        
+        // Parse damage messages (contain kill feed, crashes, overheats)
+        if let Some(damage_array) = json.get("damage").and_then(|v| v.as_array()) {
+            for msg_value in damage_array {
+                let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
+                
+                // Update last seen ID
+                if id > self.last_hud_dmg_id {
+                    self.last_hud_dmg_id = id;
+                }
+                
+                // Parse player events
+                if let Some(event) = self.parse_hud_message(msg) {
+                    events.push(event);
+                }
+            }
+        }
+        
+        Ok(events)
+    }
+    
+    /// Parse HUD message to detect player events
+    fn parse_hud_message(&self, msg: &str) -> Option<HudEvent> {
+        // Parse event type - these are always player events
+        if msg.contains("Engine overheated") {
+            return Some(HudEvent::EngineOverheated);
+        }
+        
+        if msg.contains("Oil overheated") {
+            return Some(HudEvent::OilOverheated);
+        }
+        
+        if msg.contains("has crashed") {
+            // Only detect if it's the player's crash (not another player)
+            // Format: "=DEST= _WingsOfPrey_ (Rafale C) has crashed."
+            // We can't reliably detect player name, so only detect crashes with specific patterns
+            // For now, detect all crashes - user can filter if needed
+            return Some(HudEvent::Crashed);
+        }
+        
+        if msg.contains("destroyed") {
+            // Check if player name is set for more accurate filtering
+            if let Some(player_name) = &self.player_name {
+                if msg.contains(player_name) {
+                    // Extract enemy vehicle name
+                    if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
+                        let enemy = destroyed_part.trim().to_string();
+                        log::info!("[HUD Event] 🎯 KILL: {}", enemy);
+                        return Some(HudEvent::Kill(enemy));
+                    }
+                }
+            } else {
+                // Without player name, try to detect by pattern
+                // "=DEST= text" format is common but not universal
+                // Best heuristic: if message contains "destroyed" and has format "A destroyed B"
+                // and A is not "[ai]", it's likely a player kill
+                
+                // Skip AI kills
+                if msg.contains("[ai]") {
+                    return None;
+                }
+                
+                // Check if this is a kill message with proper format
+                let parts: Vec<&str> = msg.split("destroyed").collect();
+                if parts.len() == 2 {
+                    // Format: "Player1 (Vehicle1) destroyed Player2 (Vehicle2)"
+                    // Extract enemy name
+                    let enemy = parts[1].trim().to_string();
+                    
+                    // Skip if enemy is empty or starts with lowercase (likely continuation of sentence)
+                    if !enemy.is_empty() && enemy.chars().next().unwrap_or(' ').is_uppercase() {
+                        log::info!("[HUD Event] 🎯 KILL (heuristic): {}", enemy);
+                        return Some(HudEvent::Kill(enemy));
+                    }
+                }
+            }
+        }
+        
+        None
     }
 
     /// Parse combined data from /indicators and /state
@@ -295,38 +427,13 @@ impl WTTelemetryReader {
             *last = vehicle_name.clone();
         }
 
-        // 5. Detect combat events (Hit, CriticalDamage) by comparing with last_state
-        let mut hit_received = false;
-        let mut critical_damage = false;
-        
-        if let Some(last) = &self.last_state {
-            // Hit detection: new damage entries in state array
-            let new_damage_entries: Vec<_> = state.iter()
-                .filter(|s| s.contains("damaged") || s.contains("broken") || s.contains("fire"))
-                .filter(|s| !last.state.contains(s))
-                .collect();
-            
-            if !new_damage_entries.is_empty() {
-                hit_received = true;
-                log::error!("[Combat Event] 🎯 HIT DETECTED: {:?}", new_damage_entries);
-            }
-            
-            // Critical damage detection: multiple new damage entries OR engine/controls damage
-            if new_damage_entries.len() >= 2 || 
-               new_damage_entries.iter().any(|s| s.contains("engine") || s.contains("controls") || s.contains("fire")) {
-                critical_damage = true;
-                log::error!("[Combat Event] 💥 CRITICAL HIT: {:?}", new_damage_entries);
-            }
-        }
-
         Ok(GameState {
             valid,
             type_,
             vehicle_name,
             indicators,
             state,
-            hit_received,
-            critical_damage,
+            hud_events: Vec::new(),
         })
     }
 
@@ -386,8 +493,7 @@ impl WTTelemetryReader {
             vehicle_name,
             indicators,
             state,
-            hit_received: false,      // Legacy method doesn't track state changes
-            critical_damage: false,
+            hud_events: Vec::new(),
         })
     }
 

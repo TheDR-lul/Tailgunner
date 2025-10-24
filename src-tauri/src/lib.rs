@@ -240,8 +240,82 @@ async fn toggle_trigger(state: tauri::State<'_, AppState>, id: String, enabled: 
     let mut manager = engine.trigger_manager.write().await;
     manager.toggle_trigger(&id, enabled);
     
+    // Auto-save settings
+    let config_dir = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let settings_path = config_dir.join("trigger_settings.json");
+    let _ = manager.save_settings(&settings_path);
+    
     log::info!("[Triggers] Toggle '{}' to {}", id, enabled);
     Ok(format!("Trigger {} toggled to {}", id, enabled))
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct SimpleVibration {
+    intensity: f32,
+    duration_ms: u64,
+}
+
+#[tauri::command]
+async fn update_trigger(
+    state: tauri::State<'_, AppState>, 
+    id: String, 
+    cooldown_ms: Option<u64>,
+    pattern: Option<SimpleVibration>
+) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    let mut manager = engine.trigger_manager.write().await;
+    
+    // Convert SimpleVibration to VibrationPattern if provided
+    let vibration_pattern = pattern.map(|simple| {
+        pattern_engine::VibrationPattern::simple(simple.intensity, simple.duration_ms)
+    });
+    
+    let has_pattern = vibration_pattern.is_some();
+    manager.update_trigger(&id, cooldown_ms, Some(vibration_pattern))?;
+    
+    // Auto-save settings
+    let config_dir = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let settings_path = config_dir.join("trigger_settings.json");
+    let _ = manager.save_settings(&settings_path);
+    
+    log::info!("[Triggers] Updated trigger '{}': cooldown={:?}, pattern={}", id, cooldown_ms, has_pattern);
+    Ok("Trigger updated".to_string())
+}
+
+#[tauri::command]
+async fn save_trigger_settings(state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    let manager = engine.trigger_manager.read().await;
+    
+    let config_dir = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let settings_path = config_dir.join("trigger_settings.json");
+    
+    manager.save_settings(&settings_path)?;
+    Ok(format!("Settings saved to: {}", settings_path.display()))
+}
+
+#[tauri::command]
+async fn get_vehicle_info(state: tauri::State<'_, AppState>) -> Result<wt_vehicles_api::VehicleData, String> {
+    let engine = state.engine.lock().await;
+    let status = engine.get_game_status().await
+        .map_err(|e| format!("Failed to get game status: {}", e))?;
+    
+    if !status.connected || status.vehicle_name.is_empty() || status.vehicle_name == "N/A" {
+        return Err("No vehicle connected".to_string());
+    }
+    
+    log::info!("[Vehicle Info] Fetching data for vehicle: '{}'", status.vehicle_name);
+    
+    // Get vehicle data from API (using search endpoint)
+    let api = wt_vehicles_api::WTVehiclesAPI::new();
+    api.search_vehicle(&status.vehicle_name).await
+        .map_err(|e| {
+            log::error!("[Vehicle Info] Failed for '{}': {}", status.vehicle_name, e);
+            format!("Failed to fetch vehicle data: {}", e)
+        })
 }
 
 #[tauri::command]
@@ -319,6 +393,9 @@ pub fn run() {
             get_debug_info,
             get_triggers,
             toggle_trigger,
+            update_trigger,
+            save_trigger_settings,
+            get_vehicle_info,
             add_pattern,
             remove_pattern,
             toggle_pattern,
