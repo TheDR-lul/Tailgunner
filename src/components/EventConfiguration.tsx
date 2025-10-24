@@ -316,7 +316,13 @@ export function EventConfiguration() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {profiles.map((profile) => {
               const isExpanded = expandedProfile === profile.id;
-              const patterns = Object.entries(profile.event_mappings);
+              // Only show events that have at least one trigger
+              const patterns = Object.entries(profile.event_mappings).filter(([eventName]) => 
+                getTriggersForEvent(eventName).length > 0
+              );
+              
+              // Skip profiles with no events that have triggers
+              if (patterns.length === 0) return null;
               
               return (
                 <div
@@ -377,32 +383,28 @@ export function EventConfiguration() {
                                   display: 'flex',
                                   justifyContent: 'space-between',
                                   alignItems: 'center',
-                                  background: eventTriggers.length > 0 ? 'var(--bg-secondary)' : 'transparent'
+                                  background: 'var(--bg-secondary)'
                                 }}
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span style={{ fontSize: '12px', fontWeight: 600 }}>
                                     {t(`game_events.${eventName}`, eventName)}
                                   </span>
-                                  {eventTriggers.length > 0 && (
-                                    <span style={{
-                                      fontSize: '10px',
-                                      padding: '2px 6px',
-                                      background: 'var(--primary)',
-                                      color: 'white',
-                                      borderRadius: '10px'
-                                    }}>
-                                      {eventTriggers.length} {eventTriggers.length === 1 ? 'trigger' : 'triggers'}
-                                    </span>
-                                  )}
+                                  <span style={{
+                                    fontSize: '10px',
+                                    padding: '2px 6px',
+                                    background: 'var(--primary)',
+                                    color: 'white',
+                                    borderRadius: '10px'
+                                  }}>
+                                    {eventTriggers.length} {eventTriggers.length === 1 ? 'trigger' : 'triggers'}
+                                  </span>
                                 </div>
-                                {eventTriggers.length > 0 && (
-                                  isEventExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                )}
+                                {isEventExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                               </div>
                               
                               {/* Triggers for this event */}
-                              {isEventExpanded && eventTriggers.length > 0 && (
+                              {isEventExpanded && (
                                 <div style={{ padding: '8px', borderTop: '1px solid var(--border)' }}>
                                   {eventTriggers.map((trigger) => {
                                     const triggerExpanded = expandedTrigger === `${eventKey}_${trigger.id}`;
