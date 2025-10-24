@@ -16,6 +16,10 @@ dist-ssr
 trigger_settings.json
 *.json.bak
 
+# Rust build artifacts
+target/
+Cargo.lock
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
