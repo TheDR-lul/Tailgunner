@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Runtime files
+trigger_settings.json
+*.json.bak
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
