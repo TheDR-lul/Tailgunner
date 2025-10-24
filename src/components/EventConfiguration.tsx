@@ -19,6 +19,7 @@ export function EventConfiguration() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [triggers, setTriggers] = useState<EventTrigger[]>([]);
   const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -63,6 +64,11 @@ export function EventConfiguration() {
     }
   };
 
+  // Get triggers for a specific event
+  const getTriggersForEvent = (eventName: string): EventTrigger[] => {
+    return triggers.filter(trigger => trigger.event === eventName);
+  };
+
   const vehicleIcons: Record<string, string> = {
     Tank: '🛡️',
     Aircraft: '✈️',
@@ -79,7 +85,7 @@ export function EventConfiguration() {
         <div className="card-header">
           <h3 className="card-title">
             <Zap size={20} />
-            {t('dashboard.title')}
+            {t('events.title')}
           </h3>
         </div>
         <div className="empty-state">
@@ -102,7 +108,6 @@ export function EventConfiguration() {
       </div>
 
       <div className="card-content">
-        {/* Profiles List */}
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             <Layers size={16} style={{ display: 'inline', marginRight: '6px' }} />
@@ -118,10 +123,12 @@ export function EventConfiguration() {
                 <div
                   key={profile.id}
                   className={`profile-item ${profile.enabled ? 'active' : ''}`}
-                  onClick={() => setExpandedProfile(isExpanded ? null : profile.id)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <div className="profile-header">
+                  <div 
+                    className="profile-header"
+                    onClick={() => setExpandedProfile(isExpanded ? null : profile.id)}
+                  >
                     <div className="profile-name">
                       <span style={{ fontSize: '18px' }}>{vehicleIcons[profile.vehicle_type]}</span>
                       <span>{t(`profiles.${profile.id}`)}</span>
@@ -139,25 +146,112 @@ export function EventConfiguration() {
                   
                   {isExpanded && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', fontWeight: 600 }}>
                         {t('events.assigned_events')}:
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {patterns.map(([eventName]) => (
-                          <div
-                            key={eventName}
-                            style={{
-                              padding: '4px 8px',
-                              background: 'var(--bg-tertiary)',
-                              border: '1px solid var(--border)',
-                              borderRadius: 'var(--radius-sm)',
-                              fontSize: '11px',
-                              color: 'var(--text-secondary)'
-                            }}
-                          >
-                            {t(`events.${eventName}`, eventName)}
-                          </div>
-                        ))}
+                      
+                      {/* Event cards with triggers */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {patterns.map(([eventName]) => {
+                          const eventTriggers = getTriggersForEvent(eventName);
+                          const isEventExpanded = expandedEvent === `${profile.id}_${eventName}`;
+                          const eventKey = `${profile.id}_${eventName}`;
+                          
+                          return (
+                            <div
+                              key={eventName}
+                              style={{
+                                background: 'var(--bg-tertiary)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 'var(--radius-sm)',
+                                overflow: 'hidden'
+                              }}
+                            >
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedEvent(isEventExpanded ? null : eventKey);
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  background: eventTriggers.length > 0 ? 'var(--bg-secondary)' : 'transparent'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 600 }}>
+                                    {t(`game_events.${eventName}`, eventName)}
+                                  </span>
+                                  {eventTriggers.length > 0 && (
+                                    <span style={{
+                                      fontSize: '10px',
+                                      padding: '2px 6px',
+                                      background: 'var(--primary)',
+                                      color: 'white',
+                                      borderRadius: '10px'
+                                    }}>
+                                      {eventTriggers.length} {eventTriggers.length === 1 ? 'trigger' : 'triggers'}
+                                    </span>
+                                  )}
+                                </div>
+                                {eventTriggers.length > 0 && (
+                                  isEventExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                )}
+                              </div>
+                              
+                              {/* Triggers for this event */}
+                              {isEventExpanded && eventTriggers.length > 0 && (
+                                <div style={{ padding: '8px', borderTop: '1px solid var(--border)' }}>
+                                  {eventTriggers.map((trigger) => (
+                                    <div
+                                      key={trigger.id}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '6px 8px',
+                                        marginBottom: '4px',
+                                        background: trigger.enabled ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-primary)',
+                                        border: `1px solid ${trigger.enabled ? 'var(--primary)' : 'var(--border)'}`,
+                                        borderRadius: 'var(--radius-sm)',
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
+                                          {trigger.name}
+                                        </div>
+                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                          {trigger.description}
+                                        </div>
+                                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                          {t('triggers.cooldown', { time: (trigger.cooldown_ms / 1000).toFixed(0) })}
+                                        </div>
+                                      </div>
+                                      
+                                      <button
+                                        className={`btn-toggle ${trigger.enabled ? 'active' : ''}`}
+                                        onClick={() => toggleTrigger(trigger.id, !trigger.enabled)}
+                                        title={trigger.enabled ? t('common.disable') : t('common.enable')}
+                                        style={{
+                                          padding: '4px 8px',
+                                          fontSize: '10px',
+                                          minWidth: '50px'
+                                        }}
+                                      >
+                                        <Power size={12} />
+                                        {trigger.enabled ? t('common.on') : t('common.off')}
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -166,52 +260,7 @@ export function EventConfiguration() {
             })}
           </div>
         </div>
-
-        {/* Built-in Triggers */}
-        <div>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            <Zap size={16} style={{ display: 'inline', marginRight: '6px' }} />
-            {t('events.event_triggers')}
-          </h3>
-
-          {triggers.length === 0 ? (
-            <div className="empty-state">
-              <p>{t('triggers.no_triggers')}</p>
-            </div>
-          ) : (
-            <div className="trigger-list">
-              {triggers.map((trigger) => (
-                <div 
-                  key={trigger.id} 
-                  className={`trigger-item ${trigger.enabled ? 'enabled' : 'disabled'}`}
-                >
-                  <div className="trigger-info">
-                    <div className="trigger-header">
-                      <h3>{t(`events.${trigger.event}`, trigger.name)}</h3>
-                      <span className="trigger-cooldown">
-                        {t('triggers.cooldown', { time: (trigger.cooldown_ms / 1000).toFixed(0) })}
-                      </span>
-                    </div>
-                    <p className="trigger-description">
-                      {trigger.description}
-                    </p>
-                  </div>
-                  
-                  <button
-                    className={`btn-toggle ${trigger.enabled ? 'active' : ''}`}
-                    onClick={() => toggleTrigger(trigger.id, !trigger.enabled)}
-                    title={trigger.enabled ? t('common.disable') : t('common.enable')}
-                  >
-                    <Power size={18} />
-                    {trigger.enabled ? t('common.on') : t('common.off')}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
 }
-

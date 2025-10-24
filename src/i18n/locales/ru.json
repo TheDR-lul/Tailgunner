@@ -108,6 +108,9 @@
       "select_operator": "Выберите оператор",
       "enter_value": "Введите значение"
     },
+    "condition": {
+      "title": "Условие"
+    },
     "vibration": {
       "title": "Вибрация",
       "duration": "Длительность",
@@ -140,7 +143,7 @@
     "fuel": "Топливо",
     "ammo": "Боезапас"
   },
-  "events": {
+  "game_events": {
     "Hit": "Попадание",
     "CriticalHit": "Критическое попадание",
     "PenetrationHit": "Пробитие",

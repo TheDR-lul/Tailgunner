@@ -261,7 +261,7 @@ impl HapticEngine {
                 
                 Ok(GameStatusInfo {
                     connected: true,
-                    vehicle_name: format!("{:?}", state.type_),
+                    vehicle_name: state.vehicle_name.clone(),
                     speed_kmh: state.indicators.speed as i32, // Already in km/h
                     altitude_m: state.indicators.altitude as i32,
                     g_load: state.indicators.g_load,

@@ -108,6 +108,9 @@
       "select_operator": "Select operator",
       "enter_value": "Enter value"
     },
+    "condition": {
+      "title": "Condition"
+    },
     "vibration": {
       "title": "Vibration",
       "duration": "Duration",
@@ -140,7 +143,7 @@
     "fuel": "Fuel",
     "ammo": "Ammo"
   },
-  "events": {
+  "game_events": {
     "Hit": "Hit",
     "CriticalHit": "Critical Hit",
     "PenetrationHit": "Penetration",

@@ -383,6 +383,18 @@ impl TriggerManager {
             trigger.enabled = enabled;
         }
     }
+    
+    /// Удаление триггера
+    pub fn remove_trigger(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.triggers.iter().position(|t| t.id == id) {
+            self.triggers.remove(pos);
+            log::info!("[Triggers] Removed trigger: {}", id);
+            true
+        } else {
+            log::warn!("[Triggers] Trigger not found: {}", id);
+            false
+        }
+    }
 }
 
 impl Default for TriggerManager {

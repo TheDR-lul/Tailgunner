@@ -114,14 +114,19 @@ async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<DebugInfo, 
     let engine = state.engine.lock().await;
     let status = engine.get_game_status().await.map_err(|e| e.to_string())?;
     
+    // Get triggers count
+    let trigger_manager = engine.trigger_manager.read().await;
+    let triggers_count = trigger_manager.get_triggers().len();
+    let patterns_active = trigger_manager.get_triggers().iter().filter(|t| t.enabled).count();
+    
     Ok(DebugInfo {
         indicators: format!(
-            "Speed: {} km/h, Alt: {} m, G: {:.1}, RPM: {}, Fuel: {}%",
-            status.speed_kmh, status.altitude_m, status.g_load, 
+            "Vehicle: {}, Speed: {} km/h, Alt: {} m, G: {:.1}, RPM: {}, Fuel: {}%",
+            status.vehicle_name, status.speed_kmh, status.altitude_m, status.g_load, 
             status.engine_rpm, status.fuel_percent
         ),
-        triggers_count: 0, // TODO: get from engine
-        patterns_active: 0, // TODO: get from engine
+        triggers_count,
+        patterns_active,
     })
 }
 
@@ -166,13 +171,19 @@ async fn add_pattern(
 
 #[tauri::command]
 async fn remove_pattern(
-    _state: tauri::State<'_, AppState>,
+    state: tauri::State<'_, AppState>,
     id: String
 ) -> Result<String, String> {
     log::info!("[UI Patterns] Removing pattern: {}", id);
     
-    // TODO: Add remove_trigger method to TriggerManager
-    Ok(format!("Pattern '{}' removed", id))
+    let engine = state.engine.lock().await;
+    let mut manager = engine.trigger_manager.write().await;
+    
+    if manager.remove_trigger(&id) {
+        Ok(format!("Pattern '{}' removed successfully", id))
+    } else {
+        Err(format!("Pattern '{}' not found", id))
+    }
 }
 
 #[tauri::command]

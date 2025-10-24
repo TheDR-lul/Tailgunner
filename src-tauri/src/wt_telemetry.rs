@@ -13,6 +13,7 @@ const POLL_INTERVAL_MS: u64 = 100; // 10 раз в секунду
 pub struct GameState {
     pub valid: bool,
     pub type_: VehicleType,
+    pub vehicle_name: String,
     pub indicators: Indicators,
     pub state: Vec<String>,
 }
@@ -107,6 +108,7 @@ impl WTTelemetryReader {
     }
 
     /// Проверка доступности War Thunder
+    #[allow(dead_code)]
     pub async fn is_game_running(&self) -> bool {
         let url = format!("{}/state", WT_TELEMETRY_URL);
         self.client
@@ -141,6 +143,7 @@ impl WTTelemetryReader {
     }
 
     /// Получение индикаторов
+    #[allow(dead_code)]
     pub async fn get_indicators(&self) -> Result<Indicators> {
         let url = format!("{}/indicators", WT_TELEMETRY_URL);
         
@@ -164,12 +167,29 @@ impl WTTelemetryReader {
         let valid = json.get("valid").and_then(|v| v.as_bool()).unwrap_or(false);
         
         let type_str = json.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
-        let type_ = match type_str.to_lowercase().as_str() {
-            "tank" | "spaa" | "spg" => VehicleType::Tank,
-            "aircraft" | "fighter" | "bomber" | "attacker" => VehicleType::Aircraft,
-            "helicopter" => VehicleType::Helicopter,
-            "ship" | "boat" => VehicleType::Ship,
-            _ => VehicleType::Unknown,
+        
+        // Extract vehicle name from type string
+        // Examples:
+        // - "tankModels/sw_cv_90105_tml" -> "sw_cv_90105_tml"
+        // - "rafale_c_f3" -> "rafale_c_f3"
+        let vehicle_name = if type_str.contains('/') {
+            type_str.split('/').last().unwrap_or(type_str).to_string()
+        } else {
+            type_str.to_string()
+        };
+        
+        // Detect vehicle type from string
+        let type_ = if type_str.contains("tankModels") || type_str.contains("tank_") {
+            VehicleType::Tank
+        } else if type_str.contains("ship") || type_str.contains("boat") {
+            VehicleType::Ship
+        } else if type_str.contains("helicopter") || type_str.contains("heli_") {
+            VehicleType::Helicopter
+        } else if !type_str.is_empty() && type_str != "unknown" {
+            // If it's not a tank/ship/heli and has a name, it's likely an aircraft
+            VehicleType::Aircraft
+        } else {
+            VehicleType::Unknown
         };
 
         let state = json.get("state")
@@ -180,9 +200,12 @@ impl WTTelemetryReader {
         // Парсим indicators из ТОГО ЖЕ JSON (все данные в /state)
         let indicators = self.parse_indicators(json);
 
+        log::info!("[WT Parser] Vehicle: '{}', Type: {:?}", vehicle_name, type_);
+
         Ok(GameState {
             valid,
             type_,
+            vehicle_name,
             indicators,
             state,
         })
