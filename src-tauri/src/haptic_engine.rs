@@ -105,6 +105,8 @@ impl HapticEngine {
 
         tokio::spawn(async move {
             let mut tick_interval = interval(WTTelemetryReader::get_poll_interval());
+            let mut connection_lost_counter = 0u32;
+            let mut connection_established = false;
             
             while *running.read().await {
                 tick_interval.tick().await;
@@ -114,6 +116,13 @@ impl HapticEngine {
                     let mut telem = telemetry.write().await;
                     match telem.get_state().await {
                         Ok(state) => {
+                            // Connection successful
+                            if !connection_established || connection_lost_counter > 0 {
+                                log::info!("🎮 War Thunder connected! Vehicle: {:?}", state.type_);
+                                connection_established = true;
+                                connection_lost_counter = 0;
+                            }
+                            
                             log::debug!("[WT] Vehicle: {:?}, Speed: {:.0} km/h, Alt: {:.0}m, Fuel: {:.0}/{:.0} kg", 
                                 state.type_, 
                                 state.indicators.speed,  // Already in km/h from API
@@ -124,8 +133,15 @@ impl HapticEngine {
                             state
                         },
                         Err(e) => {
-                            // Game not running or not available
-                            log::warn!("[WT] Game not connected: {}", e);
+                            // Game not running or connection lost
+                            connection_lost_counter += 1;
+                            
+                            if connection_lost_counter == 1 {
+                                log::warn!("⚠️ War Thunder connection lost! Waiting for reconnect...");
+                            } else if connection_lost_counter % 10 == 0 {
+                                log::warn!("🔄 Still waiting for War Thunder... ({}s)", connection_lost_counter);
+                            }
+                            
                             drop(telem);
                             tokio::time::sleep(Duration::from_secs(1)).await;
                             continue;
@@ -256,9 +272,16 @@ impl HapticEngine {
 
     /// Stop main loop
     pub async fn stop(&self) -> Result<()> {
+        log::warn!("🛑 EMERGENCY STOP - Halting all vibrations!");
         *self.running.write().await = false;
+        
+        // Immediately stop all devices
         self.device_manager.stop_all().await?;
-        log::info!("Haptic engine stopped");
+        
+        // Reset current intensity
+        *self.current_intensity.write().await = 0.0;
+        
+        log::info!("✅ All vibrations stopped");
         Ok(())
     }
 

@@ -40,6 +40,10 @@ pub enum TriggerCondition {
     EngineDamageAbove(f32),
     ControlsDamageAbove(f32),
     
+    // Combat events (from state changes)
+    HitReceived,        // Detected hit this frame
+    CriticalDamage,     // Critical damage detected this frame
+    
     // Tank-specific
     StabilizerActive,
     StabilizerInactive,
@@ -111,6 +115,10 @@ impl TriggerCondition {
             TriggerCondition::EngineDamageAbove(threshold) => state.indicators.engine_damage > *threshold,
             TriggerCondition::ControlsDamageAbove(threshold) => state.indicators.controls_damage > *threshold,
             
+            // Combat events
+            TriggerCondition::HitReceived => state.hit_received,
+            TriggerCondition::CriticalDamage => state.critical_damage,
+            
             // Tank-specific
             TriggerCondition::StabilizerActive => state.indicators.stabilizer > 0.5,
             TriggerCondition::StabilizerInactive => state.indicators.stabilizer < 0.5,
@@ -163,6 +171,7 @@ impl TriggerCondition {
             TriggerCondition::FuelBelow(_) | TriggerCondition::FuelTimeBelow(_) |
             TriggerCondition::AmmoBelow(_) |
             TriggerCondition::EngineDamageAbove(_) | TriggerCondition::ControlsDamageAbove(_) |
+            TriggerCondition::HitReceived | TriggerCondition::CriticalDamage |
             TriggerCondition::StabilizerActive | TriggerCondition::StabilizerInactive |
             TriggerCondition::CrewLost | TriggerCondition::CrewMemberDead(_) |
             TriggerCondition::GearAbove(_) | TriggerCondition::GearBelow(_) | TriggerCondition::GearEquals(_) |
@@ -285,30 +294,30 @@ impl TriggerManager {
     
     /// Load built-in triggers (common events for all vehicle types)
     fn load_default_triggers(&mut self) {
-        // === COMMON COMBAT EVENTS ===
+        // === COMBAT EVENTS (DETECTED FROM STATE CHANGES) ===
         
-        // Hit (basic)
+        // Hit received (detected from new damage entries in state array)
         self.triggers.push(EventTrigger {
-            id: "hit_basic".to_string(),
+            id: "hit_received".to_string(),
             name: "Hit Received".to_string(),
-            description: "Triggers on any hit received. Basic damage feedback.".to_string(),
-            condition: TriggerCondition::SpeedAbove(0.0), // Always true when vehicle is active
+            description: "Triggers when a hit is detected from War Thunder API state changes.".to_string(),
+            condition: TriggerCondition::HitReceived,
             event: GameEvent::Hit,
             cooldown_ms: 500,
-            enabled: true,  // ENABLED - common event
+            enabled: false,  // OFF by default
             is_builtin: true,
             pattern: None,
         });
         
-        // Critical Hit (penetration or significant damage)
+        // Critical hit (engine, controls, fire, or multiple damages)
         self.triggers.push(EventTrigger {
             id: "critical_hit".to_string(),
             name: "Critical Hit".to_string(),
-            description: "Triggers on penetration or critical damage. High intensity feedback.".to_string(),
-            condition: TriggerCondition::SpeedAbove(0.0),
+            description: "Triggers when critical damage is detected (engine, controls, fire, or multiple hits).".to_string(),
+            condition: TriggerCondition::CriticalDamage,
             event: GameEvent::CriticalHit,
             cooldown_ms: 1000,
-            enabled: true,  // ENABLED - common event
+            enabled: false,  // OFF by default
             is_builtin: true,
             pattern: None,
         });
@@ -323,7 +332,7 @@ impl TriggerManager {
             condition: TriggerCondition::FuelBelow(10.0),
             event: GameEvent::LowFuel,
             cooldown_ms: 30000,
-            enabled: true,  // ENABLED - common event
+            enabled: false,  // OFF by default
             is_builtin: true,
             pattern: None,
         });
@@ -336,7 +345,7 @@ impl TriggerManager {
             condition: TriggerCondition::FuelBelow(5.0),
             event: GameEvent::CriticalFuel,
             cooldown_ms: 15000,
-            enabled: true,  // ENABLED - common event
+            enabled: false,  // OFF by default
             is_builtin: true,
             pattern: None,
         });
@@ -351,7 +360,7 @@ impl TriggerManager {
             condition: TriggerCondition::AmmoBelow(20.0),
             event: GameEvent::LowAmmo,
             cooldown_ms: 30000,
-            enabled: true,  // ENABLED - common event
+            enabled: false,  // OFF by default
             is_builtin: true,
             pattern: None,
         });
@@ -366,7 +375,7 @@ impl TriggerManager {
             condition: TriggerCondition::EngineDamageAbove(0.5),
             event: GameEvent::EngineDamaged,
             cooldown_ms: 10000,
-            enabled: true,  // ENABLED - common event
+            enabled: false,  // OFF by default
             is_builtin: true,
             pattern: None,
         });
@@ -379,150 +388,7 @@ impl TriggerManager {
             condition: TriggerCondition::EngineDamageAbove(0.9),
             event: GameEvent::EngineFire,
             cooldown_ms: 5000,
-            enabled: true,  // ENABLED - common event
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // === AIRCRAFT-SPECIFIC (ADVANCED CONDITIONS) ===
-        
-        // Overspeed (for aircraft)
-        self.triggers.push(EventTrigger {
-            id: "overspeed_800".to_string(),
-            name: "Overspeed 800 km/h".to_string(),
-            description: "Triggers when indicated airspeed exceeds 800 km/h. Critical speed warning.".to_string(),
-            condition: TriggerCondition::IASAbove(800.0),
-            event: GameEvent::Overspeed,
-            cooldown_ms: 5000,
-            enabled: true,  // ENABLED - common for aircraft
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // Critical G-overload (COMBO: positive OR negative)
-        self.triggers.push(EventTrigger {
-            id: "over_g_10".to_string(),
-            name: "G-Overload >10G".to_string(),
-            description: "Triggers at extreme G-load (>10G positive OR >5G negative). Risk of blackout/structural damage!".to_string(),
-            condition: TriggerCondition::Or(
-                Box::new(TriggerCondition::GLoadAbove(10.0)),
-                Box::new(TriggerCondition::GLoadBelow(-5.0)),
-            ),
-            event: GameEvent::OverG,
-            cooldown_ms: 2000,
-            enabled: true,  // ENABLED - critical safety
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // High angle of attack
-        self.triggers.push(EventTrigger {
-            id: "high_aoa_15".to_string(),
-            name: "High AoA >15°".to_string(),
-            description: "Triggers at high angle of attack (>15°). Warning of approaching stall.".to_string(),
-            condition: TriggerCondition::AOAAbove(15.0),
-            event: GameEvent::HighAOA,
-            cooldown_ms: 3000,
-            enabled: true,  // ENABLED - safety warning
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // Critical angle of attack (COMBO: high AoA AND low speed)
-        self.triggers.push(EventTrigger {
-            id: "critical_aoa_20".to_string(),
-            name: "Critical AoA >20°".to_string(),
-            description: "Triggers at critical angle of attack (>20° AND speed <350 km/h). STALL IMMINENT!".to_string(),
-            condition: TriggerCondition::And(
-                Box::new(TriggerCondition::AOAAbove(20.0)),
-                Box::new(TriggerCondition::SpeedBelow(350.0)),
-            ),
-            event: GameEvent::CriticalAOA,
-            cooldown_ms: 2000,
-            enabled: true,  // ENABLED - critical warning
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // Breaking the sound barrier
-        self.triggers.push(EventTrigger {
-            id: "mach_1".to_string(),
-            name: "Mach 1.0 Breach".to_string(),
-            description: "Triggers when reaching sound speed (Mach >0.98). Sonic boom!".to_string(),
-            condition: TriggerCondition::MachAbove(0.98),
-            event: GameEvent::Mach1,
-            cooldown_ms: 10000,
-            enabled: true,  // ENABLED - milestone event
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // Low altitude warning (COMBO: low altitude AND high speed)
-        self.triggers.push(EventTrigger {
-            id: "low_altitude_100".to_string(),
-            name: "Terrain Proximity <100m".to_string(),
-            description: "Triggers at low altitude (<100m AND speed >200 km/h). PULL UP!".to_string(),
-            condition: TriggerCondition::And(
-                Box::new(TriggerCondition::AltitudeBelow(100.0)),
-                Box::new(TriggerCondition::SpeedAbove(200.0)),
-            ),
-            event: GameEvent::LowAltitude,
-            cooldown_ms: 5000,
-            enabled: true,  // ENABLED - critical safety
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // Engine overheat
-        self.triggers.push(EventTrigger {
-            id: "engine_overheat_250".to_string(),
-            name: "Engine Overheat >250°C".to_string(),
-            description: "Triggers when engine temperature exceeds 250°C. Risk of fire!".to_string(),
-            condition: TriggerCondition::TempAbove(250.0),
-            event: GameEvent::EngineOverheat,
-            cooldown_ms: 10000,
-            enabled: true,  // ENABLED - safety warning
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // === TEMPORAL CONDITIONS (ADVANCED) ===
-        
-        // Hard braking (speed dropped rapidly)
-        self.triggers.push(EventTrigger {
-            id: "hard_brake".to_string(),
-            name: "Hard Braking".to_string(),
-            description: "Speed dropped by 150+ km/h in 1.5 seconds. Emergency stop!".to_string(),
-            condition: TriggerCondition::SpeedDroppedBy { threshold: 150.0, window_seconds: 1.5 },
-            event: GameEvent::Hit,  // Reuse Hit event for feedback
-            cooldown_ms: 3000,
-            enabled: true,  // ENABLED - dynamic feedback
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // Aggressive maneuver (G-load spiked)
-        self.triggers.push(EventTrigger {
-            id: "aggressive_turn".to_string(),
-            name: "Aggressive Maneuver".to_string(),
-            description: "G-load increased by 5G+ in 0.5 seconds. Sharp turn detected!".to_string(),
-            condition: TriggerCondition::GLoadSpiked { threshold: 5.0, window_seconds: 0.5 },
-            event: GameEvent::OverG,
-            cooldown_ms: 2000,
-            enabled: true,  // ENABLED - dynamic feedback
-            is_builtin: true,
-            pattern: None,
-        });
-        
-        // Sustained high speed
-        self.triggers.push(EventTrigger {
-            id: "sustained_speed".to_string(),
-            name: "Sustained High Speed".to_string(),
-            description: "Average speed >700 km/h for 5 seconds. Maintaining velocity!".to_string(),
-            condition: TriggerCondition::AverageSpeedAbove { threshold: 700.0, window_seconds: 5.0 },
-            event: GameEvent::Overspeed,
-            cooldown_ms: 10000,
-            enabled: false,  // DISABLED - optional feedback
+            enabled: false,  // OFF by default
             is_builtin: true,
             pattern: None,
         });
@@ -651,6 +517,10 @@ impl TriggerManager {
             
             TriggerCondition::EngineDamageAbove(val) => ind.engine_damage > *val,
             TriggerCondition::ControlsDamageAbove(val) => ind.controls_damage > *val,
+            
+            // Combat events
+            TriggerCondition::HitReceived => state.hit_received,
+            TriggerCondition::CriticalDamage => state.critical_damage,
             
             // Tank-specific
             TriggerCondition::StabilizerActive => ind.stabilizer > 0.5,

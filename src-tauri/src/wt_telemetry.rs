@@ -16,6 +16,10 @@ pub struct GameState {
     pub vehicle_name: String,
     pub indicators: Indicators,
     pub state: Vec<String>,
+    
+    // Combat events (detected from state changes)
+    pub hit_received: bool,        // Detected hit this frame
+    pub critical_damage: bool,     // Critical damage this frame
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -101,6 +105,8 @@ pub struct Indicators {
 pub struct WTTelemetryReader {
     client: reqwest::Client,
     last_state: Option<GameState>,
+    last_fetch_time: Option<std::time::Instant>,
+    cache_duration_ms: u64,
 }
 
 impl WTTelemetryReader {
@@ -113,6 +119,8 @@ impl WTTelemetryReader {
         Self {
             client,
             last_state: None,
+            last_fetch_time: None,
+            cache_duration_ms: 50, // Cache for 50ms (20 Hz max poll rate)
         }
     }
 
@@ -132,6 +140,15 @@ impl WTTelemetryReader {
     /// - /indicators → type, army, valid (vehicle information)
     /// - /state → flight indicators (IAS, AoA, G-load, etc.)
     pub async fn get_state(&mut self) -> Result<GameState> {
+        // Check cache first
+        if let Some(last_time) = self.last_fetch_time {
+            let elapsed = last_time.elapsed().as_millis() as u64;
+            if elapsed < self.cache_duration_ms {
+                if let Some(ref cached_state) = self.last_state {
+                    return Ok(cached_state.clone());
+                }
+            }
+        }
         // 1. Request /indicators for vehicle type
         let indicators_url = format!("{}/indicators", WT_TELEMETRY_URL);
         let indicators_response = self.client
@@ -164,6 +181,7 @@ impl WTTelemetryReader {
         // 3. Combine data from both endpoints
         let state = self.parse_combined_state(indicators_json, state_json)?;
         self.last_state = Some(state.clone());
+        self.last_fetch_time = Some(std::time::Instant::now());
         
         Ok(state)
     }
@@ -277,12 +295,38 @@ impl WTTelemetryReader {
             *last = vehicle_name.clone();
         }
 
+        // 5. Detect combat events (Hit, CriticalDamage) by comparing with last_state
+        let mut hit_received = false;
+        let mut critical_damage = false;
+        
+        if let Some(last) = &self.last_state {
+            // Hit detection: new damage entries in state array
+            let new_damage_entries: Vec<_> = state.iter()
+                .filter(|s| s.contains("damaged") || s.contains("broken") || s.contains("fire"))
+                .filter(|s| !last.state.contains(s))
+                .collect();
+            
+            if !new_damage_entries.is_empty() {
+                hit_received = true;
+                log::error!("[Combat Event] 🎯 HIT DETECTED: {:?}", new_damage_entries);
+            }
+            
+            // Critical damage detection: multiple new damage entries OR engine/controls damage
+            if new_damage_entries.len() >= 2 || 
+               new_damage_entries.iter().any(|s| s.contains("engine") || s.contains("controls") || s.contains("fire")) {
+                critical_damage = true;
+                log::error!("[Combat Event] 💥 CRITICAL HIT: {:?}", new_damage_entries);
+            }
+        }
+
         Ok(GameState {
             valid,
             type_,
             vehicle_name,
             indicators,
             state,
+            hit_received,
+            critical_damage,
         })
     }
 
@@ -342,6 +386,8 @@ impl WTTelemetryReader {
             vehicle_name,
             indicators,
             state,
+            hit_received: false,      // Legacy method doesn't track state changes
+            critical_damage: false,
         })
     }
 

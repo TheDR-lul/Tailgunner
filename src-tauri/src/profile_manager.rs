@@ -43,10 +43,19 @@ impl ProfileManager {
 
     /// Load ready-made presets
     fn load_default_profiles(&mut self) {
-        // Tank Profile (Universal - Tank-specific events only)
+        // Tank Profile (Universal)
         let mut tank_mappings = HashMap::new();
         
-        // Tank-specific events (removed common events - they're in built-in triggers)
+        // Common events (controlled by built-in triggers)
+        tank_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
+        tank_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
+        tank_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
+        tank_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
+        tank_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
+        tank_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_simple_hit());
+        tank_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
+        
+        // Tank-specific events
         tank_mappings.insert(GameEvent::EngineRunning, VibrationPattern::preset_engine_rumble());
         tank_mappings.insert(GameEvent::TrackBroken, VibrationPattern::preset_simple_hit());
         tank_mappings.insert(GameEvent::AmmunitionExploded, VibrationPattern::preset_critical_hit());
@@ -61,12 +70,28 @@ impl ProfileManager {
             enabled: true,
         });
 
-        // Aircraft Profile (Universal - Aircraft-specific events only)
+        // Aircraft Profile (Universal)
         let mut aircraft_mappings = HashMap::new();
         
-        // Aircraft-specific flight dynamics (removed common events - they're in built-in triggers)
+        // Common events (controlled by built-in triggers)
+        aircraft_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
+        aircraft_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
+        aircraft_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
+        
+        // Aircraft-specific flight dynamics
         aircraft_mappings.insert(GameEvent::Stall, VibrationPattern::preset_fire());
         aircraft_mappings.insert(GameEvent::Spin, VibrationPattern::preset_fire());
+        aircraft_mappings.insert(GameEvent::Overspeed, VibrationPattern::preset_critical_hit());
+        aircraft_mappings.insert(GameEvent::OverG, VibrationPattern::preset_critical_hit());
+        aircraft_mappings.insert(GameEvent::HighAOA, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::CriticalAOA, VibrationPattern::preset_fire());
+        aircraft_mappings.insert(GameEvent::Mach1, VibrationPattern::preset_critical_hit());
+        aircraft_mappings.insert(GameEvent::LowAltitude, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::EngineOverheat, VibrationPattern::preset_fire());
 
         self.profiles.push(Profile {
             id: "aircraft_universal".to_string(),

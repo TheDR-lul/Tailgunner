@@ -89,7 +89,7 @@ impl VehicleLimitsManager {
                     condition: TriggerCondition::SpeedAbove(warning_speed),
                     event: GameEvent::Overspeed,
                     cooldown_ms: 5000,
-                    enabled: true,
+                    enabled: false,  // OFF by default
                     is_builtin: false,
                     pattern: None,
                 });
@@ -105,7 +105,7 @@ impl VehicleLimitsManager {
                     condition: TriggerCondition::GLoadAbove(warning_g),
                     event: GameEvent::OverG,
                     cooldown_ms: 3000,
-                    enabled: true,
+                    enabled: false,  // OFF by default
                     is_builtin: false,
                     pattern: None,
                 });
@@ -121,7 +121,7 @@ impl VehicleLimitsManager {
                     condition: TriggerCondition::GLoadBelow(warning_g),
                     event: GameEvent::OverG,
                     cooldown_ms: 3000,
-                    enabled: true,
+                    enabled: false,  // OFF by default
                     is_builtin: false,
                     pattern: None,
                 });

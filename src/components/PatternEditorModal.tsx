@@ -128,40 +128,77 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
     onClose();
   };
 
-  const exportPattern = () => {
-    const config = { name: patternName, nodes, edges };
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${patternName || 'pattern'}.json`;
-    a.click();
+  const exportPattern = async () => {
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      
+      const config = { name: patternName, nodes, edges };
+      const jsonContent = JSON.stringify(config, null, 2);
+      
+      // Open save dialog with suggested filename
+      const filePath = await save({
+        title: 'Export Pattern',
+        defaultPath: `${patternName || 'pattern'}.json`,
+        filters: [{
+          name: 'Pattern File',
+          extensions: ['json']
+        }]
+      });
+      
+      if (filePath) {
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        await writeTextFile(filePath, jsonContent);
+        
+        if ((window as any).debugLog) {
+          (window as any).debugLog('success', `✅ Pattern exported to: ${filePath}`);
+        }
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      if ((window as any).debugLog) {
+        (window as any).debugLog('error', `❌ Export failed: ${error}`);
+      }
+    }
   };
 
-  const importPattern = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e: any) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const config = JSON.parse(event.target?.result as string);
-            setPatternName(config.name || '');
-            setNodes(config.nodes || []);
-            setEdges(config.edges || []);
-            console.log('[Pattern Editor] Imported pattern:', config.name, 'Nodes:', config.nodes?.length);
-          } catch (error) {
-            console.error('[Pattern Editor] Import error:', error);
-            alert(t('pattern_editor.import_error') || 'Failed to import pattern');
-          }
-        };
-        reader.readAsText(file);
+  const importPattern = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      
+      // Open file dialog
+      const filePath = await open({
+        title: 'Import Pattern',
+        filters: [{
+          name: 'Pattern File',
+          extensions: ['json']
+        }],
+        multiple: false
+      });
+      
+      if (filePath && typeof filePath === 'string') {
+        const { readTextFile } = await import('@tauri-apps/plugin-fs');
+        const content = await readTextFile(filePath);
+        
+        const config = JSON.parse(content);
+        setPatternName(config.name || '');
+        setNodes(config.nodes || []);
+        setEdges(config.edges || []);
+        
+        console.log('[Pattern Editor] ✅ Imported pattern:', config.name, 'from:', filePath);
+        
+        if ((window as any).debugLog) {
+          (window as any).debugLog('success', `✅ Pattern imported: ${config.name}`);
+        }
       }
-    };
-    input.click(); // ⚠️ ДОБАВЛЕНО! Без этого диалог не открывался!
+    } catch (error) {
+      console.error('[Pattern Editor] ❌ Import error:', error);
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('error', `❌ Import failed: ${error}`);
+      }
+      
+      alert(t('pattern_editor.import_error') || 'Failed to import pattern');
+    }
   };
 
   if (!isOpen) return null;
