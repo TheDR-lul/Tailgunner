@@ -250,7 +250,7 @@ impl TriggerCondition {
     }
 }
 
-/// Триггер события
+/// Event Trigger
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventTrigger {
     pub id: String,
@@ -266,7 +266,7 @@ pub struct EventTrigger {
     pub curve_points: Option<Vec<crate::pattern_engine::CurvePoint>>,
 }
 
-/// Менеджер триггеров
+/// Trigger Manager
 pub struct TriggerManager {
     triggers: Vec<EventTrigger>,
     last_triggered: std::collections::HashMap<String, std::time::Instant>,
@@ -396,7 +396,7 @@ impl TriggerManager {
                 continue;
             }
             
-            // Проверка cooldown
+            // Check cooldown
             if let Some(last_time) = self.last_triggered.get(&trigger.id) {
                 let elapsed = now.duration_since(*last_time).as_millis() as u64;
                 if elapsed < trigger.cooldown_ms {
@@ -404,7 +404,7 @@ impl TriggerManager {
                 }
             }
             
-            // Проверка условия (с поддержкой временных условий)
+            // Check condition (with temporal support)
             let result = trigger.condition.evaluate_with_history(state, Some(&self.state_history));
             
             // Debug G-load triggers specifically
@@ -415,7 +415,7 @@ impl TriggerManager {
             
             if result {
                 log::error!("[Triggers DEBUG] ✅ TRIGGERED: '{}' -> {:?}", trigger.name, trigger.event);
-                // Возвращаем событие И паттерн (если есть)
+                // Return event and pattern (if exists)
                 events.push((trigger.event.clone(), trigger.pattern.clone()));
                 self.last_triggered.insert(trigger.id.clone(), now);
             }
@@ -658,7 +658,7 @@ impl TriggerManager {
         Ok(())
     }
     
-    /// Удаление триггера
+    /// Remove trigger
     pub fn remove_trigger(&mut self, id: &str) -> bool {
         if let Some(pos) = self.triggers.iter().position(|t| t.id == id) {
             self.triggers.remove(pos);

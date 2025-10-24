@@ -71,9 +71,9 @@ impl WTVehiclesAPI {
         }
     }
     
-    /// Получить данные о технике по имени
+    /// Get vehicle data by identifier
     pub async fn get_vehicle(&self, identifier: &str) -> anyhow::Result<VehicleData> {
-        // Проверяем кэш
+        // Check cache
         {
             let cache = self.cache.read().await;
             if let Some(data) = cache.get(identifier) {
@@ -81,7 +81,7 @@ impl WTVehiclesAPI {
             }
         }
         
-        // Запрос к API
+        // API request
         let url = format!("{}/api/vehicles/{}", WT_VEHICLES_API_BASE, identifier);
         
         let response = self.client
@@ -109,7 +109,7 @@ impl WTVehiclesAPI {
                 anyhow::anyhow!("Failed to parse vehicle data: {}", e)
             })?;
         
-        // Кэшируем
+        // Cache it
         {
             let mut cache = self.cache.write().await;
             cache.insert(identifier.to_string(), data.clone());
@@ -200,7 +200,7 @@ impl WTVehiclesAPI {
         Ok(data)
     }
     
-    /// Получить список всей техники (с лимитом)
+    /// Get list of all vehicles (with limit)
     pub async fn get_all_vehicles(&self, limit: Option<usize>) -> anyhow::Result<Vec<VehicleData>> {
         let url = format!("{}/api/vehicles", WT_VEHICLES_API_BASE);
         
@@ -219,12 +219,12 @@ impl WTVehiclesAPI {
         Ok(vehicles)
     }
     
-    /// Получить максимальную скорость для конкретной техники
+    /// Get max speed for specific vehicle
     pub async fn get_max_speed(&self, identifier: &str) -> Option<f32> {
         self.get_vehicle(identifier).await.ok()?.max_speed_kmh
     }
     
-    /// Получить максимальную G-перегрузку
+    /// Get max G-load limits
     pub async fn get_max_g_limits(&self, identifier: &str) -> Option<(f32, f32)> {
         let vehicle = self.get_vehicle(identifier).await.ok()?;
         Some((
@@ -240,13 +240,13 @@ impl Default for WTVehiclesAPI {
     }
 }
 
-/// Упрощенная версия для быстрого доступа к данным
+/// Simplified version for quick data access
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VehicleLimits {
     pub identifier: String,
     pub max_speed_kmh: f32,
-    pub wing_rip_speed_kmh: f32,  // Скорость слома крыла (flutter)
-    pub flutter_speed_kmh: f32,   // Скорость начала флаттера (предупреждение)
+    pub wing_rip_speed_kmh: f32,
+    pub flutter_speed_kmh: f32,
     pub max_positive_g: f32,
     pub max_negative_g: f32,
 }
@@ -265,8 +265,8 @@ impl VehicleLimits {
     }
 }
 
-// ===== КЭШИРОВАННЫЕ ДАННЫЕ ПОПУЛЯРНЫХ САМОЛЕТОВ =====
-// (для работы без интернета)
+// ===== CACHED DATA FOR POPULAR AIRCRAFT =====
+// (for offline operation)
 
 lazy_static::lazy_static! {
     pub static ref DEFAULT_LIMITS: HashMap<&'static str, VehicleLimits> = {
@@ -332,7 +332,7 @@ lazy_static::lazy_static! {
             max_negative_g: -4.5,
         });
         
-        // Дефолтные значения для неизвестной техники
+        // Default values for unknown vehicles
         m.insert("default", VehicleLimits {
             identifier: "default".to_string(),
             max_speed_kmh: 700.0,

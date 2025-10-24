@@ -43,18 +43,18 @@ pub struct BurstConfig {
     pub pause_between_ms: u64,
 }
 
-/// Событие из игры (расширенный набор из всех WT API эндпоинтов)
+/// Game Event (extended set from all WT API endpoints)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum GameEvent {
-    // === ПОПАДАНИЯ И УРОН ===
+    // === HITS AND DAMAGE ===
     Hit,
     CriticalHit,
     PenetrationHit,
     Ricochet,
     HitCamera,
     
-    // === ПОВРЕЖДЕНИЯ ТЕХНИКИ ===
-    // Двигатель
+    // === VEHICLE DAMAGE ===
+    // Engine
     EngineDestroyed,
     EngineDamaged,
     EngineOverheat,
@@ -62,13 +62,13 @@ pub enum GameEvent {
     OilLeak,
     WaterLeak,
     
-    // Экипаж
+    // Crew
     CrewKnocked,
     PilotKnockedOut,
     GunnerKnockedOut,
     DriverKnockedOut,
     
-    // Танк
+    // Tank
     TrackBroken,
     TurretJammed,
     GunBreach,
@@ -76,7 +76,7 @@ pub enum GameEvent {
     AmmunitionExploded,
     FuelTankHit,
     
-    // Самолет
+    // Aircraft
     WingDamaged,
     TailDamaged,
     ElevatorDamaged,
@@ -85,16 +85,16 @@ pub enum GameEvent {
     GearDamaged,
     FlapsDamaged,
     
-    // === СОСТОЯНИЯ САМОЛЕТА ===
+    // === AIRCRAFT STATES ===
     Stall,
     Spin,
     FlatSpin,
-    Overspeed,            // Превышение макс скорости
-    OverG,                // Превышение макс G-перегрузки
-    CompressorStall,      // Срыв компрессора
+    Overspeed,
+    OverG,
+    CompressorStall,
     EngineCompressorDamage,
     
-    // Управление
+    // Control
     GearUp,
     GearDown,
     GearStuck,
@@ -103,7 +103,7 @@ pub enum GameEvent {
     AirbrakeDeployed,
     ParachuteDeployed,
     
-    // === БОЕВЫЕ ДЕЙСТВИЯ ===
+    // === COMBAT ACTIONS ===
     Shooting,
     CannonFiring,
     MachineGunFiring,
@@ -111,50 +111,50 @@ pub enum GameEvent {
     BombDropped,
     TorpedoDropped,
     
-    // === НЕПРЕРЫВНЫЕ СОСТОЯНИЯ ===
+    // === CONTINUOUS STATES ===
     EngineRunning,
     
-    // Попадания игрока
+    // Player hits
     TargetHit,
     TargetDestroyed,
     TargetCritical,
     AircraftDestroyed,
     TankDestroyed,
     
-    // === ТОПЛИВО И БОЕЗАПАС ===
+    // === FUEL AND AMMO ===
     LowFuel,              // <10%
     CriticalFuel,         // <5%
     OutOfFuel,
     LowAmmo,              // <20%
     OutOfAmmo,
     
-    // === АЭРОДИНАМИКА ===
-    HighAOA,              // Высокий угол атаки >15°
-    CriticalAOA,          // Критический угол >20°
-    HighSlip,             // Скольжение
-    Mach1,                // Преодоление звукового барьера
+    // === AERODYNAMICS ===
+    HighAOA,              // High angle of attack >15°
+    CriticalAOA,          // Critical angle >20°
+    HighSlip,
+    Mach1,
     
-    // === СИСТЕМА УПРАВЛЕНИЯ ===
+    // === CONTROL SYSTEMS ===
     AutopilotEngaged,
     AutopilotDisengaged,
     TrimAdjusted,
     
-    // === ОКРУЖЕНИЕ ===
-    LowAltitude,          // <100м
-    CriticalAltitude,     // <50м
-    HighAltitude,         // >5000м
-    Touchdown,            // Касание земли
+    // === ENVIRONMENT ===
+    LowAltitude,          // <100m
+    CriticalAltitude,     // <50m
+    HighAltitude,         // >5000m
+    Touchdown,
     Landed,
     Takeoff,
-    Crashed,              // Crashed into ground/object
-    OilOverheated,        // Oil temperature critical
+    Crashed,
+    OilOverheated,
     
-    // === ЭКИПАЖ И СИСТЕМЫ ===
+    // === CREW AND SYSTEMS ===
     FireExtinguished,
     RepairCompleted,
     CrewReplenished,
     
-    // === МИССИЯ ===
+    // === MISSION ===
     MissionStarted,
     MissionObjectiveCompleted,
     MissionFailed,
