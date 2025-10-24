@@ -79,16 +79,31 @@ impl VehicleLimitsManager {
         if let Some(limits) = self.get_limits().await {
             log::info!("[Vehicle Limits] 🎯 Generating dynamic triggers for {}", limits.identifier);
             
-            // Max Speed Warning (90% of max)
-            if limits.max_speed_kmh > 0.0 {
-                let warning_speed = limits.max_speed_kmh * 0.9;
+            // Flutter Warning (at flutter speed - before wing rip)
+            if limits.flutter_speed_kmh > 0.0 {
+                triggers.push(EventTrigger {
+                    id: "dynamic_flutter".to_string(),
+                    name: format!("Flutter Warning ({}+ km/h)", limits.flutter_speed_kmh as i32),
+                    description: format!("Wings starting to flutter! Rip at {} km/h", limits.wing_rip_speed_kmh as i32),
+                    condition: TriggerCondition::SpeedAbove(limits.flutter_speed_kmh),
+                    event: GameEvent::Overspeed,
+                    cooldown_ms: 3000,
+                    enabled: false,  // OFF by default - user must enable manually
+                    is_builtin: false,
+                    pattern: None,
+                });
+            }
+            
+            // Critical Speed Warning (95% of wing rip speed)
+            if limits.wing_rip_speed_kmh > 0.0 {
+                let critical_speed = limits.wing_rip_speed_kmh * 0.95;
                 triggers.push(EventTrigger {
                     id: "dynamic_overspeed".to_string(),
-                    name: format!("Overspeed Warning ({}+ km/h)", warning_speed as i32),
-                    description: format!("Approaching max speed of {} km/h", limits.max_speed_kmh as i32),
-                    condition: TriggerCondition::SpeedAbove(warning_speed),
+                    name: format!("CRITICAL SPEED ({}+ km/h)", critical_speed as i32),
+                    description: format!("DANGER! Wings will rip at {} km/h!", limits.wing_rip_speed_kmh as i32),
+                    condition: TriggerCondition::SpeedAbove(critical_speed),
                     event: GameEvent::Overspeed,
-                    cooldown_ms: 5000,
+                    cooldown_ms: 2000,
                     enabled: false,  // OFF by default - user must enable manually
                     is_builtin: false,
                     pattern: None,
