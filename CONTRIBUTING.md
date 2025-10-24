@@ -82,7 +82,7 @@ Then create a Pull Request via GitHub UI.
 
 ### Priority Tasks:
 
-1. **Lovense LAN API integration** — Direct connection without Buttplug
+1. **On-screen HUD overlay** — Real-time game state and trigger visualization
 2. **Mock server for testing** — War Thunder API emulator
 3. **Enhanced curve editor** — Preset curves, copy/paste functionality
 4. **Profile import/export system** — JSON format with validation

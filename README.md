@@ -323,7 +323,11 @@ MIT License - see [LICENSE](LICENSE) for details
 - ✅ Editable number inputs with keyboard support
 
 ### **v0.8.0** *(Planned)*
-- 🔄 Lovense direct API support
+- 🔄 On-screen HUD overlay
+  - Real-time game state visualization
+  - Active trigger indicators
+  - Device status display
+  - Customizable position and opacity
 - 🔄 Community pattern library
 - 🔄 Enhanced curve editor with presets
 - 🔄 Trigger import/export functionality
