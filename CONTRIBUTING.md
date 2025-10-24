@@ -1,110 +1,113 @@
-# 🤝 Contributing to Butt Thunder
+# 🤝 Contributing to Tailgunner
 
-Спасибо за ваш интерес к проекту! Мы приветствуем вклад от сообщества.
+Thank you for your interest in the project! We welcome contributions from the community.
 
-## 📋 Как внести вклад
+## 📋 How to Contribute
 
-### 1. Fork и Clone
+### 1. Fork and Clone
 
 ```bash
-# Fork через GitHub UI
-git clone https://github.com/YOUR_USERNAME/butt_thunder.git
-cd butt_thunder
+# Fork via GitHub UI
+git clone https://github.com/YOUR_USERNAME/tailgunner.git
+cd tailgunner
 ```
 
-### 2. Установка зависимостей
+### 2. Install Dependencies
 
 ```bash
-# Установка Rust (если еще не установлен)
+# Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Установка Node.js зависимостей
+# Install Node.js dependencies
 npm install
 ```
 
-### 3. Создание ветки
+### 3. Create a Branch
 
 ```bash
 git checkout -b feature/amazing-feature
 ```
 
-### 4. Разработка
+### 4. Development
 
-#### Запуск в dev режиме:
+#### Run in dev mode:
 
 ```bash
 npm run tauri dev
 ```
 
-#### Проверка Rust кода:
+#### Check Rust code:
 
 ```bash
 cargo check --manifest-path=src-tauri/Cargo.toml
 cargo clippy --manifest-path=src-tauri/Cargo.toml
 ```
 
-#### Проверка TypeScript кода:
+#### Check TypeScript code:
 
 ```bash
-npm run build  # Проверяет TypeScript
+npm run build  # Validates TypeScript
 ```
 
-### 5. Коммит изменений
+### 5. Commit Changes
 
-Используйте понятные commit message:
+Use clear commit messages:
 
 ```bash
-git commit -m "feat: Добавлен новый паттерн для критических попаданий"
-git commit -m "fix: Исправлена утечка памяти в DeviceManager"
-git commit -m "docs: Обновлен README с новыми инструкциями"
+git commit -m "feat: Add new pattern for critical hits"
+git commit -m "fix: Fix memory leak in DeviceManager"
+git commit -m "docs: Update README with new instructions"
 ```
 
-**Префиксы:**
-- `feat:` — новая фича
-- `fix:` — исправление бага
-- `docs:` — документация
-- `refactor:` — рефакторинг
-- `test:` — тесты
-- `chore:` — обслуживание
+**Prefixes:**
+- `feat:` — new feature
+- `fix:` — bug fix
+- `docs:` — documentation
+- `refactor:` — refactoring
+- `test:` — tests
+- `chore:` — maintenance
+- `style:` — code style (no functional changes)
 
-### 6. Push и Pull Request
+### 6. Push and Pull Request
 
 ```bash
 git push origin feature/amazing-feature
 ```
 
-Затем создайте Pull Request через GitHub UI.
+Then create a Pull Request via GitHub UI.
 
 ---
 
-## 🎯 Что можно улучшить
+## 🎯 What Can Be Improved
 
-### Приоритетные задачи:
+### Priority Tasks:
 
-1. **Lovense LAN API интеграция** — прямое подключение без Buttplug
-2. **Mock сервер для тестирования** — эмулятор War Thunder API
-3. **UI для создания кастомных паттернов** — интерактивный редактор ADSR
-4. **Система импорта/экспорта профилей** — JSON формат
-5. **Настройки приложения** — выбор порта, частоты опроса и т.д.
-6. **Тесты** — unit и integration тесты
-7. **i18n** — поддержка английского языка
+1. **Lovense LAN API integration** — Direct connection without Buttplug
+2. **Mock server for testing** — War Thunder API emulator
+3. **Enhanced curve editor** — Preset curves, copy/paste functionality
+4. **Profile import/export system** — JSON format with validation
+5. **Application settings** — Port selection, polling frequency, etc.
+6. **Tests** — Unit and integration tests
+7. **Additional translations** — Support for more languages
 
-### Идеи для фич:
+### Feature Ideas:
 
-- Интеграция с другими играми (DCS, IL-2)
-- Поддержка многоканальных устройств (разные зоны вибрации)
-- WebSocket API для стримеров (Twitch интеграция)
-- Статистика событий (сколько попаданий за сессию)
-- Облачные профили (синхронизация между устройствами)
+- Integration with other games (DCS, IL-2)
+- Multi-channel device support (different vibration zones)
+- WebSocket API for streamers (Twitch integration)
+- Event statistics (hits per session, G-force records)
+- Cloud profiles (sync between devices)
+- Voice alerts and TTS announcements
+- VR headset haptic integration
 
 ---
 
-## 📝 Стиль кода
+## 📝 Code Style
 
 ### Rust
 
 ```rust
-// Хорошо
+// Good
 pub struct VibrationPattern {
     pub name: String,
     attack: EnvelopeStage,
@@ -119,22 +122,23 @@ impl VibrationPattern {
     }
 }
 
-// Плохо
-pub struct vibrationPattern {  // snake_case для типов
-    Name: String,  // PascalCase для полей
+// Bad
+pub struct vibrationPattern {  // Use PascalCase for types
+    Name: String,  // Use snake_case for fields
 }
 ```
 
-**Правила:**
-- `PascalCase` для типов и трейтов
-- `snake_case` для функций и переменных
-- Документируйте публичные API с `///`
-- Используйте `clippy` для проверки
+**Rules:**
+- `PascalCase` for types and traits
+- `snake_case` for functions and variables
+- Document public APIs with `///`
+- Use `clippy` for linting
+- **English only** for comments and documentation
 
 ### TypeScript
 
 ```typescript
-// Хорошо
+// Good
 export interface DeviceInfo {
   id: number;
   name: string;
@@ -145,22 +149,23 @@ export async function getDevices(): Promise<DeviceInfo[]> {
   return invoke<DeviceInfo[]>('get_devices');
 }
 
-// Плохо
-export interface device_info {  // PascalCase для интерфейсов
-  ID: number;  // camelCase для полей
+// Bad
+export interface device_info {  // Use PascalCase for interfaces
+  ID: number;  // Use camelCase for fields
 }
 ```
 
-**Правила:**
-- `PascalCase` для типов и интерфейсов
-- `camelCase` для переменных и функций
-- Используйте `async/await` вместо `.then()`
-- Типизируйте всё
+**Rules:**
+- `PascalCase` for types and interfaces
+- `camelCase` for variables and functions
+- Use `async/await` instead of `.then()`
+- Type everything (avoid `any`)
+- **English only** for comments and variable names
 
 ### React
 
 ```tsx
-// Хорошо
+// Good
 export function Dashboard() {
   const [isRunning, setIsRunning] = useState(false);
   
@@ -171,18 +176,25 @@ export function Dashboard() {
   );
 }
 
-// Плохо
-export default function dashboard() {  // PascalCase для компонентов
-  const is_running = useState(false);  // camelCase для переменных
-  return <div style={{color: 'red'}}></div>;  // используйте CSS классы
+// Bad
+export default function dashboard() {  // Use PascalCase for components
+  const is_running = useState(false);  // Use camelCase for variables
+  return <div style={{color: 'red'}}></div>;  // Use CSS classes
 }
 ```
 
+**Rules:**
+- `PascalCase` for component names
+- `camelCase` for props and state
+- Prefer CSS classes over inline styles
+- Use functional components with hooks
+- **English only** for component names and props
+
 ---
 
-## 🧪 Тестирование
+## 🧪 Testing
 
-### Unit тесты (Rust)
+### Unit Tests (Rust)
 
 ```rust
 #[cfg(test)]
@@ -193,76 +205,122 @@ mod tests {
     fn test_rate_limiting() {
         let limiter = RateLimiter::new();
         assert!(limiter.try_send());
-        assert!(!limiter.try_send());  // Должно быть заблокировано
+        assert!(!limiter.try_send());  // Should be blocked
     }
 }
 ```
 
-Запуск:
+Run tests:
 ```bash
 cargo test --manifest-path=src-tauri/Cargo.toml
 ```
 
-### Интеграционные тесты
+### Integration Tests
 
-TODO: Добавить интеграционные тесты с mock War Thunder API
+TODO: Add integration tests with mock War Thunder API
 
 ---
 
-## 🐛 Баг репорты
+## 🐛 Bug Reports
 
-При создании issue укажите:
+When creating an issue, include:
 
-1. **Версия приложения**
-2. **ОС и версия** (Windows 10/11)
-3. **Шаги для воспроизведения**
-4. **Ожидаемое поведение**
-5. **Фактическое поведение**
-6. **Логи** (если есть)
+1. **Application version**
+2. **OS and version** (Windows 10/11, Linux, etc.)
+3. **Steps to reproduce**
+4. **Expected behavior**
+5. **Actual behavior**
+6. **Logs** (if available)
 
-### Пример:
+### Example:
 
 ```markdown
-**Версия:** 0.1.0
-**ОС:** Windows 11 23H2
-**Устройство:** Lovense Edge 2
+**Version:** 0.7.0
+**OS:** Windows 11 23H2
+**Device:** Lovense Edge 2
 
-**Шаги:**
-1. Запустить приложение
-2. Нажать "Инициализировать"
-3. Запустить движок
+**Steps:**
+1. Launch application
+2. Click "Initialize Devices"
+3. Start engine
 
-**Ожидается:** Вибрация при попадании
-**Фактически:** Вибрация не работает
+**Expected:** Vibration on hit
+**Actual:** No vibration
 
-**Логи:**
+**Logs:**
 [WARN] Failed to send vibration: Timeout
 ```
 
 ---
 
-## 📚 Дополнительные ресурсы
+## 🎨 UI/UX Guidelines
 
-### Документация
+When contributing to the frontend:
+
+1. **Maintain consistency** - Follow existing design patterns
+2. **Accessibility** - Ensure keyboard navigation works
+3. **Responsive design** - Test on different window sizes
+4. **Internationalization** - Use `t()` for all user-facing text
+5. **Performance** - Avoid unnecessary re-renders
+
+### Translation Guidelines
+
+When adding new UI text:
+
+1. Add keys to both `src/i18n/locales/en.json` and `ru.json`
+2. Use descriptive key names: `trigger_settings.cooldown` not `ts.cd`
+3. Provide context in comments if meaning is ambiguous
+4. Test with language switcher to ensure layout works in both languages
+
+---
+
+## 📚 Additional Resources
+
+### Documentation
 
 - [Tauri](https://tauri.app/)
 - [Buttplug.io](https://buttplug.io/docs/)
 - [React](https://react.dev/)
 - [Rust](https://www.rust-lang.org/learn)
 
-### Полезные ссылки
+### Useful Links
 
 - [War Thunder LocalHost API](https://localhost.warthunder.com/help)
-- [Buttplug Устройства](https://iostindex.com/)
+- [Buttplug Devices](https://iostindex.com/)
 - [Tauri IPC](https://tauri.app/develop/calling-rust/)
+- [React Flow Docs](https://reactflow.dev/)
 
 ---
 
-## ⚖️ Лицензия
+## 🚀 Project Structure
 
-Внося вклад в проект, вы соглашаетесь, что ваш код будет лицензирован под MIT License.
+```
+tailgunner/
+├── src/                    # Frontend (React + TypeScript)
+│   ├── components/         # React components
+│   ├── hooks/             # Custom React hooks
+│   ├── i18n/              # Translations
+│   └── styles/            # CSS files
+├── src-tauri/             # Backend (Rust + Tauri)
+│   └── src/
+│       ├── device_manager.rs    # Buttplug.io integration
+│       ├── event_engine.rs      # Game event detection
+│       ├── event_triggers.rs    # Trigger evaluation
+│       ├── haptic_engine.rs     # Main haptic engine
+│       ├── pattern_engine.rs    # Pattern generation
+│       ├── profile_manager.rs   # Profile switching
+│       ├── ui_patterns.rs       # UI pattern parsing
+│       ├── wt_telemetry.rs      # War Thunder API
+│       └── lib.rs               # Tauri commands
+└── public/                # Static assets
+```
 
 ---
 
-**Спасибо за ваш вклад! 🎮💜**
+## ⚖️ License
 
+By contributing to this project, you agree that your code will be licensed under the MIT License.
+
+---
+
+**Thank you for your contribution! 🎮💜**
