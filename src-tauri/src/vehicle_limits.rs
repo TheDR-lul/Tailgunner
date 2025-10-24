@@ -88,9 +88,10 @@ impl VehicleLimitsManager {
                     condition: TriggerCondition::SpeedAbove(limits.flutter_speed_kmh),
                     event: GameEvent::Overspeed,
                     cooldown_ms: 3000,
-                    enabled: false,  // OFF by default - user must enable manually
+                    enabled: false,
                     is_builtin: false,
                     pattern: None,
+                    curve_points: None,
                 });
             }
             
@@ -104,9 +105,10 @@ impl VehicleLimitsManager {
                     condition: TriggerCondition::SpeedAbove(critical_speed),
                     event: GameEvent::Overspeed,
                     cooldown_ms: 2000,
-                    enabled: false,  // OFF by default - user must enable manually
+                    enabled: false,
                     is_builtin: false,
                     pattern: None,
+                    curve_points: None,
                 });
             }
             
@@ -120,9 +122,10 @@ impl VehicleLimitsManager {
                     condition: TriggerCondition::GLoadAbove(warning_g),
                     event: GameEvent::OverG,
                     cooldown_ms: 3000,
-                    enabled: false,  // OFF by default - user must enable manually
+                    enabled: false,
                     is_builtin: false,
                     pattern: None,
+                    curve_points: None,
                 });
             }
             
@@ -136,9 +139,10 @@ impl VehicleLimitsManager {
                     condition: TriggerCondition::GLoadBelow(warning_g),
                     event: GameEvent::OverG,
                     cooldown_ms: 3000,
-                    enabled: false,  // OFF by default - user must enable manually
+                    enabled: false,
                     is_builtin: false,
                     pattern: None,
+                    curve_points: None,
                 });
             }
             

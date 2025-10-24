@@ -254,6 +254,7 @@ async fn toggle_trigger(state: tauri::State<'_, AppState>, id: String, enabled: 
 struct SimpleVibration {
     intensity: f32,
     duration_ms: u64,
+    curve: Option<Vec<pattern_engine::CurvePoint>>,
 }
 
 #[tauri::command]
@@ -266,13 +267,21 @@ async fn update_trigger(
     let engine = state.engine.lock().await;
     let mut manager = engine.trigger_manager.write().await;
     
-    // Convert SimpleVibration to VibrationPattern if provided
-    let vibration_pattern = pattern.map(|simple| {
-        pattern_engine::VibrationPattern::simple(simple.intensity, simple.duration_ms)
-    });
+    // Convert SimpleVibration to VibrationPattern and save curve points
+    let (vibration_pattern, curve_points) = match pattern {
+        Some(simple) => {
+            let curve = simple.curve.clone();
+            let pattern = if let Some(ref curve_points) = simple.curve {
+                pattern_engine::VibrationPattern::from_curve_points(curve_points.clone(), simple.duration_ms)
+            } else {
+                pattern_engine::VibrationPattern::simple(simple.intensity, simple.duration_ms)
+            };
+            (Some(Some(pattern)), curve)
+        },
+        None => (None, None)  // Don't touch pattern if not provided
+    };
     
-    let has_pattern = vibration_pattern.is_some();
-    manager.update_trigger(&id, cooldown_ms, Some(vibration_pattern))?;
+    manager.update_trigger_with_curve(&id, cooldown_ms, vibration_pattern, curve_points)?;
     
     // Auto-save settings
     let config_dir = std::env::current_dir()
@@ -280,7 +289,7 @@ async fn update_trigger(
     let settings_path = config_dir.join("trigger_settings.json");
     let _ = manager.save_settings(&settings_path);
     
-    log::info!("[Triggers] Updated trigger '{}': cooldown={:?}, pattern={}", id, cooldown_ms, has_pattern);
+    log::info!("[Triggers] Updated trigger '{}': cooldown={:?}", id, cooldown_ms);
     Ok("Trigger updated".to_string())
 }
 

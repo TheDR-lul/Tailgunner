@@ -17,6 +17,8 @@
     "close": "Закрыть",
     "on": "ВКЛ",
     "off": "ВЫКЛ",
+    "settings": "Настройки",
+    "reset": "Сброс",
     "cooldown": "cooldown",
     "loading": "Загрузка..."
   },
@@ -72,6 +74,15 @@
     "description": "Автоматические события на основе показателей игры",
     "no_triggers": "Нет триггеров",
     "cooldown": "{{time}}s cooldown"
+  },
+  "trigger_settings": {
+    "cooldown": "Кулдаун (секунды)",
+    "intensity": "Интенсивность вибрации (%)",
+    "duration": "Длительность вибрации (мс)",
+    "vibration_duration": "Длительность (сек)",
+    "curve_hint": "Клик = добавить • Тянуть = двигать • 2× клик = удалить",
+    "points": "Точек",
+    "hint": "Настройки сохраняются автоматически"
   },
   "events": {
     "title": "Игровые События",
@@ -160,9 +171,18 @@
     "LowAltitude": "Низкая высота",
     "EngineDamaged": "Повреждение двигателя",
     "EngineDestroyed": "Уничтожен двигатель",
+    "EngineFire": "Пожар двигателя",
+    "EngineRunning": "Двигатель работает",
     "TrackBroken": "Сломана гусеница",
     "Shooting": "Выстрел",
-    "CannonFiring": "Стрельба из пушки"
+    "CannonFiring": "Стрельба из пушки",
+    "Stall": "Сваливание",
+    "Spin": "Штопор",
+    "EngineOverheat": "Перегрев двигателя",
+    "OilOverheated": "Масло перегрето",
+    "Crashed": "Столкновение",
+    "AmmunitionExploded": "Взрыв боекомплекта",
+    "TargetDestroyed": "Цель уничтожена"
   },
   "debug": {
     "title": "Консоль отладки",

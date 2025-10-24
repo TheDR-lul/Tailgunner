@@ -4,6 +4,13 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+/// Curve point for custom vibration curves
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurvePoint {
+    pub x: f32,
+    pub y: f32,
+}
+
 /// Main vibration pattern (ADSR + burst)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VibrationPattern {
@@ -165,6 +172,57 @@ pub enum GameEvent {
 }
 
 impl VibrationPattern {
+    /// Create vibration pattern from curve points
+    pub fn from_curve_points(curve_points: Vec<CurvePoint>, total_duration_ms: u64) -> Self {
+        if curve_points.is_empty() {
+            return Self::simple(1.0, total_duration_ms);
+        }
+        
+        // Sort points by x (time)
+        let mut points = curve_points;
+        points.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+        
+        // Get start and end points
+        let start_point = points.first().unwrap();
+        let end_point = points.last().unwrap();
+        
+        // Find peak intensity point
+        let peak_point = points.iter()
+            .max_by(|a, b| a.y.partial_cmp(&b.y).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap();
+        
+        // Calculate durations based on point positions
+        let attack_duration = (peak_point.x * total_duration_ms as f32) as u64;
+        let decay_duration = ((1.0 - peak_point.x) * total_duration_ms as f32) as u64;
+        let hold_duration = total_duration_ms.saturating_sub(attack_duration + decay_duration);
+        
+        Self {
+            name: "Custom Curve".to_string(),
+            attack: EnvelopeStage {
+                duration_ms: attack_duration.max(10),
+                start_intensity: start_point.y.clamp(0.0, 1.0),
+                end_intensity: peak_point.y.clamp(0.0, 1.0),
+                curve: Curve::EaseInOut,
+            },
+            hold: EnvelopeStage {
+                duration_ms: hold_duration,
+                start_intensity: peak_point.y.clamp(0.0, 1.0),
+                end_intensity: peak_point.y.clamp(0.0, 1.0),
+                curve: Curve::Linear,
+            },
+            decay: EnvelopeStage {
+                duration_ms: decay_duration.max(10),
+                start_intensity: peak_point.y.clamp(0.0, 1.0),
+                end_intensity: end_point.y.clamp(0.0, 1.0),
+                curve: Curve::EaseInOut,
+            },
+            burst: BurstConfig {
+                repeat_count: 1,
+                pause_between_ms: 0,
+            },
+        }
+    }
+
     /// Create simple vibration pattern with intensity and duration
     pub fn simple(intensity: f32, duration_ms: u64) -> Self {
         let intensity = intensity.clamp(0.0, 1.0);

@@ -1,0 +1,94 @@
+[
+  {
+    "id": "low_fuel_10",
+    "enabled": false,
+    "cooldown_ms": 30000,
+    "pattern": {
+      "name": "Custom Curve",
+      "attack": {
+        "duration_ms": 10,
+        "start_intensity": 1.0,
+        "end_intensity": 1.0,
+        "curve": "EaseInOut"
+      },
+      "hold": {
+        "duration_ms": 0,
+        "start_intensity": 1.0,
+        "end_intensity": 1.0,
+        "curve": "Linear"
+      },
+      "decay": {
+        "duration_ms": 510,
+        "start_intensity": 1.0,
+        "end_intensity": 0.0,
+        "curve": "EaseInOut"
+      },
+      "burst": {
+        "repeat_count": 1,
+        "pause_between_ms": 0
+      }
+    },
+    "curve_points": [
+      {
+        "x": 0.0,
+        "y": 1.0
+      },
+      {
+        "x": 0.18214285,
+        "y": 0.87075895
+      },
+      {
+        "x": 1.0,
+        "y": 0.0
+      }
+    ]
+  },
+  {
+    "id": "critical_fuel_5",
+    "enabled": false,
+    "cooldown_ms": 15000,
+    "pattern": {
+      "name": "Simple",
+      "attack": {
+        "duration_ms": 50,
+        "start_intensity": 0.0,
+        "end_intensity": 1.0,
+        "curve": "Linear"
+      },
+      "hold": {
+        "duration_ms": 500,
+        "start_intensity": 1.0,
+        "end_intensity": 1.0,
+        "curve": "Linear"
+      },
+      "decay": {
+        "duration_ms": 50,
+        "start_intensity": 1.0,
+        "end_intensity": 0.0,
+        "curve": "Linear"
+      },
+      "burst": {
+        "repeat_count": 1,
+        "pause_between_ms": 0
+      }
+    }
+  },
+  {
+    "id": "low_ammo_20",
+    "enabled": false,
+    "cooldown_ms": 30000,
+    "pattern": null
+  },
+  {
+    "id": "engine_damaged",
+    "enabled": false,
+    "cooldown_ms": 10000,
+    "pattern": null
+  },
+  {
+    "id": "engine_fire",
+    "enabled": false,
+    "cooldown_ms": 5000,
+    "pattern": null
+  }
+]

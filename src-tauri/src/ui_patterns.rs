@@ -121,6 +121,7 @@ impl UIPattern {
             enabled: self.enabled,
             is_builtin: false,
             pattern: Some(pattern),
+            curve_points: None,
         })
     }
     

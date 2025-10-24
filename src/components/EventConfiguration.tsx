@@ -3,6 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { Zap, Power, ChevronDown, ChevronUp, Layers } from 'lucide-react';
 import type { Profile } from '../types';
+import { VibrationCurveEditor } from './VibrationCurveEditor';
+import { EditableNumberInput } from './EditableNumberInput';
+
+interface CurvePoint {
+  x: number;
+  y: number;
+}
 
 interface EventTrigger {
   id: string;
@@ -16,6 +23,7 @@ interface EventTrigger {
     intensity?: number;
     duration_ms?: number;
   };
+  curve_points?: CurvePoint[];
 }
 
 export function EventConfiguration() {
@@ -66,6 +74,37 @@ export function EventConfiguration() {
       }
     } catch (error) {
       console.error('Failed to toggle trigger:', error);
+    }
+  };
+
+  const updateTrigger = async (id: string, cooldown_ms: number | null, pattern: any) => {
+    try {
+      // Update backend
+      await invoke('update_trigger', { id, cooldown_ms, pattern });
+      
+      // Update local state immediately without full reload
+      setTriggers(prev => prev.map(t => {
+        if (t.id !== id) return t;
+        
+        const updated = { ...t };
+        
+        if (cooldown_ms !== null) {
+          updated.cooldown_ms = cooldown_ms;
+        }
+        
+        if (pattern !== null) {
+          updated.pattern = updated.pattern || {};
+          updated.pattern.duration_ms = pattern.duration_ms || updated.pattern.duration_ms || 500;
+          updated.pattern.intensity = pattern.intensity || updated.pattern.intensity || 1.0;
+          updated.curve_points = pattern.curve || updated.curve_points;
+        }
+        
+        return updated;
+      }));
+    } catch (error) {
+      console.error('Failed to update trigger:', error);
+      // Reload on error to ensure consistency
+      loadData();
     }
   };
 
@@ -155,8 +194,12 @@ export function EventConfiguration() {
                         {trigger.description}
                       </div>
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Event: {t(`game_events.${trigger.event}`, trigger.event)} | 
-                        Cooldown: {(trigger.cooldown_ms / 1000).toFixed(1)}s
+                        Event: {t(`game_events.${trigger.event}`, trigger.event)}
+                      </div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Cooldown: {(trigger.cooldown_ms / 1000).toFixed(1)}s | 
+                        Duration: {((trigger.pattern?.duration_ms || 500) / 1000).toFixed(1)}s | 
+                        Points: {trigger.curve_points?.length || 2}
                       </div>
                     </div>
                     
@@ -207,18 +250,16 @@ export function EventConfiguration() {
                         <label style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
                           {t('trigger_settings.cooldown', 'Cooldown (seconds)')}
                         </label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0.1"
-                          value={(trigger.cooldown_ms / 1000).toFixed(1)}
-                          onChange={(e) => {
-                            const newCooldown = Math.max(0.1, parseFloat(e.target.value) || 0.1) * 1000;
-                            invoke('update_trigger', { 
-                              id: trigger.id, 
-                              cooldown_ms: newCooldown
-                            }).then(() => loadData());
+                        <EditableNumberInput
+                          value={trigger.cooldown_ms / 1000}
+                          onChange={(newValue) => {
+                            updateTrigger(trigger.id, newValue * 1000, null);
                           }}
+                          min={0.1}
+                          max={300}
+                          step={0.1}
+                          decimals={1}
+                          suffix="s"
                           style={{
                             width: '100%',
                             padding: '4px 8px',
@@ -231,81 +272,28 @@ export function EventConfiguration() {
                         />
                       </div>
 
-                      {/* Vibration Intensity */}
-                      <div>
-                        <label style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                          {t('trigger_settings.intensity', 'Vibration Intensity (%)')}
-                        </label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="1"
-                          value={(trigger.pattern?.intensity ?? 1.0) * 100}
-                          onChange={(e) => {
-                            const intensity = parseInt(e.target.value) / 100;
-                            invoke('update_trigger', { 
-                              id: trigger.id, 
-                              cooldown_ms: null,
-                              pattern: {
-                                intensity,
-                                duration_ms: trigger.pattern?.duration_ms || 500
-                              }
-                            }).then(() => loadData());
-                          }}
-                          style={{
-                            width: '100%',
-                            accentColor: 'var(--primary)'
-                          }}
-                        />
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between', 
-                          fontSize: '9px', 
-                          color: 'var(--text-muted)',
-                          marginTop: '4px'
-                        }}>
-                          <span>0%</span>
-                          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                            {Math.round((trigger.pattern?.intensity ?? 1.0) * 100)}%
-                          </span>
-                          <span>100%</span>
-                        </div>
-                      </div>
-
-                      {/* Vibration Duration */}
-                      <div>
-                        <label style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                          {t('trigger_settings.duration', 'Vibration Duration (ms)')}
-                        </label>
-                        <input
-                          type="number"
-                          step="50"
-                          min="100"
-                          max="5000"
-                          value={trigger.pattern?.duration_ms || 500}
-                          onChange={(e) => {
-                            const duration = Math.max(100, Math.min(5000, parseInt(e.target.value) || 500));
-                            invoke('update_trigger', { 
-                              id: trigger.id, 
-                              cooldown_ms: null,
-                              pattern: {
-                                intensity: trigger.pattern?.intensity || 1.0,
-                                duration_ms: duration
-                              }
-                            }).then(() => loadData());
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            background: 'var(--bg-tertiary)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius-sm)',
-                            color: 'var(--text-primary)'
-                          }}
-                        />
-                      </div>
+                      {/* Vibration Curve Editor */}
+                      <VibrationCurveEditor
+                        duration={(trigger.pattern?.duration_ms || 500) / 1000}
+                        curve={trigger.curve_points || [
+                          { x: 0.0, y: 1.0 },
+                          { x: 1.0, y: 0.0 }
+                        ]}
+                        onDurationChange={(newDuration) => {
+                          updateTrigger(trigger.id, null, {
+                            intensity: trigger.pattern?.intensity || 1.0,
+                            duration_ms: Math.round(newDuration * 1000),
+                            curve: trigger.curve_points
+                          });
+                        }}
+                        onCurveChange={(newCurve) => {
+                          updateTrigger(trigger.id, null, {
+                            intensity: trigger.pattern?.intensity || 1.0,
+                            duration_ms: trigger.pattern?.duration_ms || 500,
+                            curve: newCurve
+                          });
+                        }}
+                      />
 
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                         {t('trigger_settings.hint', 'These settings will be saved automatically')}
@@ -416,48 +404,138 @@ export function EventConfiguration() {
                               {/* Triggers for this event */}
                               {isEventExpanded && eventTriggers.length > 0 && (
                                 <div style={{ padding: '8px', borderTop: '1px solid var(--border)' }}>
-                                  {eventTriggers.map((trigger) => (
-                                    <div
-                                      key={trigger.id}
-                                      style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        padding: '6px 8px',
-                                        marginBottom: '4px',
-                                        background: trigger.enabled ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-primary)',
-                                        border: `1px solid ${trigger.enabled ? 'var(--primary)' : 'var(--border)'}`,
-                                        borderRadius: 'var(--radius-sm)',
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
-                                          {trigger.name}
-                                        </div>
-                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                                          {trigger.description}
-                                        </div>
-                                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                          {t('triggers.cooldown', { time: (trigger.cooldown_ms / 1000).toFixed(0) })}
-                                        </div>
-                                      </div>
-                                      
-                                      <button
-                                        className={`btn-toggle ${trigger.enabled ? 'active' : ''}`}
-                                        onClick={() => toggleTrigger(trigger.id, !trigger.enabled)}
-                                        title={trigger.enabled ? t('common.disable') : t('common.enable')}
+                                  {eventTriggers.map((trigger) => {
+                                    const triggerExpanded = expandedTrigger === `${eventKey}_${trigger.id}`;
+                                    return (
+                                      <div
+                                        key={trigger.id}
                                         style={{
-                                          padding: '4px 8px',
-                                          fontSize: '10px',
-                                          minWidth: '50px'
+                                          marginBottom: '8px',
+                                          background: trigger.enabled ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-primary)',
+                                          border: `1px solid ${trigger.enabled ? 'var(--primary)' : 'var(--border)'}`,
+                                          borderRadius: 'var(--radius-sm)',
                                         }}
+                                        onClick={(e) => e.stopPropagation()}
                                       >
-                                        <Power size={12} />
-                                        {trigger.enabled ? t('common.on') : t('common.off')}
-                                      </button>
-                                    </div>
-                                  ))}
+                                        <div style={{
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          padding: '8px 10px',
+                                        }}>
+                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
+                                              {trigger.name}
+                                            </div>
+                                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                              {trigger.description}
+                                            </div>
+                                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                              Cooldown: {(trigger.cooldown_ms / 1000).toFixed(1)}s | 
+                                              Duration: {((trigger.pattern?.duration_ms || 500) / 1000).toFixed(1)}s | 
+                                              Points: {trigger.curve_points?.length || 2}
+                                            </div>
+                                          </div>
+                                          
+                                          <div style={{ display: 'flex', gap: '4px', marginLeft: '8px', flexShrink: 0 }}>
+                                            <button
+                                              onClick={() => setExpandedTrigger(triggerExpanded ? null : `${eventKey}_${trigger.id}`)}
+                                              style={{
+                                                padding: '4px 6px',
+                                                fontSize: '10px',
+                                                background: 'var(--bg-secondary)',
+                                                border: '1px solid var(--border)',
+                                                borderRadius: 'var(--radius-sm)',
+                                                cursor: 'pointer',
+                                                color: 'var(--text-secondary)'
+                                              }}
+                                              title={t('common.settings', 'Settings')}
+                                            >
+                                              {triggerExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                            </button>
+                                            <button
+                                              className={`btn-toggle ${trigger.enabled ? 'active' : ''}`}
+                                              onClick={() => toggleTrigger(trigger.id, !trigger.enabled)}
+                                              title={trigger.enabled ? t('common.disable') : t('common.enable')}
+                                              style={{
+                                                padding: '4px 8px',
+                                                fontSize: '10px',
+                                                minWidth: '50px'
+                                              }}
+                                            >
+                                              <Power size={12} />
+                                              {trigger.enabled ? t('common.on') : t('common.off')}
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Expanded Settings for Profile Trigger */}
+                                        {triggerExpanded && (
+                                          <div style={{ 
+                                            padding: '12px', 
+                                            borderTop: '1px solid var(--border)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '12px'
+                                          }}>
+                                            {/* Cooldown */}
+                                            <div>
+                                              <label style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                                                {t('trigger_settings.cooldown', 'Cooldown (seconds)')}
+                                              </label>
+                                              <EditableNumberInput
+                                                value={trigger.cooldown_ms / 1000}
+                                                onChange={(newValue) => {
+                                                  updateTrigger(trigger.id, newValue * 1000, null);
+                                                }}
+                                                min={0.1}
+                                                max={300}
+                                                step={0.1}
+                                                decimals={1}
+                                                suffix="s"
+                                                style={{
+                                                  width: '100%',
+                                                  padding: '4px 8px',
+                                                  fontSize: '11px',
+                                                  background: 'var(--bg-tertiary)',
+                                                  border: '1px solid var(--border)',
+                                                  borderRadius: 'var(--radius-sm)',
+                                                  color: 'var(--text-primary)'
+                                                }}
+                                              />
+                                            </div>
+
+                                            {/* Vibration Curve Editor */}
+                                            <VibrationCurveEditor
+                                              duration={(trigger.pattern?.duration_ms || 500) / 1000}
+                                              curve={trigger.curve_points || [
+                                                { x: 0.0, y: 1.0 },
+                                                { x: 1.0, y: 0.0 }
+                                              ]}
+                                              onDurationChange={(newDuration) => {
+                                                updateTrigger(trigger.id, null, {
+                                                  intensity: trigger.pattern?.intensity || 1.0,
+                                                  duration_ms: Math.round(newDuration * 1000),
+                                                  curve: trigger.curve_points
+                                                });
+                                              }}
+                                              onCurveChange={(newCurve) => {
+                                                updateTrigger(trigger.id, null, {
+                                                  intensity: trigger.pattern?.intensity || 1.0,
+                                                  duration_ms: trigger.pattern?.duration_ms || 500,
+                                                  curve: newCurve
+                                                });
+                                              }}
+                                            />
+
+                                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                              {t('trigger_settings.hint', 'These settings will be saved automatically')}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>

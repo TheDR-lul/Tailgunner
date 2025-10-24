@@ -17,6 +17,8 @@
     "close": "Close",
     "on": "ON",
     "off": "OFF",
+    "settings": "Settings",
+    "reset": "Reset",
     "cooldown": "cooldown",
     "loading": "Loading..."
   },
@@ -72,6 +74,15 @@
     "description": "Automatic events based on game indicators",
     "no_triggers": "No triggers",
     "cooldown": "{{time}}s cooldown"
+  },
+  "trigger_settings": {
+    "cooldown": "Cooldown (seconds)",
+    "intensity": "Vibration Intensity (%)",
+    "duration": "Vibration Duration (ms)",
+    "vibration_duration": "Duration (sec)",
+    "curve_hint": "Click = add • Drag = move • 2× click = delete",
+    "points": "Points",
+    "hint": "These settings will be saved automatically"
   },
   "events": {
     "title": "Game Events",
@@ -160,9 +171,18 @@
     "LowAltitude": "Low Altitude",
     "EngineDamaged": "Engine Damaged",
     "EngineDestroyed": "Engine Destroyed",
+    "EngineFire": "Engine Fire",
+    "EngineRunning": "Engine Running",
     "TrackBroken": "Track Broken",
     "Shooting": "Firing",
-    "CannonFiring": "Cannon Firing"
+    "CannonFiring": "Cannon Firing",
+    "Stall": "Stall",
+    "Spin": "Spin",
+    "EngineOverheat": "Engine Overheat",
+    "OilOverheated": "Oil Overheated",
+    "Crashed": "Crashed",
+    "AmmunitionExploded": "Ammunition Exploded",
+    "TargetDestroyed": "Target Destroyed"
   },
   "debug": {
     "title": "Debug Console",

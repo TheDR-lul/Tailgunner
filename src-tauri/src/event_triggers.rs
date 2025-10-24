@@ -255,13 +255,15 @@ impl TriggerCondition {
 pub struct EventTrigger {
     pub id: String,
     pub name: String,
-    pub description: String,     // Описание триггера
+    pub description: String,
     pub condition: TriggerCondition,
     pub event: GameEvent,
-    pub cooldown_ms: u64,        // Минимальное время между срабатываниями
+    pub cooldown_ms: u64,
     pub enabled: bool,
-    pub is_builtin: bool,        // Встроенный или пользовательский
-    pub pattern: Option<crate::pattern_engine::VibrationPattern>, // Кастомный паттерн для UI триггеров
+    pub is_builtin: bool,
+    pub pattern: Option<crate::pattern_engine::VibrationPattern>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub curve_points: Option<Vec<crate::pattern_engine::CurvePoint>>,
 }
 
 /// Менеджер триггеров
@@ -295,9 +297,10 @@ impl TriggerManager {
             condition: TriggerCondition::FuelBelow(10.0),
             event: GameEvent::LowFuel,
             cooldown_ms: 30000,
-            enabled: false,  // OFF by default
+            enabled: false,
             is_builtin: true,
             pattern: None,
+            curve_points: None,
         });
         
         // Critical fuel (<5%)
@@ -308,9 +311,10 @@ impl TriggerManager {
             condition: TriggerCondition::FuelBelow(5.0),
             event: GameEvent::CriticalFuel,
             cooldown_ms: 15000,
-            enabled: false,  // OFF by default
+            enabled: false,
             is_builtin: true,
             pattern: None,
+            curve_points: None,
         });
         
         // === AMMO WARNINGS (COMMON FOR ALL) ===
@@ -323,9 +327,10 @@ impl TriggerManager {
             condition: TriggerCondition::AmmoBelow(20.0),
             event: GameEvent::LowAmmo,
             cooldown_ms: 30000,
-            enabled: false,  // OFF by default
+            enabled: false,
             is_builtin: true,
             pattern: None,
+            curve_points: None,
         });
         
         // === ENGINE WARNINGS (COMMON FOR ALL) ===
@@ -338,9 +343,10 @@ impl TriggerManager {
             condition: TriggerCondition::EngineDamageAbove(0.5),
             event: GameEvent::EngineDamaged,
             cooldown_ms: 10000,
-            enabled: false,  // OFF by default
+            enabled: false,
             is_builtin: true,
             pattern: None,
+            curve_points: None,
         });
         
         // Engine fire
@@ -351,9 +357,10 @@ impl TriggerManager {
             condition: TriggerCondition::EngineDamageAbove(0.9),
             event: GameEvent::EngineFire,
             cooldown_ms: 5000,
-            enabled: false,  // OFF by default
+            enabled: false,
             is_builtin: true,
             pattern: None,
+            curve_points: None,
         });
     }
     
@@ -571,15 +578,46 @@ impl TriggerManager {
         }
     }
     
+    /// Update trigger with curve points
+    pub fn update_trigger_with_curve(
+        &mut self, 
+        id: &str, 
+        cooldown_ms: Option<u64>, 
+        pattern: Option<Option<VibrationPattern>>,
+        curve_points: Option<Vec<crate::pattern_engine::CurvePoint>>
+    ) -> Result<(), String> {
+        if let Some(trigger) = self.triggers.iter_mut().find(|t| t.id == id) {
+            if let Some(cooldown) = cooldown_ms {
+                trigger.cooldown_ms = cooldown;
+                log::info!("[Triggers] Updated trigger '{}' cooldown to {}ms", id, cooldown);
+            }
+            
+            if let Some(pattern_opt) = pattern {
+                trigger.pattern = pattern_opt;
+                trigger.curve_points = curve_points;
+                log::info!("[Triggers] Updated trigger '{}' pattern with curve", id);
+            } else if curve_points.is_some() {
+                // If only curve_points provided without pattern, update them
+                trigger.curve_points = curve_points;
+                log::info!("[Triggers] Updated trigger '{}' curve points only", id);
+            }
+            
+            Ok(())
+        } else {
+            Err(format!("Trigger not found: {}", id))
+        }
+    }
+    
     /// Save trigger settings to file
     pub fn save_settings(&self, path: &std::path::Path) -> Result<(), String> {
-        // Save only customizable settings (enabled, cooldown, pattern)
+        // Save only customizable settings (enabled, cooldown, pattern, curve_points)
         let settings: Vec<TriggerSettings> = self.triggers.iter()
             .map(|t| TriggerSettings {
                 id: t.id.clone(),
                 enabled: t.enabled,
                 cooldown_ms: t.cooldown_ms,
                 pattern: t.pattern.clone(),
+                curve_points: t.curve_points.clone(),
             })
             .collect();
         
@@ -612,6 +650,7 @@ impl TriggerManager {
                 trigger.enabled = setting.enabled;
                 trigger.cooldown_ms = setting.cooldown_ms;
                 trigger.pattern = setting.pattern;
+                trigger.curve_points = setting.curve_points;
             }
         }
         
@@ -639,6 +678,8 @@ struct TriggerSettings {
     enabled: bool,
     cooldown_ms: u64,
     pattern: Option<VibrationPattern>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    curve_points: Option<Vec<crate::pattern_engine::CurvePoint>>,
 }
 
 impl Default for TriggerManager {
