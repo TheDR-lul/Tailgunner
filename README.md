@@ -261,7 +261,7 @@ Tailgunner **ONLY** reads from War Thunder's official localhost API (`127.0.0.1:
 - ❌ Use any anti-cheat bypass techniques
 
 ### **Device Safety**
-- **Rate Limiting**: Max 8 commands/second to prevent overheating
+- **Rate Limiting**: Max 8 commands/second to prevent overheating, XD
 - **Fail-Safe Mode**: Devices stop smoothly if game crashes
 - **Manual Override**: Emergency stop button in UI
 
@@ -316,7 +316,7 @@ For commercial licensing inquiries, please contact the maintainers.
 - [Tauri](https://tauri.app/) - Cross-platform framework
 - [Buttplug.io](https://buttplug.io/) - Haptic device control
 - [React Flow](https://reactflow.dev/) - Node editor
-- [War Thunder API](https://github.com/lucasvmx/WarThunder-localhost-documentation) - Telemetry documentation
+- [War Thunder API](https://github.com/lucasvmx/WarThunder-localhost-documentation) - Telemetry documentation (Temp)
 
 ---
 
@@ -350,12 +350,10 @@ For commercial licensing inquiries, please contact the maintainers.
 - 🔄 Community pattern library
 - 🔄 Enhanced curve editor with presets
 - 🔄 Trigger import/export functionality
+- 🔄 WT wiki parcer
 
 ### **v1.0.0** *(Future)*
-- 🔮 Multi-game support (DCS, IL-2, etc.)
-- 🔮 Voice alerts & TTS
-- 🔮 Discord Rich Presence
-- 🔮 Tournament/Esports mode
+- TODO
 
 ---
 
