@@ -10,6 +10,7 @@ mod wt_vehicles_api;
 mod dynamic_triggers;
 mod ui_patterns;
 mod vehicle_limits;
+mod state_history;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -109,6 +110,93 @@ async fn get_game_status(state: tauri::State<'_, AppState>) -> Result<GameStatus
     let engine = state.engine.lock().await;
     engine.get_game_status().await
         .map_err(|e| e.to_string())
+}
+
+// Lovense commands
+#[tauri::command]
+async fn add_lovense_device(
+    state: tauri::State<'_, AppState>,
+    ip: String,
+    port: Option<u16>,
+) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.get_device_manager().add_lovense_device(ip, port).await
+        .map(|_| "Lovense device added".to_string())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_lovense_device(
+    state: tauri::State<'_, AppState>,
+    device_id: String,
+) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.get_device_manager().remove_lovense_device(&device_id).await
+        .map(|_| "Lovense device removed".to_string())
+        .map_err(|e| e.to_string())
+}
+
+// Pattern import/export commands
+use ui_patterns::UIPattern;
+
+#[tauri::command]
+async fn export_pattern(
+    state: tauri::State<'_, AppState>,
+    pattern_id: String,
+) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    let triggers = engine.trigger_manager.read().await;
+    
+    // Find pattern by ID (user patterns only)
+    let pattern = triggers.get_triggers()
+        .iter()
+        .filter(|t| !t.is_builtin)
+        .find(|t| t.id == pattern_id)
+        .ok_or_else(|| format!("Pattern not found: {}", pattern_id))?;
+    
+    // Serialize to JSON
+    serde_json::to_string_pretty(&pattern)
+        .map_err(|e| format!("Failed to serialize pattern: {}", e))
+}
+
+#[tauri::command]
+async fn export_all_patterns(
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    let triggers = engine.trigger_manager.read().await;
+    
+    // Get user patterns only
+    let patterns: Vec<_> = triggers.get_triggers()
+        .iter()
+        .filter(|t| !t.is_builtin)
+        .cloned()
+        .collect();
+    
+    // Serialize to JSON
+    serde_json::to_string_pretty(&patterns)
+        .map_err(|e| format!("Failed to serialize patterns: {}", e))
+}
+
+#[tauri::command]
+async fn import_pattern(
+    state: tauri::State<'_, AppState>,
+    json_data: String,
+) -> Result<String, String> {
+    // Deserialize from JSON
+    let ui_pattern: UIPattern = serde_json::from_str(&json_data)
+        .map_err(|e| format!("Failed to parse pattern JSON: {}", e))?;
+    
+    // Convert to trigger
+    let trigger = ui_pattern.to_trigger()
+        .ok_or_else(|| "Failed to convert pattern to trigger".to_string())?;
+    
+    // Add to engine
+    let engine = state.engine.lock().await;
+    engine.trigger_manager.write().await.add_trigger(trigger.clone());
+    
+    log::info!("✅ Pattern imported: {}", trigger.name);
+    Ok(format!("Pattern imported: {}", trigger.name))
 }
 
 #[derive(serde::Serialize)]
@@ -232,6 +320,11 @@ pub fn run() {
             add_pattern,
             remove_pattern,
             toggle_pattern,
+            add_lovense_device,
+            remove_lovense_device,
+            export_pattern,
+            export_all_patterns,
+            import_pattern,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

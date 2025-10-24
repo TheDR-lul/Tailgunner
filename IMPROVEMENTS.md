@@ -19,67 +19,124 @@
 
 ---
 
-## 🔧 **Заготовки в коде (можно доделать):**
+## ✅ **Реализовано в последнем обновлении:**
 
-### **A. Расширенная телеметрия (wt_telemetry.rs)**
+### **A. Расширенная телеметрия** ✅
 
 #### **1. Вооружение**
-```rust
-// TODO: Парсить из API
-rockets_ready: 0,
-bombs_ready: 0,
-torpedoes_ready: 0,
-ammo_count: 0,
-rocket_count: 0,
-bomb_count: 0,
-```
-
-**Предложение:**
-- Найти названия полей в War Thunder API для боеприпасов
-- Добавить парсинг в `parse_indicators()`
-- Создать события: `LowAmmo`, `OutOfAmmo`, `NoRockets`
+- ✅ Добавлен парсинг `rockets_ready`, `bombs_ready`, `torpedoes_ready`
+- ✅ `ammo_count` дифференцирован для танков (`first_stage_ammo`) и самолетов (`cannon ammo`)
+- ✅ Добавлены `rocket_count`, `bomb_count`
 
 #### **2. Расчет времени до конца топлива**
-```rust
-fuel_time: 0.0, // TODO: вычислить из Mfuel / расход
-```
-
-**Предложение:**
-- Отслеживать изменение `Mfuel` за секунду = расход
-- Вычислять: `fuel_time = current_fuel / fuel_consumption_per_sec / 60` (минуты)
-- Добавить событие: `FuelRunningOut` (< 2 минуты)
+- ✅ Реализован расчет `fuel_time` (минуты остались)
+- ✅ Отслеживание расхода топлива между тиками
+- ✅ Формула: `fuel_time = current_fuel / consumption_per_sec / 60`
 
 #### **3. Повреждения из /state**
-```rust
-engine_damage: 0.0, // TODO: из /state
-controls_damage: 0.0,
-gear_damage: 0.0,
-flaps_damage: 0.0,
-```
-
-**Предложение:**
-- Парсить массив `state: []` из API (например: `["damaged", "engine_damaged", "gear_damaged"]`)
-- Вычислять процент повреждений по количеству тегов
-- События: `MinorDamage`, `ModerateDamage`, `CriticalDamage`
+- ✅ Парсинг массива `state: []` из API
+- ✅ Определение `engine_damage`, `controls_damage`, `gear_damage`, `flaps_damage`
+- ✅ Обнаружение по ключевым словам в state array
 
 ---
 
-### **B. Lovense интеграция (device_manager.rs)**
+### **B. Lovense интеграция** ✅
 
-```rust
-lovense_enabled: false, // Никогда не используется
-```
-
-**Статус:** Заготовка для будущей интеграции Lovense API
-
-**Предложение:**
-- Добавить HTTP-клиент для Lovense LAN API
-- Реализовать `init_lovense()` и `scan_lovense_devices()`
-- Добавить UI-переключатель: Buttplug / Lovense / Оба
-- Создать единый интерфейс для отправки вибраций на оба типа устройств
+- ✅ Добавлен HTTP-клиент для Lovense LAN API
+- ✅ Реализованы методы `add_lovense_device()`, `remove_lovense_device()`
+- ✅ Unified `send_vibration()` для Buttplug + Lovense
+- ✅ Tauri commands для управления Lovense устройствами
+- ✅ Конвертация интенсивности (0.0-1.0 → 0-20 для Lovense)
 
 **Ссылки:**
 - [Lovense LAN API Docs](https://developer.lovense.com/)
+
+---
+
+### **C. Temporal Conditions (Time-Based Triggers)** ✅
+
+#### **State History System**
+- ✅ Circular buffer для хранения истории состояний (100 снапшотов, 10 секунд)
+- ✅ Автоматическая очистка старых данных
+- ✅ Методы анализа: `dropped_by`, `increased_by`, `rate_of_change`, `average`, `min`, `max`
+
+#### **Новые триггерные условия**
+```rust
+// Speed changes
+SpeedDroppedBy { threshold: f32, window_seconds: f32 }     // ▼ Скорость упала
+SpeedIncreasedBy { threshold: f32, window_seconds: f32 }   // ▲ Скорость выросла
+AccelerationAbove { threshold: f32, window_seconds: f32 }  // ⇧ Ускорение
+AccelerationBelow { threshold: f32, window_seconds: f32 }  // ⇩ Замедление
+
+// Altitude changes
+AltitudeDroppedBy { threshold: f32, window_seconds: f32 }  // Высота упала
+AltitudeGainedBy { threshold: f32, window_seconds: f32 }   // Высота выросла
+ClimbRateAbove { threshold: f32, window_seconds: f32 }     // Скорость набора
+
+// G-load changes
+GLoadSpiked { threshold: f32, window_seconds: f32 }        // Резкий скачок G
+SuddenGChange { threshold: f32, window_seconds: f32 }      // Резкое изменение G
+
+// Averages
+AverageSpeedAbove { threshold: f32, window_seconds: f32 }  // Средняя скорость
+AverageGLoadAbove { threshold: f32, window_seconds: f32 }  // Средняя G-нагрузка
+FuelDepletingFast { threshold: f32, window_seconds: f32 }  // Быстрый расход топлива
+```
+
+#### **UI Integration**
+- ✅ Добавлены временные операторы в InputNode: `dropped_by`, `increased_by`, `accel_above`, `accel_below`, `avg_above`
+- ✅ Поле `window_seconds` (0.1-10.0 секунд) появляется автоматически
+- ✅ Парсинг в `ui_patterns.rs` для конвертации в `TriggerCondition`
+- ✅ Метод `evaluate_with_history()` для оценки условий
+
+**Примеры использования:**
+- **Hard Brake:** `Speed dropped_by 150 over 1.5 sec` → тяжелая вибрация
+- **Aggressive Maneuver:** `G-Load increased_by 5.0 over 0.5 sec` → резкий импульс
+- **Sustained High Speed:** `Speed avg_above 600 over 5.0 sec` → плавная вибрация
+
+**Документация:** См. `TEMPORAL_CONDITIONS.md`
+
+---
+
+### **D. Dynamic Triggers (WT Vehicles API)** ✅
+
+#### **Integration**
+- ✅ API: `https://www.wtvehiclesapi.sgambe.serv00.net`
+- ✅ Автоматическое получение характеристик техники при смене
+- ✅ Кэширование данных для оффлайн работы
+- ✅ `VehicleLimitsManager` для управления лимитами
+
+#### **Автоматически создаваемые триггеры**
+```rust
+// Overspeed Warning (90% от max_speed)
+dynamic_overspeed: "Overspeed Warning (2385+ km/h)"
+
+// High G Warning (95% от max_positive_g)
+dynamic_high_g: "High G Warning (11.9+ G)"
+
+// Negative G Warning (95% от max_negative_g)
+dynamic_negative_g: "Negative G Warning (-5.7 G)"
+```
+
+#### **Поддерживаемые характеристики**
+- `max_speed_kmh` - максимальная скорость
+- `max_positive_g` / `max_negative_g` - перегрузки
+- `max_altitude_meters` - максимальная высота
+- `fuel_capacity_kg` - емкость топлива
+- `engine_power_hp` - мощность двигателя
+
+**Пример для Rafale C F3:**
+- Max Speed: 2650 km/h → warning at 2385 km/h
+- Max +G: 12.5G → warning at 11.9G
+- Max -G: -6.0G → warning at -5.7G
+
+#### **UI Display**
+- ✅ Отдельная секция "All Triggers" в Events tab
+- ✅ Badges: "Built-in" (синий) / "Dynamic" (зелёный)
+- ✅ Отображение события, cooldown, включено/выключено
+- ✅ Grid layout для компактности
+
+**Источник:** [WT Vehicles API](https://github.com/Sgambe33/WarThunder-Vehicles-API)
 
 ---
 

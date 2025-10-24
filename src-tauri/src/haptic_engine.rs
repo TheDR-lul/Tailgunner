@@ -144,7 +144,15 @@ impl HapticEngine {
                     let last_vehicle = last_vehicle_name.read().await;
                     if game_state.vehicle_name != "unknown" && *last_vehicle != game_state.vehicle_name {
                         drop(last_vehicle);
-                        log::info!("[Vehicle Limits] 🔄 Vehicle changed: {}", game_state.vehicle_name);
+                        log::info!("[Vehicle Limits] 🔄 Vehicle changed: {} (type: {:?})", game_state.vehicle_name, game_state.type_);
+                        
+                        // Auto-switch profile based on vehicle type
+                        {
+                            let mut pm = profile_manager.write().await;
+                            if let Some(profile) = pm.auto_select_profile(&game_state.type_) {
+                                log::info!("[Profile] ✅ Auto-selected profile: {}", profile.name);
+                            }
+                        }
                         
                         // Update vehicle limits
                         if let Err(e) = vehicle_limits_manager.update_vehicle(&game_state.vehicle_name).await {

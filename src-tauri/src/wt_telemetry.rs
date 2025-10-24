@@ -229,7 +229,7 @@ impl WTTelemetryReader {
             }
         };
 
-        let state = state_json.get("state")
+        let state: Vec<String> = state_json.get("state")
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default();
@@ -237,11 +237,31 @@ impl WTTelemetryReader {
         // 2. Parse indicators from correct source
         // TANKS: all data in /indicators
         // AIRCRAFT: flight data in /state
-        let indicators = if matches!(type_, VehicleType::Tank) {
+        let mut indicators = if matches!(type_, VehicleType::Tank) {
             self.parse_indicators(indicators_json.clone())
         } else {
             self.parse_indicators(state_json.clone())
         };
+
+        // 3. Parse damage from state array
+        // State contains strings like: ["damaged", "engine_damaged", "controls_damaged", "gear_damaged", "flaps_damaged"]
+        indicators.engine_damage = if state.iter().any(|s| s.contains("engine")) { 1.0 } else { 0.0 };
+        indicators.controls_damage = if state.iter().any(|s| s.contains("controls") || s.contains("aileron") || s.contains("elevator") || s.contains("rudder")) { 1.0 } else { 0.0 };
+        indicators.gear_damage = if state.iter().any(|s| s.contains("gear")) { 1.0 } else { 0.0 };
+        indicators.flaps_damage = if state.iter().any(|s| s.contains("flaps")) { 1.0 } else { 0.0 };
+
+        // 4. Calculate fuel time remaining (minutes)
+        // Use cached fuel consumption rate from previous state
+        if let Some(last_state) = &self.last_state {
+            let fuel_diff = last_state.indicators.fuel - indicators.fuel;
+            if fuel_diff > 0.0 && indicators.fuel > 0.0 {
+                // fuel_diff is per tick (0.1 sec), multiply by 10 to get per second
+                let consumption_per_sec = fuel_diff * 10.0;
+                if consumption_per_sec > 0.01 {
+                    indicators.fuel_time = (indicators.fuel / consumption_per_sec) / 60.0; // minutes
+                }
+            }
+        }
 
         // Reduced log spam - only log on vehicle change
         use std::sync::Mutex;
@@ -425,14 +445,18 @@ impl WTTelemetryReader {
             // Weapons
             cannon_ready: get_bool("cannon_ready"),
             machine_gun_ready: get_bool("machine_gun_ready"),
-            rockets_ready: 0,
-            bombs_ready: 0,
-            torpedoes_ready: 0,
+            rockets_ready: get_i32("rockets_ready"),
+            bombs_ready: get_i32("bombs_ready"),
+            torpedoes_ready: get_i32("torpedoes_ready"),
             
-            // Ammo
-            ammo_count: get_i32("first_stage_ammo"),  // Tank ammo in ready rack
-            rocket_count: 0,
-            bomb_count: 0,
+            // Ammo (different fields for tanks vs aircraft)
+            ammo_count: if is_tank {
+                get_i32("first_stage_ammo")  // Tank ammo in ready rack
+            } else {
+                get_i32("cannon ammo 1").max(get_i32("cannon ammo 2"))  // Aircraft cannon ammo
+            },
+            rocket_count: get_i32("rockets"),
+            bomb_count: get_i32("bombs"),
             
             // Fuel (kg)
             fuel,

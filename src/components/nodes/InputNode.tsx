@@ -8,6 +8,7 @@ interface InputNodeData {
   indicator: string;
   operator?: string;
   value?: number;
+  window_seconds?: number;
 }
 
 export function InputNode({ data, id, selected }: { data: InputNodeData; id: string; selected?: boolean }) {
@@ -15,6 +16,7 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
   const [indicator, setIndicator] = useState(data.indicator || 'speed');
   const [operator, setOperator] = useState(data.operator || '>');
   const [value, setValue] = useState(data.value || 0);
+  const [windowSeconds, setWindowSeconds] = useState(data.window_seconds || 1.0);
   
   const INDICATORS = [
     // Flight Parameters
@@ -88,11 +90,16 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
     return acc;
   }, {} as Record<string, typeof INDICATORS>);
   
+  // Temporal operators that require time window
+  const TEMPORAL_OPERATORS = ['dropped_by', 'increased_by', 'accel_above', 'accel_below', 'avg_above'];
+  const isTemporalOperator = TEMPORAL_OPERATORS.includes(operator);
+  
   useEffect(() => {
     data.indicator = indicator;
     data.operator = operator;
     data.value = value;
-  }, [indicator, operator, value, data]);
+    data.window_seconds = windowSeconds;
+  }, [indicator, operator, value, windowSeconds, data]);
   
   return (
     <div 
@@ -148,14 +155,24 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
               background: 'rgba(0, 0, 0, 0.3)',
               border: '1px solid rgba(255, 153, 51, 0.5)',
               color: '#94a3b8',
-              flex: '0 0 45px'
+              flex: '0 0 100px',
+              fontSize: '11px'
             }}
           >
-            <option value=">">{'>'}</option>
-            <option value="<">{'<'}</option>
-            <option value=">=">{'≥'}</option>
-            <option value="<=">{'≤'}</option>
-            <option value="==">{'='}</option>
+            <optgroup label="━━ Instant ━━">
+              <option value=">">{'>'}</option>
+              <option value="<">{'<'}</option>
+              <option value=">=">{'≥'}</option>
+              <option value="<=">{'≤'}</option>
+              <option value="==">{'='}</option>
+            </optgroup>
+            <optgroup label="━━ Over Time ━━">
+              <option value="dropped_by">▼ Dropped</option>
+              <option value="increased_by">▲ Increased</option>
+              <option value="accel_above">⇧ Accel+</option>
+              <option value="accel_below">⇩ Accel-</option>
+              <option value="avg_above">~ Avg &gt;</option>
+            </optgroup>
           </select>
           
           <input
@@ -176,6 +193,33 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
             }}
           />
         </div>
+        
+        {isTemporalOperator && (
+          <div style={{ display: 'flex', gap: '4px', marginTop: '6px', alignItems: 'center' }}>
+            <span style={{ fontSize: '10px', color: '#64748b', flex: '0 0 35px' }}>over</span>
+            <input
+              type="number"
+              value={windowSeconds}
+              onChange={(e) => setWindowSeconds(parseFloat(e.target.value) || 1.0)}
+              className="node-input-field"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              step="0.1"
+              min="0.1"
+              max="10.0"
+              style={{
+                background: 'rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(255, 153, 51, 0.5)',
+                color: '#06b6d4',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                flex: 1
+              }}
+            />
+            <span style={{ fontSize: '10px', color: '#64748b', flex: '0 0 20px' }}>sec</span>
+          </div>
+        )}
         
         <div style={{
           marginTop: '6px',

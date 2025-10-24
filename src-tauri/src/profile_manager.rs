@@ -43,54 +43,33 @@ impl ProfileManager {
 
     /// Load ready-made presets
     fn load_default_profiles(&mut self) {
-        // Tank RB Profile (Immersive)
-        let mut tank_rb_mappings = HashMap::new();
-        // Combat
-        tank_rb_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
-        tank_rb_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
-        tank_rb_mappings.insert(GameEvent::PenetrationHit, VibrationPattern::preset_critical_hit());
-        // Engine and damage
-        tank_rb_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
-        tank_rb_mappings.insert(GameEvent::EngineDestroyed, VibrationPattern::preset_fire());
-        tank_rb_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_simple_hit());
-        tank_rb_mappings.insert(GameEvent::EngineRunning, VibrationPattern::preset_engine_rumble());
-        tank_rb_mappings.insert(GameEvent::TrackBroken, VibrationPattern::preset_simple_hit());
-        // Ammo
-        tank_rb_mappings.insert(GameEvent::AmmunitionExploded, VibrationPattern::preset_critical_hit());
-        tank_rb_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
-        // Fuel
-        tank_rb_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
-        tank_rb_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
+        // Tank Profile (Universal - Tank-specific events only)
+        let mut tank_mappings = HashMap::new();
+        
+        // Tank-specific events (removed common events - they're in built-in triggers)
+        tank_mappings.insert(GameEvent::EngineRunning, VibrationPattern::preset_engine_rumble());
+        tank_mappings.insert(GameEvent::TrackBroken, VibrationPattern::preset_simple_hit());
+        tank_mappings.insert(GameEvent::AmmunitionExploded, VibrationPattern::preset_critical_hit());
+        tank_mappings.insert(GameEvent::PenetrationHit, VibrationPattern::preset_critical_hit());
 
         self.profiles.push(Profile {
-            id: "tank_rb".to_string(),
-            name: "Tank RB - Immersive".to_string(),
+            id: "tank_universal".to_string(),
+            name: "Tank - Universal".to_string(),
             vehicle_type: VehicleType::Tank,
-            game_mode: GameMode::Realistic,
-            event_mappings: tank_rb_mappings,
+            game_mode: GameMode::Any,
+            event_mappings: tank_mappings,
             enabled: true,
         });
 
-        // Aircraft Profile (Universal)
+        // Aircraft Profile (Universal - Aircraft-specific events only)
         let mut aircraft_mappings = HashMap::new();
-        // Combat
-        aircraft_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
-        aircraft_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
-        // Flight dynamics
+        
+        // Aircraft-specific flight dynamics (removed common events - they're in built-in triggers)
         aircraft_mappings.insert(GameEvent::Stall, VibrationPattern::preset_fire());
         aircraft_mappings.insert(GameEvent::Spin, VibrationPattern::preset_fire());
-        aircraft_mappings.insert(GameEvent::Overspeed, VibrationPattern::preset_critical_hit());
-        aircraft_mappings.insert(GameEvent::OverG, VibrationPattern::preset_critical_hit());
-        aircraft_mappings.insert(GameEvent::HighAOA, VibrationPattern::preset_simple_hit());
-        aircraft_mappings.insert(GameEvent::CriticalAOA, VibrationPattern::preset_fire());
-        aircraft_mappings.insert(GameEvent::Mach1, VibrationPattern::preset_critical_hit());
-        // Fuel and altitude warnings
-        aircraft_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
-        aircraft_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
-        aircraft_mappings.insert(GameEvent::LowAltitude, VibrationPattern::preset_simple_hit());
 
         self.profiles.push(Profile {
-            id: "aircraft_any".to_string(),
+            id: "aircraft_universal".to_string(),
             name: "Aircraft - Universal".to_string(),
             vehicle_type: VehicleType::Aircraft,
             game_mode: GameMode::Any,
@@ -98,25 +77,26 @@ impl ProfileManager {
             enabled: true,
         });
 
-        // Light Background Profile (Universal)
+        // Light Background Profile (Minimal, all vehicles)
+        // NOTE: This profile overrides built-in patterns with lighter versions
         let mut light_mappings = HashMap::new();
         let light_hit = VibrationPattern {
-            name: "Light Hit".to_string(),
+            name: "Light Touch".to_string(),
             attack: crate::pattern_engine::EnvelopeStage {
-                duration_ms: 30,
+                duration_ms: 20,
                 start_intensity: 0.0,
-                end_intensity: 0.4,
+                end_intensity: 0.3,
                 curve: crate::pattern_engine::Curve::Linear,
             },
             hold: crate::pattern_engine::EnvelopeStage {
-                duration_ms: 50,
-                start_intensity: 0.4,
-                end_intensity: 0.4,
+                duration_ms: 30,
+                start_intensity: 0.3,
+                end_intensity: 0.3,
                 curve: crate::pattern_engine::Curve::Linear,
             },
             decay: crate::pattern_engine::EnvelopeStage {
-                duration_ms: 100,
-                start_intensity: 0.4,
+                duration_ms: 80,
+                start_intensity: 0.3,
                 end_intensity: 0.0,
                 curve: crate::pattern_engine::Curve::EaseOut,
             },
@@ -125,34 +105,20 @@ impl ProfileManager {
                 pause_between_ms: 0,
             },
         };
+        
+        // Only override most common events with light version
         light_mappings.insert(GameEvent::Hit, light_hit.clone());
         light_mappings.insert(GameEvent::CriticalHit, light_hit.clone());
-        
-        // Aerodynamic events
-        light_mappings.insert(GameEvent::Overspeed, light_hit.clone());
         light_mappings.insert(GameEvent::OverG, light_hit.clone());
-        light_mappings.insert(GameEvent::HighAOA, light_hit.clone());
-        light_mappings.insert(GameEvent::CriticalAOA, light_hit.clone());
-        light_mappings.insert(GameEvent::Mach1, light_hit.clone());
-        
-        // Fuel and ammo
-        light_mappings.insert(GameEvent::LowFuel, light_hit.clone());
-        light_mappings.insert(GameEvent::CriticalFuel, light_hit.clone());
-        light_mappings.insert(GameEvent::LowAmmo, light_hit.clone());
-        
-        // Environment
-        light_mappings.insert(GameEvent::LowAltitude, light_hit.clone());
-        
-        // Damage
-        light_mappings.insert(GameEvent::EngineDamaged, light_hit);
+        light_mappings.insert(GameEvent::Overspeed, light_hit);
 
         self.profiles.push(Profile {
             id: "light_background".to_string(),
-            name: "Light Background (Universal)".to_string(),
+            name: "Light Background".to_string(),
             vehicle_type: VehicleType::Unknown,
             game_mode: GameMode::Any,
             event_mappings: light_mappings,
-            enabled: true,
+            enabled: false,  // Disabled by default
         });
     }
 

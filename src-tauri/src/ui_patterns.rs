@@ -39,10 +39,19 @@ impl UIPattern {
         
         // Build adjacency map for graph traversal
         let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
+        // Build reverse adjacency for finding inputs to LOGIC nodes
+        let mut reverse_adjacency: HashMap<String, Vec<(String, String)>> = HashMap::new();
+        
         for edge in &self.edges {
             adjacency.entry(edge.source.clone())
                 .or_insert_with(Vec::new)
                 .push(edge.target.clone());
+            
+            // Store reverse edges with handle info (for LOGIC node inputs)
+            let source_handle = edge.source.split('|').nth(1).unwrap_or("");
+            reverse_adjacency.entry(edge.target.clone())
+                .or_insert_with(Vec::new)
+                .push((edge.source.clone(), source_handle.to_string()));
         }
         
         // Build node lookup
@@ -62,9 +71,24 @@ impl UIPattern {
         
         log::error!("[UI Pattern] ✅ Found {} input node(s)", input_nodes.len());
         
-        // 2. Parse INPUT node condition
+        // 2. Parse first INPUT node condition (or find OUTPUT via LOGIC nodes)
         let input_node = input_nodes[0];
-        let base_condition = self.parse_input_node(input_node)?;
+        
+        // Check if INPUT connects to LOGIC node or directly to OUTPUT
+        let next_nodes = adjacency.get(&input_node.id)?;
+        let base_condition = if next_nodes.iter().any(|id| {
+            node_map.get(id.as_str()).map(|n| n.type_ == "condition").unwrap_or(false)
+        }) {
+            // INPUT → LOGIC → OUTPUT flow
+            let logic_node_id = next_nodes.iter()
+                .find(|id| node_map.get(id.as_str()).map(|n| n.type_ == "condition").unwrap_or(false))?;
+            let logic_node = node_map.get(logic_node_id.as_str())?;
+            self.parse_logic_node(logic_node, &reverse_adjacency, &node_map)?
+        } else {
+            // Simple INPUT → OUTPUT flow
+            self.parse_input_node(input_node)?
+        };
+        
         log::error!("[UI Pattern] ✅ Parsed base condition: {:?}", base_condition);
         
         // 3. Traverse graph from INPUT node to find VIBRATION/LINEAR/ROTATE nodes
@@ -126,11 +150,121 @@ impl UIPattern {
             }
         };
         
-        let condition = self.parse_condition(indicator, operator, value);
+        // For temporal operators, extract window_seconds
+        let window_seconds = node.data.get("window_seconds")
+            .and_then(|v| v.as_f64())
+            .map(|v| v as f32)
+            .unwrap_or(1.0);
+        
+        let condition = self.parse_condition(indicator, operator, value, window_seconds);
         if condition.is_none() {
             log::error!("[UI Pattern] ❌ Failed to parse condition: {} {} {}", indicator, operator, value);
         }
         condition
+    }
+    
+    /// Parse LOGIC node (AND/OR/XOR/NOT) - recursively parses inputs
+    fn parse_logic_node(
+        &self,
+        node: &UINode,
+        reverse_adjacency: &HashMap<String, Vec<(String, String)>>,
+        node_map: &HashMap<String, &UINode>,
+    ) -> Option<TriggerCondition> {
+        let logic_op = node.data.get("logic")?.as_str().unwrap_or("AND");
+        log::error!("[UI Pattern] 🔀 Parsing LOGIC node: {} ({})", node.id, logic_op);
+        
+        // Find inputs A and B
+        let inputs = reverse_adjacency.get(&node.id)?;
+        
+        // Find which input connects to input-a and input-b handles
+        let input_a_source = inputs.iter()
+            .find(|(_, handle)| handle == "input-a")
+            .map(|(source, _)| source.split('|').next().unwrap_or(source));
+        
+        let input_b_source = inputs.iter()
+            .find(|(_, handle)| handle == "input-b")
+            .map(|(source, _)| source.split('|').next().unwrap_or(source));
+        
+        match logic_op {
+            "NOT" => {
+                // NOT only uses input-a
+                if let Some(source_id) = input_a_source {
+                    let source_node = node_map.get(source_id)?;
+                    let inner_condition = if source_node.type_ == "input" {
+                        self.parse_input_node(source_node)?
+                    } else if source_node.type_ == "condition" {
+                        self.parse_logic_node(source_node, reverse_adjacency, node_map)?
+                    } else {
+                        log::error!("[UI Pattern] ❌ Unsupported node type for NOT: {}", source_node.type_);
+                        return None;
+                    };
+                    
+                    Some(TriggerCondition::Not(Box::new(inner_condition)))
+                } else {
+                    log::error!("[UI Pattern] ❌ NOT node missing input-a");
+                    None
+                }
+            },
+            
+            "AND" | "OR" | "XOR" => {
+                // AND/OR/XOR use both inputs
+                let (input_a, input_b) = match (input_a_source, input_b_source) {
+                    (Some(a), Some(b)) => (a, b),
+                    _ => {
+                        log::error!("[UI Pattern] ❌ {} node missing inputs", logic_op);
+                        return None;
+                    }
+                };
+                
+                let cond_a = {
+                    let node_a = node_map.get(input_a)?;
+                    if node_a.type_ == "input" {
+                        self.parse_input_node(node_a)?
+                    } else if node_a.type_ == "condition" {
+                        self.parse_logic_node(node_a, reverse_adjacency, node_map)?
+                    } else {
+                        log::error!("[UI Pattern] ❌ Unsupported node type for input-a: {}", node_a.type_);
+                        return None;
+                    }
+                };
+                
+                let cond_b = {
+                    let node_b = node_map.get(input_b)?;
+                    if node_b.type_ == "input" {
+                        self.parse_input_node(node_b)?
+                    } else if node_b.type_ == "condition" {
+                        self.parse_logic_node(node_b, reverse_adjacency, node_map)?
+                    } else {
+                        log::error!("[UI Pattern] ❌ Unsupported node type for input-b: {}", node_b.type_);
+                        return None;
+                    }
+                };
+                
+                match logic_op {
+                    "AND" => Some(TriggerCondition::And(Box::new(cond_a), Box::new(cond_b))),
+                    "OR" => Some(TriggerCondition::Or(Box::new(cond_a), Box::new(cond_b))),
+                    "XOR" => {
+                        // XOR = (A AND NOT B) OR (NOT A AND B)
+                        Some(TriggerCondition::Or(
+                            Box::new(TriggerCondition::And(
+                                Box::new(cond_a.clone()),
+                                Box::new(TriggerCondition::Not(Box::new(cond_b.clone())))
+                            )),
+                            Box::new(TriggerCondition::And(
+                                Box::new(TriggerCondition::Not(Box::new(cond_a))),
+                                Box::new(cond_b)
+                            ))
+                        ))
+                    },
+                    _ => None,
+                }
+            },
+            
+            _ => {
+                log::error!("[UI Pattern] ❌ Unknown logic operator: {}", logic_op);
+                None
+            }
+        }
     }
     
     /// Find output node (vibration/linear/rotate) by traversing graph
@@ -166,7 +300,48 @@ impl UIPattern {
     }
     
     /// Parse trigger condition from indicator/operator/value
-    fn parse_condition(&self, indicator: &str, operator: &str, value: f32) -> Option<TriggerCondition> {
+    fn parse_condition(&self, indicator: &str, operator: &str, value: f32, window_seconds: f32) -> Option<TriggerCondition> {
+        // Temporal operators
+        match operator {
+            "dropped_by" => {
+                return match indicator {
+                    "speed" | "ias" | "tas" => Some(TriggerCondition::SpeedDroppedBy { threshold: value, window_seconds }),
+                    "altitude" => Some(TriggerCondition::AltitudeDroppedBy { threshold: value, window_seconds }),
+                    _ => None,
+                };
+            },
+            "increased_by" => {
+                return match indicator {
+                    "speed" | "ias" | "tas" => Some(TriggerCondition::SpeedIncreasedBy { threshold: value, window_seconds }),
+                    "altitude" => Some(TriggerCondition::AltitudeGainedBy { threshold: value, window_seconds }),
+                    "g_load" => Some(TriggerCondition::GLoadSpiked { threshold: value, window_seconds }),
+                    _ => None,
+                };
+            },
+            "accel_above" => {
+                return match indicator {
+                    "speed" | "ias" | "tas" => Some(TriggerCondition::AccelerationAbove { threshold: value, window_seconds }),
+                    "altitude" => Some(TriggerCondition::ClimbRateAbove { threshold: value, window_seconds }),
+                    _ => None,
+                };
+            },
+            "accel_below" => {
+                return match indicator {
+                    "speed" | "ias" | "tas" => Some(TriggerCondition::AccelerationBelow { threshold: value, window_seconds }),
+                    _ => None,
+                };
+            },
+            "avg_above" => {
+                return match indicator {
+                    "speed" | "ias" | "tas" => Some(TriggerCondition::AverageSpeedAbove { threshold: value, window_seconds }),
+                    "g_load" => Some(TriggerCondition::AverageGLoadAbove { threshold: value, window_seconds }),
+                    _ => None,
+                };
+            },
+            _ => {},
+        }
+        
+        // Regular (instant) operators
         match (indicator, operator) {
             // Speed
             ("speed", ">") | ("speed", ">=") => Some(TriggerCondition::SpeedAbove(value)),

@@ -3,6 +3,7 @@
 
 use crate::wt_telemetry::GameState;
 use crate::pattern_engine::{GameEvent, VibrationPattern};
+use crate::state_history::{StateHistory, speed_extractor, altitude_extractor, g_load_extractor, fuel_extractor};
 use serde::{Deserialize, Serialize};
 
 /// Trigger condition
@@ -56,6 +57,29 @@ pub enum TriggerCondition {
     And(Box<TriggerCondition>, Box<TriggerCondition>),
     Or(Box<TriggerCondition>, Box<TriggerCondition>),
     Not(Box<TriggerCondition>),
+    
+    // Temporal conditions (require state history)
+    // Speed changes
+    SpeedDroppedBy { threshold: f32, window_seconds: f32 },     // Speed dropped by X km/h in Y seconds
+    SpeedIncreasedBy { threshold: f32, window_seconds: f32 },   // Speed increased by X km/h in Y seconds
+    AccelerationAbove { threshold: f32, window_seconds: f32 },  // Acceleration > X km/h/s over Y seconds
+    AccelerationBelow { threshold: f32, window_seconds: f32 },  // Deceleration > X km/h/s over Y seconds
+    
+    // Altitude changes
+    AltitudeDroppedBy { threshold: f32, window_seconds: f32 },  // Altitude dropped by X meters in Y seconds
+    AltitudeGainedBy { threshold: f32, window_seconds: f32 },   // Altitude gained by X meters in Y seconds
+    ClimbRateAbove { threshold: f32, window_seconds: f32 },     // Climb rate > X m/s over Y seconds
+    
+    // G-load changes
+    GLoadSpiked { threshold: f32, window_seconds: f32 },        // G-load increased by X G in Y seconds
+    SuddenGChange { threshold: f32, window_seconds: f32 },      // Sudden G change (any direction)
+    
+    // Fuel depletion rate
+    FuelDepletingFast { threshold: f32, window_seconds: f32 },  // Fuel dropping faster than X kg/s
+    
+    // Averages over time
+    AverageSpeedAbove { threshold: f32, window_seconds: f32 },  // Average speed > X over Y seconds
+    AverageGLoadAbove { threshold: f32, window_seconds: f32 },  // Average G-load > X over Y seconds
 }
 
 impl TriggerCondition {
@@ -109,6 +133,119 @@ impl TriggerCondition {
             TriggerCondition::And(a, b) => a.evaluate(state) && b.evaluate(state),
             TriggerCondition::Or(a, b) => a.evaluate(state) || b.evaluate(state),
             TriggerCondition::Not(cond) => !cond.evaluate(state),
+            
+            // Temporal conditions require state history (return false if not available)
+            TriggerCondition::SpeedDroppedBy { .. } => false,
+            TriggerCondition::SpeedIncreasedBy { .. } => false,
+            TriggerCondition::AccelerationAbove { .. } => false,
+            TriggerCondition::AccelerationBelow { .. } => false,
+            TriggerCondition::AltitudeDroppedBy { .. } => false,
+            TriggerCondition::AltitudeGainedBy { .. } => false,
+            TriggerCondition::ClimbRateAbove { .. } => false,
+            TriggerCondition::GLoadSpiked { .. } => false,
+            TriggerCondition::SuddenGChange { .. } => false,
+            TriggerCondition::FuelDepletingFast { .. } => false,
+            TriggerCondition::AverageSpeedAbove { .. } => false,
+            TriggerCondition::AverageGLoadAbove { .. } => false,
+        }
+    }
+    
+    /// Check if condition is met with state history support
+    pub fn evaluate_with_history(&self, state: &GameState, history: Option<&StateHistory>) -> bool {
+        match self {
+            // Regular conditions use standard evaluate
+            TriggerCondition::SpeedAbove(_) | TriggerCondition::SpeedBelow(_) |
+            TriggerCondition::AltitudeAbove(_) | TriggerCondition::AltitudeBelow(_) |
+            TriggerCondition::RPMAbove(_) | TriggerCondition::TempAbove(_) |
+            TriggerCondition::GLoadAbove(_) | TriggerCondition::GLoadBelow(_) |
+            TriggerCondition::AOAAbove(_) | TriggerCondition::AOABelow(_) |
+            TriggerCondition::IASAbove(_) | TriggerCondition::TASAbove(_) | TriggerCondition::MachAbove(_) |
+            TriggerCondition::FuelBelow(_) | TriggerCondition::FuelTimeBelow(_) |
+            TriggerCondition::AmmoBelow(_) |
+            TriggerCondition::EngineDamageAbove(_) | TriggerCondition::ControlsDamageAbove(_) |
+            TriggerCondition::StabilizerActive | TriggerCondition::StabilizerInactive |
+            TriggerCondition::CrewLost | TriggerCondition::CrewMemberDead(_) |
+            TriggerCondition::GearAbove(_) | TriggerCondition::GearBelow(_) | TriggerCondition::GearEquals(_) |
+            TriggerCondition::CruiseControlAbove(_) | TriggerCondition::CruiseControlBelow(_) |
+            TriggerCondition::DrivingForward | TriggerCondition::DrivingBackward => {
+                self.evaluate(state)
+            },
+            
+            // Logical conditions need recursive evaluation with history
+            TriggerCondition::And(a, b) => {
+                a.evaluate_with_history(state, history) && b.evaluate_with_history(state, history)
+            },
+            TriggerCondition::Or(a, b) => {
+                a.evaluate_with_history(state, history) || b.evaluate_with_history(state, history)
+            },
+            TriggerCondition::Not(cond) => {
+                !cond.evaluate_with_history(state, history)
+            },
+            
+            // Temporal conditions require state history
+            TriggerCondition::SpeedDroppedBy { threshold, window_seconds } => {
+                history.map(|h| h.dropped_by(*threshold, *window_seconds, speed_extractor)).unwrap_or(false)
+            },
+            TriggerCondition::SpeedIncreasedBy { threshold, window_seconds } => {
+                history.map(|h| h.increased_by(*threshold, *window_seconds, speed_extractor)).unwrap_or(false)
+            },
+            TriggerCondition::AccelerationAbove { threshold, window_seconds } => {
+                history.map(|h| {
+                    h.rate_of_change(*window_seconds, speed_extractor)
+                        .map(|rate| rate > *threshold)
+                        .unwrap_or(false)
+                }).unwrap_or(false)
+            },
+            TriggerCondition::AccelerationBelow { threshold, window_seconds } => {
+                history.map(|h| {
+                    h.rate_of_change(*window_seconds, speed_extractor)
+                        .map(|rate| rate < -*threshold)
+                        .unwrap_or(false)
+                }).unwrap_or(false)
+            },
+            TriggerCondition::AltitudeDroppedBy { threshold, window_seconds } => {
+                history.map(|h| h.dropped_by(*threshold, *window_seconds, altitude_extractor)).unwrap_or(false)
+            },
+            TriggerCondition::AltitudeGainedBy { threshold, window_seconds } => {
+                history.map(|h| h.increased_by(*threshold, *window_seconds, altitude_extractor)).unwrap_or(false)
+            },
+            TriggerCondition::ClimbRateAbove { threshold, window_seconds } => {
+                history.map(|h| {
+                    h.rate_of_change(*window_seconds, altitude_extractor)
+                        .map(|rate| rate > *threshold)
+                        .unwrap_or(false)
+                }).unwrap_or(false)
+            },
+            TriggerCondition::GLoadSpiked { threshold, window_seconds } => {
+                history.map(|h| h.increased_by(*threshold, *window_seconds, g_load_extractor)).unwrap_or(false)
+            },
+            TriggerCondition::SuddenGChange { threshold, window_seconds } => {
+                history.map(|h| {
+                    let rate = h.rate_of_change(*window_seconds, g_load_extractor).unwrap_or(0.0);
+                    rate.abs() > *threshold
+                }).unwrap_or(false)
+            },
+            TriggerCondition::FuelDepletingFast { threshold, window_seconds } => {
+                history.map(|h| {
+                    h.rate_of_change(*window_seconds, fuel_extractor)
+                        .map(|rate| rate < -*threshold)
+                        .unwrap_or(false)
+                }).unwrap_or(false)
+            },
+            TriggerCondition::AverageSpeedAbove { threshold, window_seconds } => {
+                history.map(|h| {
+                    h.average(*window_seconds, speed_extractor)
+                        .map(|avg| avg > *threshold)
+                        .unwrap_or(false)
+                }).unwrap_or(false)
+            },
+            TriggerCondition::AverageGLoadAbove { threshold, window_seconds } => {
+                history.map(|h| {
+                    h.average(*window_seconds, g_load_extractor)
+                        .map(|avg| avg > *threshold)
+                        .unwrap_or(false)
+                }).unwrap_or(false)
+            },
         }
     }
 }
@@ -131,6 +268,7 @@ pub struct EventTrigger {
 pub struct TriggerManager {
     triggers: Vec<EventTrigger>,
     last_triggered: std::collections::HashMap<String, std::time::Instant>,
+    pub state_history: StateHistory,  // pub for access from HapticEngine
 }
 
 impl TriggerManager {
@@ -138,148 +276,255 @@ impl TriggerManager {
         let mut manager = Self {
             triggers: Vec::new(),
             last_triggered: std::collections::HashMap::new(),
+            state_history: StateHistory::default(),
         };
         
         manager.load_default_triggers();
         manager
     }
     
-    /// Load built-in triggers
+    /// Load built-in triggers (common events for all vehicle types)
     fn load_default_triggers(&mut self) {
+        // === COMMON COMBAT EVENTS ===
+        
+        // Hit (basic)
+        self.triggers.push(EventTrigger {
+            id: "hit_basic".to_string(),
+            name: "Hit Received".to_string(),
+            description: "Triggers on any hit received. Basic damage feedback.".to_string(),
+            condition: TriggerCondition::SpeedAbove(0.0), // Always true when vehicle is active
+            event: GameEvent::Hit,
+            cooldown_ms: 500,
+            enabled: true,  // ENABLED - common event
+            is_builtin: true,
+            pattern: None,
+        });
+        
+        // Critical Hit (penetration or significant damage)
+        self.triggers.push(EventTrigger {
+            id: "critical_hit".to_string(),
+            name: "Critical Hit".to_string(),
+            description: "Triggers on penetration or critical damage. High intensity feedback.".to_string(),
+            condition: TriggerCondition::SpeedAbove(0.0),
+            event: GameEvent::CriticalHit,
+            cooldown_ms: 1000,
+            enabled: true,  // ENABLED - common event
+            is_builtin: true,
+            pattern: None,
+        });
+        
+        // === FUEL WARNINGS (COMMON FOR ALL) ===
+        
+        // Low fuel (<10%)
+        self.triggers.push(EventTrigger {
+            id: "low_fuel_10".to_string(),
+            name: "Low Fuel <10%".to_string(),
+            description: "Triggers when less than 10% fuel remains. Time to return to base!".to_string(),
+            condition: TriggerCondition::FuelBelow(10.0),
+            event: GameEvent::LowFuel,
+            cooldown_ms: 30000,
+            enabled: true,  // ENABLED - common event
+            is_builtin: true,
+            pattern: None,
+        });
+        
+        // Critical fuel (<5%)
+        self.triggers.push(EventTrigger {
+            id: "critical_fuel_5".to_string(),
+            name: "Critical Fuel <5%".to_string(),
+            description: "Triggers when less than 5% fuel remains. CRITICALLY LOW!".to_string(),
+            condition: TriggerCondition::FuelBelow(5.0),
+            event: GameEvent::CriticalFuel,
+            cooldown_ms: 15000,
+            enabled: true,  // ENABLED - common event
+            is_builtin: true,
+            pattern: None,
+        });
+        
+        // === AMMO WARNINGS (COMMON FOR ALL) ===
+        
+        // Low ammo (<20%)
+        self.triggers.push(EventTrigger {
+            id: "low_ammo_20".to_string(),
+            name: "Low Ammo <20%".to_string(),
+            description: "Triggers when less than 20% ammo remains. Conserve ammunition!".to_string(),
+            condition: TriggerCondition::AmmoBelow(20.0),
+            event: GameEvent::LowAmmo,
+            cooldown_ms: 30000,
+            enabled: true,  // ENABLED - common event
+            is_builtin: true,
+            pattern: None,
+        });
+        
+        // === ENGINE WARNINGS (COMMON FOR ALL) ===
+        
+        // Engine damaged
+        self.triggers.push(EventTrigger {
+            id: "engine_damaged".to_string(),
+            name: "Engine Damaged".to_string(),
+            description: "Triggers when engine is damaged. Reduced performance.".to_string(),
+            condition: TriggerCondition::EngineDamageAbove(0.5),
+            event: GameEvent::EngineDamaged,
+            cooldown_ms: 10000,
+            enabled: true,  // ENABLED - common event
+            is_builtin: true,
+            pattern: None,
+        });
+        
+        // Engine fire
+        self.triggers.push(EventTrigger {
+            id: "engine_fire".to_string(),
+            name: "Engine Fire".to_string(),
+            description: "Triggers when engine is on fire. CRITICAL EMERGENCY!".to_string(),
+            condition: TriggerCondition::EngineDamageAbove(0.9),
+            event: GameEvent::EngineFire,
+            cooldown_ms: 5000,
+            enabled: true,  // ENABLED - common event
+            is_builtin: true,
+            pattern: None,
+        });
+        
+        // === AIRCRAFT-SPECIFIC (ADVANCED CONDITIONS) ===
+        
         // Overspeed (for aircraft)
         self.triggers.push(EventTrigger {
             id: "overspeed_800".to_string(),
             name: "Overspeed 800 km/h".to_string(),
-            description: "Triggers when indicated airspeed exceeds 800 km/h. Used for critical speed warning.".to_string(),
+            description: "Triggers when indicated airspeed exceeds 800 km/h. Critical speed warning.".to_string(),
             condition: TriggerCondition::IASAbove(800.0),
             event: GameEvent::Overspeed,
             cooldown_ms: 5000,
-            enabled: false,  // Disabled by default
+            enabled: true,  // ENABLED - common for aircraft
             is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
+            pattern: None,
         });
         
-        // Critical G-overload
+        // Critical G-overload (COMBO: positive OR negative)
         self.triggers.push(EventTrigger {
             id: "over_g_10".to_string(),
             name: "G-Overload >10G".to_string(),
-            description: "Triggers at extreme G-load (>10G positive or >5G negative). Warning of stall risk or structural damage.".to_string(),
+            description: "Triggers at extreme G-load (>10G positive OR >5G negative). Risk of blackout/structural damage!".to_string(),
             condition: TriggerCondition::Or(
                 Box::new(TriggerCondition::GLoadAbove(10.0)),
                 Box::new(TriggerCondition::GLoadBelow(-5.0)),
             ),
             event: GameEvent::OverG,
             cooldown_ms: 2000,
-            enabled: false,  // Disabled by default
+            enabled: true,  // ENABLED - critical safety
             is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
+            pattern: None,
         });
         
         // High angle of attack
         self.triggers.push(EventTrigger {
             id: "high_aoa_15".to_string(),
-            name: "Angle of Attack >15°".to_string(),
+            name: "High AoA >15°".to_string(),
             description: "Triggers at high angle of attack (>15°). Warning of approaching stall.".to_string(),
             condition: TriggerCondition::AOAAbove(15.0),
             event: GameEvent::HighAOA,
             cooldown_ms: 3000,
-            enabled: false,  // Disabled by default
+            enabled: true,  // ENABLED - safety warning
             is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
+            pattern: None,
         });
         
-        // Critical angle of attack
+        // Critical angle of attack (COMBO: high AoA AND low speed)
         self.triggers.push(EventTrigger {
             id: "critical_aoa_20".to_string(),
-            name: "Critical Angle of Attack >20°".to_string(),
-            description: "Triggers at critical angle of attack (>20°). High risk of stall!".to_string(),
-            condition: TriggerCondition::AOAAbove(20.0),
+            name: "Critical AoA >20°".to_string(),
+            description: "Triggers at critical angle of attack (>20° AND speed <350 km/h). STALL IMMINENT!".to_string(),
+            condition: TriggerCondition::And(
+                Box::new(TriggerCondition::AOAAbove(20.0)),
+                Box::new(TriggerCondition::SpeedBelow(350.0)),
+            ),
             event: GameEvent::CriticalAOA,
             cooldown_ms: 2000,
-            enabled: false,  // Disabled by default
+            enabled: true,  // ENABLED - critical warning
             is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
+            pattern: None,
         });
         
         // Breaking the sound barrier
         self.triggers.push(EventTrigger {
             id: "mach_1".to_string(),
-            name: "Breaking Mach 1.0".to_string(),
-            description: "Triggers when reaching sound speed (Mach >0.98). Feel the sonic boom!".to_string(),
+            name: "Mach 1.0 Breach".to_string(),
+            description: "Triggers when reaching sound speed (Mach >0.98). Sonic boom!".to_string(),
             condition: TriggerCondition::MachAbove(0.98),
             event: GameEvent::Mach1,
             cooldown_ms: 10000,
-            enabled: false,  // Disabled by default
+            enabled: true,  // ENABLED - milestone event
             is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
+            pattern: None,
         });
         
-        // Low fuel
-        self.triggers.push(EventTrigger {
-            id: "low_fuel_10".to_string(),
-            name: "Fuel <10%".to_string(),
-            description: "Triggers when less than 10% fuel remains. Time to return to base!".to_string(),
-            condition: TriggerCondition::FuelBelow(10.0),
-            event: GameEvent::LowFuel,
-            cooldown_ms: 30000,
-            enabled: false,  // Disabled by default
-            is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
-        });
-        
-        // Critical fuel
-        self.triggers.push(EventTrigger {
-            id: "critical_fuel_5".to_string(),
-            name: "Fuel <5%".to_string(),
-            description: "Triggers when less than 5% fuel remains. CRITICALLY LOW FUEL!".to_string(),
-            condition: TriggerCondition::FuelBelow(5.0),
-            event: GameEvent::CriticalFuel,
-            cooldown_ms: 15000,
-            enabled: false,  // Disabled by default
-            is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
-        });
-        
-        // Low altitude
+        // Low altitude warning (COMBO: low altitude AND high speed)
         self.triggers.push(EventTrigger {
             id: "low_altitude_100".to_string(),
-            name: "Low Altitude <100m".to_string(),
-            description: "Triggers at dangerously low altitude (<100m) at speed >200 km/h. Watch out, ground is close!".to_string(),
+            name: "Terrain Proximity <100m".to_string(),
+            description: "Triggers at low altitude (<100m AND speed >200 km/h). PULL UP!".to_string(),
             condition: TriggerCondition::And(
                 Box::new(TriggerCondition::AltitudeBelow(100.0)),
                 Box::new(TriggerCondition::SpeedAbove(200.0)),
             ),
             event: GameEvent::LowAltitude,
             cooldown_ms: 5000,
-            enabled: false,  // Disabled by default
+            enabled: true,  // ENABLED - critical safety
             is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
+            pattern: None,
         });
         
         // Engine overheat
         self.triggers.push(EventTrigger {
             id: "engine_overheat_250".to_string(),
-            name: "Engine Overheat >250°".to_string(),
-            description: "Triggers when engine temperature exceeds 250°C. Risk of engine damage!".to_string(),
+            name: "Engine Overheat >250°C".to_string(),
+            description: "Triggers when engine temperature exceeds 250°C. Risk of fire!".to_string(),
             condition: TriggerCondition::TempAbove(250.0),
             event: GameEvent::EngineOverheat,
             cooldown_ms: 10000,
-            enabled: false,  // Disabled by default
+            enabled: true,  // ENABLED - safety warning
             is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
+            pattern: None,
         });
         
-        // Low ammo
+        // === TEMPORAL CONDITIONS (ADVANCED) ===
+        
+        // Hard braking (speed dropped rapidly)
         self.triggers.push(EventTrigger {
-            id: "low_ammo_20".to_string(),
-            name: "Ammo <20%".to_string(),
-            description: "Triggers when less than 20% ammo remains. Conserve ammunition!".to_string(),
-            condition: TriggerCondition::AmmoBelow(20.0),
-            event: GameEvent::LowAmmo,
-            cooldown_ms: 30000,
-            enabled: false,  // Disabled by default
+            id: "hard_brake".to_string(),
+            name: "Hard Braking".to_string(),
+            description: "Speed dropped by 150+ km/h in 1.5 seconds. Emergency stop!".to_string(),
+            condition: TriggerCondition::SpeedDroppedBy { threshold: 150.0, window_seconds: 1.5 },
+            event: GameEvent::Hit,  // Reuse Hit event for feedback
+            cooldown_ms: 3000,
+            enabled: true,  // ENABLED - dynamic feedback
             is_builtin: true,
-            pattern: None,   // Built-in triggers use patterns from ProfileManager
+            pattern: None,
+        });
+        
+        // Aggressive maneuver (G-load spiked)
+        self.triggers.push(EventTrigger {
+            id: "aggressive_turn".to_string(),
+            name: "Aggressive Maneuver".to_string(),
+            description: "G-load increased by 5G+ in 0.5 seconds. Sharp turn detected!".to_string(),
+            condition: TriggerCondition::GLoadSpiked { threshold: 5.0, window_seconds: 0.5 },
+            event: GameEvent::OverG,
+            cooldown_ms: 2000,
+            enabled: true,  // ENABLED - dynamic feedback
+            is_builtin: true,
+            pattern: None,
+        });
+        
+        // Sustained high speed
+        self.triggers.push(EventTrigger {
+            id: "sustained_speed".to_string(),
+            name: "Sustained High Speed".to_string(),
+            description: "Average speed >700 km/h for 5 seconds. Maintaining velocity!".to_string(),
+            condition: TriggerCondition::AverageSpeedAbove { threshold: 700.0, window_seconds: 5.0 },
+            event: GameEvent::Overspeed,
+            cooldown_ms: 10000,
+            enabled: false,  // DISABLED - optional feedback
+            is_builtin: true,
+            pattern: None,
         });
     }
     
@@ -287,6 +532,10 @@ impl TriggerManager {
     pub fn check_triggers(&mut self, state: &GameState) -> Vec<(GameEvent, Option<VibrationPattern>)> {
         let mut events = Vec::new();
         let now = std::time::Instant::now();
+        
+        // Add current state to history for temporal conditions
+        use crate::state_history::StateSnapshot;
+        self.state_history.push(StateSnapshot::from_game_state(state));
         
         // Log current game state for debugging
         static mut LAST_LOG_TIME: Option<std::time::Instant> = None;
@@ -319,8 +568,8 @@ impl TriggerManager {
                 }
             }
             
-            // Проверка условия
-            let result = self.evaluate_condition(&trigger.condition, state);
+            // Проверка условия (с поддержкой временных условий)
+            let result = trigger.condition.evaluate_with_history(state, Some(&self.state_history));
             
             // Debug G-load triggers specifically
             if matches!(trigger.condition, TriggerCondition::GLoadAbove(_) | TriggerCondition::GLoadBelow(_)) {
@@ -433,6 +682,20 @@ impl TriggerManager {
             TriggerCondition::Not(inner) => {
                 !self.evaluate_condition(inner, state)
             },
+            
+            // Temporal conditions (not supported in this legacy method)
+            TriggerCondition::SpeedDroppedBy { .. } => false,
+            TriggerCondition::SpeedIncreasedBy { .. } => false,
+            TriggerCondition::AccelerationAbove { .. } => false,
+            TriggerCondition::AccelerationBelow { .. } => false,
+            TriggerCondition::AltitudeDroppedBy { .. } => false,
+            TriggerCondition::AltitudeGainedBy { .. } => false,
+            TriggerCondition::ClimbRateAbove { .. } => false,
+            TriggerCondition::GLoadSpiked { .. } => false,
+            TriggerCondition::SuddenGChange { .. } => false,
+            TriggerCondition::FuelDepletingFast { .. } => false,
+            TriggerCondition::AverageSpeedAbove { .. } => false,
+            TriggerCondition::AverageGLoadAbove { .. } => false,
         }
     }
     

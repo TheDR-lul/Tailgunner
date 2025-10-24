@@ -5,6 +5,7 @@ use anyhow::{Result, Context};
 use buttplug::client::ButtplugClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::collections::HashMap;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,18 +22,35 @@ pub enum DeviceType {
     Lovense,
 }
 
+#[derive(Debug, Clone)]
+struct LovenseDevice {
+    id: String,
+    name: String,
+    ip_address: String,
+    port: u16,
+}
+
 pub struct DeviceManager {
     buttplug_client: Arc<RwLock<Option<ButtplugClient>>>,
     devices: Arc<RwLock<Vec<DeviceInfo>>>,
+    lovense_devices: Arc<RwLock<HashMap<String, LovenseDevice>>>,
     lovense_enabled: bool,
+    http_client: reqwest::Client,
 }
 
 impl DeviceManager {
     pub fn new() -> Self {
+        let http_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(2))
+            .build()
+            .expect("Failed to create HTTP client");
+        
         Self {
             buttplug_client: Arc::new(RwLock::new(None)),
             devices: Arc::new(RwLock::new(Vec::new())),
+            lovense_devices: Arc::new(RwLock::new(HashMap::new())),
             lovense_enabled: false,
+            http_client,
         }
     }
 
@@ -144,32 +162,42 @@ impl DeviceManager {
         devices
     }
 
-    /// Send vibration command to all devices
+    /// Send vibration command to all devices (Buttplug + Lovense)
     pub async fn send_vibration(&self, intensity: f32) -> Result<()> {
         let intensity = intensity.clamp(0.0, 1.0);
+        
+        let mut buttplug_count = 0;
+        let mut lovense_count = 0;
 
+        // Send to Buttplug devices
         let guard = self.buttplug_client.read().await;
         if let Some(client) = guard.as_ref() {
             let devices = client.devices();
+            buttplug_count = devices.len();
             
-            if devices.is_empty() {
-                log::warn!("⚠️ No connected devices! Start scanning.");
-                return Ok(());
-            }
-            
-            log::info!("🎮 Sending vibration {} to {} devices", intensity, devices.len());
-            
-            for device in devices {
-                log::info!("  → {} (index: {})", device.name(), device.index());
+            if buttplug_count > 0 {
+                log::debug!("🎮 Sending vibration {} to {} Buttplug devices", intensity, buttplug_count);
                 
-                match device.vibrate(&buttplug::client::ScalarValueCommand::ScalarValue(intensity.into())).await {
-                    Ok(_) => log::info!("    ✅ Success"),
-                    Err(e) => log::error!("    ❌ Error: {}", e),
+                for device in devices {
+                    match device.vibrate(&buttplug::client::ScalarValueCommand::ScalarValue(intensity.into())).await {
+                        Ok(_) => log::debug!("  ✅ {} vibrated", device.name()),
+                        Err(e) => log::error!("  ❌ {} error: {}", device.name(), e),
+                    }
                 }
             }
-        } else {
-            log::error!("❌ Buttplug client not initialized!");
-            return Err(anyhow::anyhow!("Buttplug client not initialized"));
+        }
+        
+        // Send to Lovense devices (if enabled)
+        if self.lovense_enabled {
+            lovense_count = self.lovense_devices.read().await.len();
+            if lovense_count > 0 {
+                self.send_lovense_vibration(intensity).await?;
+            }
+        }
+        
+        let total_devices = buttplug_count + lovense_count;
+        if total_devices == 0 {
+            log::warn!("⚠️ No connected devices! Add Buttplug or Lovense devices.");
         }
 
         Ok(())
@@ -183,6 +211,109 @@ impl DeviceManager {
     /// Check connection status
     pub async fn is_connected(&self) -> bool {
         self.buttplug_client.read().await.is_some()
+    }
+    
+    // ============ LOVENSE API METHODS ============
+    
+    /// Add Lovense device manually by IP address
+    /// Lovense LAN API requires knowing the device IP (can be found in Lovense Remote app)
+    pub async fn add_lovense_device(&self, ip: String, port: Option<u16>) -> Result<()> {
+        let port = port.unwrap_or(20010); // Default Lovense LAN API port
+        let url = format!("http://{}:{}/GetToyName", ip, port);
+        
+        log::info!("🔍 Discovering Lovense device at {}:{}...", ip, port);
+        
+        // Try to get device name
+        match self.http_client.get(&url).send().await {
+            Ok(response) => {
+                if let Ok(name) = response.text().await {
+                    let device_id = format!("lovense_{}", ip.replace(".", "_"));
+                    let device = LovenseDevice {
+                        id: device_id.clone(),
+                        name: name.trim().to_string(),
+                        ip_address: ip.clone(),
+                        port,
+                    };
+                    
+                    self.lovense_devices.write().await.insert(device_id.clone(), device.clone());
+                    
+                    log::info!("✅ Lovense device added: {} ({}:{})", device.name, ip, port);
+                    
+                    // Add to devices list
+                    let mut devices = self.devices.write().await;
+                    let device_index = devices.len() as u32;
+                    devices.push(DeviceInfo {
+                        id: device_index,
+                        name: device.name.clone(),
+                        device_type: DeviceType::Lovense,
+                        connected: true,
+                    });
+                    
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("Failed to parse device name from {}", url))
+                }
+            },
+            Err(e) => {
+                log::error!("❌ Failed to connect to Lovense device at {}:{}: {}", ip, port, e);
+                Err(anyhow::anyhow!("Lovense device not found at {}:{}", ip, port))
+            }
+        }
+    }
+    
+    /// Send vibration to Lovense devices
+    /// Lovense API: POST http://ip:port/Vibrate?v=<0-20>
+    /// Note: Lovense uses 0-20 scale, we convert from 0.0-1.0
+    async fn send_lovense_vibration(&self, intensity: f32) -> Result<()> {
+        let lovense_devices = self.lovense_devices.read().await;
+        
+        if lovense_devices.is_empty() {
+            return Ok(()); // No Lovense devices, skip
+        }
+        
+        // Convert 0.0-1.0 to 0-20 scale
+        let lovense_intensity = (intensity * 20.0).round() as u8;
+        
+        log::debug!("🎮 Sending Lovense vibration: {} (intensity: {})", lovense_intensity, intensity);
+        
+        for (id, device) in lovense_devices.iter() {
+            let url = format!("http://{}:{}/Vibrate?v={}", device.ip_address, device.port, lovense_intensity);
+            
+            match self.http_client.post(&url).send().await {
+                Ok(_) => log::debug!("  ✅ Lovense {} vibrated", device.name),
+                Err(e) => log::error!("  ❌ Lovense {} failed: {}", device.name, e),
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Remove Lovense device
+    pub async fn remove_lovense_device(&self, device_id: &str) -> Result<()> {
+        let mut lovense_devices = self.lovense_devices.write().await;
+        
+        if let Some(device) = lovense_devices.remove(device_id) {
+            log::info!("✅ Removed Lovense device: {}", device.name);
+            
+            // Remove from devices list
+            let mut devices = self.devices.write().await;
+            devices.retain(|d| d.name != device.name);
+            
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Lovense device not found: {}", device_id))
+        }
+    }
+    
+    /// Enable/disable Lovense integration
+    pub fn set_lovense_enabled(&mut self, enabled: bool) {
+        self.lovense_enabled = enabled;
+        log::info!("🔧 Lovense integration: {}", if enabled { "ENABLED" } else { "DISABLED" });
+    }
+    
+    /// Get Lovense connection status
+    pub async fn is_lovense_connected(&self) -> bool {
+        !self.lovense_devices.read().await.is_empty()
     }
 }
 

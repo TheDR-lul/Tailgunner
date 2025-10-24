@@ -108,6 +108,72 @@ export function EventConfiguration() {
       </div>
 
       <div className="card-content">
+        {/* All Triggers Section */}
+        <div style={{ marginBottom: '32px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <Zap size={16} style={{ display: 'inline', marginRight: '6px' }} />
+            All Triggers ({triggers.length})
+          </h3>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' }}>
+            {triggers.map((trigger) => (
+              <div
+                key={trigger.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 12px',
+                  background: trigger.enabled ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-secondary)',
+                  border: `1px solid ${trigger.enabled ? 'var(--primary)' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {trigger.is_builtin ? (
+                      <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(99, 102, 241, 0.2)', borderRadius: '4px', color: 'var(--primary)' }}>
+                        Built-in
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(16, 185, 129, 0.2)', borderRadius: '4px', color: '#10b981' }}>
+                        Dynamic
+                      </span>
+                    )}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {trigger.name}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {trigger.description}
+                  </div>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Event: {t(`game_events.${trigger.event}`, trigger.event)} | 
+                    Cooldown: {(trigger.cooldown_ms / 1000).toFixed(1)}s
+                  </div>
+                </div>
+                
+                <button
+                  className={`btn-toggle ${trigger.enabled ? 'active' : ''}`}
+                  onClick={() => toggleTrigger(trigger.id, !trigger.enabled)}
+                  title={trigger.enabled ? t('common.disable') : t('common.enable')}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '10px',
+                    minWidth: '55px',
+                    marginLeft: '8px',
+                    flexShrink: 0
+                  }}
+                >
+                  <Power size={12} />
+                  {trigger.enabled ? t('common.on') : t('common.off')}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Profiles Section */}
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             <Layers size={16} style={{ display: 'inline', marginRight: '6px' }} />
