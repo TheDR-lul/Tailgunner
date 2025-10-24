@@ -1,7 +1,7 @@
 /// WT Vehicles API Integration
-/// Интеграция через REST API (БЕЗ GPL зависимости!)
-/// Источник: https://github.com/Sgambe33/WarThunder-Vehicles-API
-/// Публичный API: www.wtvehiclesapi.sgambe.serv00.net
+/// Integration via REST API (NO GPL dependencies!)
+/// Source: https://github.com/Sgambe33/WarThunder-Vehicles-API
+/// Public API: www.wtvehiclesapi.sgambe.serv00.net
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

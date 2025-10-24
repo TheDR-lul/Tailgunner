@@ -152,20 +152,20 @@ async fn add_pattern(
     state: tauri::State<'_, AppState>,
     pattern: ui_patterns::UIPattern
 ) -> Result<String, String> {
-    log::info!("[UI Patterns] Received pattern: {}", pattern.name);
+    log::info!("[UI Patterns] Received pattern: '{}' ({} nodes)", pattern.name, pattern.nodes.len());
     
     // Convert UIPattern → EventTrigger
     let trigger = pattern.to_trigger()
         .ok_or_else(|| "Failed to convert pattern to trigger".to_string())?;
     
-    log::info!("[UI Patterns] Converted to trigger: {:?}", trigger.name);
+    log::info!("[UI Patterns] Converted to trigger: '{}' ({:?})", trigger.name, trigger.condition);
     
     // Add to TriggerManager
     let engine = state.engine.lock().await;
     let mut manager = engine.trigger_manager.write().await;
     manager.add_trigger(trigger);
     
-    log::info!("[UI Patterns] ✅ Pattern '{}' added to engine", pattern.name);
+    log::info!("[UI Patterns] Pattern '{}' added to engine", pattern.name);
     Ok(format!("Pattern '{}' added successfully", pattern.name))
 }
 

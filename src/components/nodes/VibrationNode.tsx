@@ -12,7 +12,7 @@ export interface VibrationNodeData {
   curve: CurvePoint[];
   randomMin?: number;
   randomMax?: number;
-  mode?: 'once' | 'continuous' | 'repeat';
+  mode?: 'once' | 'continuous' | 'repeat' | 'while_true';
   repeatCount?: number;
 }
 
@@ -23,7 +23,7 @@ export function VibrationNode({ data, id, selected }: { data: VibrationNodeData;
     { x: 0.4, y: 0.6 },
     { x: 0.6, y: 0.8 }
   ]);
-  const [mode, setMode] = useState<'once' | 'continuous' | 'repeat'>(data.mode || 'once');
+  const [mode, setMode] = useState<'once' | 'continuous' | 'repeat' | 'while_true'>(data.mode || 'once');
   const [repeatCount, setRepeatCount] = useState(data.repeatCount || 3);
   const [enableRandom, setEnableRandom] = useState(!!data.randomMin);
   const [randomMin, setRandomMin] = useState(data.randomMin || 0.3);
@@ -304,7 +304,7 @@ export function VibrationNode({ data, id, selected }: { data: VibrationNodeData;
               {t('nodes.vibration.mode')}:
               <select
                 value={mode}
-                onChange={(e) => setMode(e.target.value as 'once' | 'continuous' | 'repeat')}
+                onChange={(e) => setMode(e.target.value as 'once' | 'continuous' | 'repeat' | 'while_true')}
                 className="node-input-field"
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -312,6 +312,7 @@ export function VibrationNode({ data, id, selected }: { data: VibrationNodeData;
                 <option value="once">{t('nodes.vibration.mode_once')}</option>
                 <option value="continuous">{t('nodes.vibration.mode_continuous')}</option>
                 <option value="repeat">{t('nodes.vibration.mode_repeat')}</option>
+                <option value="while_true">{t('nodes.vibration.mode_while_true')}</option>
               </select>
             </label>
             

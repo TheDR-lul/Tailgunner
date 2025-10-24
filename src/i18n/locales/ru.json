@@ -1,7 +1,7 @@
 {
   "app": {
-    "title": "Haptic Feedback System",
-    "subtitle": "Тактильная обратная связь для War Thunder"
+    "title": "Tailgunner",
+    "subtitle": "на базе A.S.S. — Adaptive Sensory System"
   },
   "header": {
     "status_active": "Активно",
@@ -121,6 +121,7 @@
       "mode_once": "Разовая",
       "mode_continuous": "Постоянная",
       "mode_repeat": "Циклическая",
+      "mode_while_true": "Пока условие выполняется",
       "repeat_count": "Количество повторов",
       "random": "Случайная",
       "random_min": "Мин",

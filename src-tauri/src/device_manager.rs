@@ -1,5 +1,5 @@
 /// Device Manager
-/// Управление вибро-устройствами через Buttplug.io и Lovense API
+/// Manage haptic devices via Buttplug.io and Lovense API
 
 use anyhow::{Result, Context};
 use buttplug::client::ButtplugClient;

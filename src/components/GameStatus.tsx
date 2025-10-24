@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Gamepad2, Gauge, Mountain, Droplet, Zap } from 'lucide-react';
 import { api } from '../api';
@@ -16,6 +16,9 @@ export function GameStatus() {
     fuel_percent: 0,
   });
 
+  // Use ref to track previous values without causing re-renders
+  const prevStatusRef = useRef<GameStatusInfo>(status);
+
   useEffect(() => {
     // Get update interval from localStorage (default: 200ms = 5 times per second)
     const updateInterval = parseInt(localStorage.getItem('gameStatusUpdateInterval') || '200');
@@ -23,32 +26,48 @@ export function GameStatus() {
     const interval = setInterval(async () => {
       try {
         const gameStatus = await api.getGameStatus();
+        const prevStatus = prevStatusRef.current;
+        
+        // Debug: Log raw data from backend
+        if (gameStatus.connected && gameStatus.vehicle_name !== prevStatus.vehicle_name) {
+          console.log('[GameStatus] 🔍 Raw vehicle_name from backend:', gameStatus.vehicle_name);
+        }
+        
+        // Update state
         setStatus(gameStatus);
         
-        // Log vehicle changes
-        if (gameStatus.connected && gameStatus.vehicle_name !== status.vehicle_name && gameStatus.vehicle_name !== 'N/A') {
+        // Log vehicle changes (skip unknown/N/A)
+        if (gameStatus.connected && 
+            gameStatus.vehicle_name !== prevStatus.vehicle_name && 
+            gameStatus.vehicle_name !== 'N/A' &&
+            gameStatus.vehicle_name !== 'unknown') {
           if ((window as any).debugLog) {
-            (window as any).debugLog('info', `🚗 Vehicle: ${gameStatus.vehicle_name}`);
+            (window as any).debugLog('info', `🚗 Vehicle detected: ${gameStatus.vehicle_name}`);
           }
         }
         
-        // Log only on connection/disconnection
-        if (gameStatus.connected && !status.connected) {
-          if ((window as any).debugLog) {
-            (window as any).debugLog('success', `✅ WT connected: ${gameStatus.vehicle_name}`);
-          }
-        } else if (!gameStatus.connected && status.connected) {
-          if ((window as any).debugLog) {
-            (window as any).debugLog('warn', '⚠️ WT disconnected');
+        // Log ONLY on connection state change (not every tick!)
+        if (gameStatus.connected !== prevStatus.connected) {
+          if (gameStatus.connected) {
+            if ((window as any).debugLog) {
+              (window as any).debugLog('success', `✅ WT connected${gameStatus.vehicle_name !== 'unknown' ? ': ' + gameStatus.vehicle_name : ''}`);
+            }
+          } else {
+            if ((window as any).debugLog) {
+              (window as any).debugLog('warn', '⚠️ WT disconnected');
+            }
           }
         }
+        
+        // Update ref for next comparison
+        prevStatusRef.current = gameStatus;
       } catch (error) {
         console.error('[GameStatus] Failed to get game status:', error);
       }
     }, updateInterval);
 
     return () => clearInterval(interval);
-  }, [status.connected, status.vehicle_name]);
+  }, []); // Empty deps - runs once, interval handles updates
 
   return (
     <div className="card game-status-card">
@@ -56,7 +75,8 @@ export function GameStatus() {
         <div>
           <h2>{t('game_status.title') || 'War Thunder'}</h2>
           <div className={`status-indicator ${status.connected ? 'connected' : 'disconnected'}`}>
-            {status.connected ? `🟢 ${t('game_status.connected')}` : `🔴 ${t('game_status.disconnected')}`}
+            <span className="status-dot">{status.connected ? '🟢' : '🔴'}</span>
+            <span className="status-text">{status.connected ? t('game_status.connected') : t('game_status.disconnected')}</span>
           </div>
         </div>
       </div>
@@ -67,7 +87,18 @@ export function GameStatus() {
             <Gamepad2 size={18} className="stat-icon" />
             <div className="stat-content">
               <span className="stat-label">{t('game_status.vehicle')}</span>
-              <span className="stat-value">{status.vehicle_name || t('game_status.unknown')}</span>
+              <span className="stat-value" style={{
+                color: (status.vehicle_name === 'unknown' || status.vehicle_name === 'N/A') 
+                  ? 'var(--text-muted)' 
+                  : 'var(--text)',
+                fontStyle: (status.vehicle_name === 'unknown' || status.vehicle_name === 'N/A')
+                  ? 'italic'
+                  : 'normal'
+              }}>
+                {(status.vehicle_name === 'unknown' || status.vehicle_name === 'N/A')
+                  ? '—'
+                  : status.vehicle_name}
+              </span>
             </div>
           </div>
 

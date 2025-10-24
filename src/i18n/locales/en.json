@@ -1,7 +1,7 @@
 {
   "app": {
-    "title": "Haptic Feedback System",
-    "subtitle": "Tactile Feedback for War Thunder"
+    "title": "Tailgunner",
+    "subtitle": "Powered by Adaptive Sensory System"
   },
   "header": {
     "status_active": "Active",
@@ -121,6 +121,7 @@
       "mode_once": "Once",
       "mode_continuous": "Continuous",
       "mode_repeat": "Repeat",
+      "mode_while_true": "While Condition True",
       "repeat_count": "Repeat count",
       "random": "Random",
       "random_min": "Min",

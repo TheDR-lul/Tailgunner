@@ -14,10 +14,10 @@ export interface Pattern {
 interface PatternsContextType {
   patterns: Pattern[];
   loading: boolean;
-  addPattern: (name: string, nodes: Node[], edges: Edge[]) => void;
-  updatePattern: (id: string, updates: Partial<Pattern>) => void;
+  addPattern: (name: string, nodes: Node[], edges: Edge[]) => Promise<void>;
+  updatePattern: (id: string, updates: Partial<Pattern>) => Promise<void>;
   deletePattern: (id: string) => void;
-  togglePattern: (id: string) => void;
+  togglePattern: (id: string) => Promise<void>;
 }
 
 const PatternsContext = createContext<PatternsContextType | undefined>(undefined);
@@ -45,14 +45,17 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
         }
         
         // Синхронизируем все паттерны с Rust движком
-        patternsWithDates.forEach(async (pattern: Pattern) => {
-          try {
-            await invoke('add_pattern', { pattern });
-            console.log(`✅ Synced pattern '${pattern.name}' to Rust`);
-          } catch (error) {
-            console.error(`Failed to sync pattern '${pattern.name}':`, error);
+        (async () => {
+          for (const pattern of patternsWithDates) {
+            console.log(`[Patterns] Syncing '${pattern.name}' (enabled: ${pattern.enabled}, nodes: ${pattern.nodes?.length || 0})`);
+            try {
+              await invoke('add_pattern', { pattern });
+              console.log(`[Patterns] ✅ Synced '${pattern.name}' to Rust`);
+            } catch (error) {
+              console.error(`[Patterns] ❌ Failed to sync '${pattern.name}':`, error);
+            }
           }
-        });
+        })();
         
       } catch (error) {
         console.error('Failed to load patterns:', error);
@@ -101,21 +104,60 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to sync pattern with Rust:', error);
       
+      // Check if pattern is too complex for engine sync
+      const hasComplexNodes = nodes.some(n => 
+        ['condition', 'logic', 'multiCondition'].includes(n.type || '')
+      );
+      
       if ((window as any).debugLog) {
-        (window as any).debugLog('error', `❌ Failed to sync pattern: ${error}`);
+        if (hasComplexNodes) {
+          (window as any).debugLog('warn', `⚠️ Pattern '${name}' uses advanced nodes (Condition/Logic). Pattern saved but won't trigger automatically. For auto-triggers, use simple Input→Vibration→Output flow.`);
+        } else {
+          (window as any).debugLog('error', `❌ Failed to sync pattern: ${error}`);
+        }
       }
     }
   }, [savePatterns]);
 
-  const updatePattern = useCallback((id: string, updates: Partial<Pattern>) => {
+  const updatePattern = useCallback(async (id: string, updates: Partial<Pattern>) => {
+    let updatedPattern: Pattern | undefined;
+    
     setPatterns(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, ...updates } : p);
+      const updated = prev.map(p => {
+        if (p.id === id) {
+          updatedPattern = { ...p, ...updates };
+          return updatedPattern;
+        }
+        return p;
+      });
       savePatterns(updated);
       return updated;
     });
     
-    if ((window as any).debugLog) {
-      (window as any).debugLog('info', `Pattern updated: ${id}`);
+    // Try to sync with Rust engine
+    if (updatedPattern) {
+      try {
+        await invoke('add_pattern', { pattern: updatedPattern });
+        
+        if ((window as any).debugLog) {
+          (window as any).debugLog('success', `✅ Pattern '${updatedPattern.name}' updated & synced`);
+        }
+      } catch (error) {
+        console.error('Failed to sync updated pattern with Rust:', error);
+        
+        // Check if pattern is too complex
+        const hasComplexNodes = updatedPattern.nodes?.some(n => 
+          ['condition', 'logic', 'multiCondition'].includes(n.type || '')
+        );
+        
+        if ((window as any).debugLog) {
+          if (hasComplexNodes) {
+            (window as any).debugLog('warn', `⚠️ Pattern '${updatedPattern.name}' uses advanced nodes. Saved locally but won't auto-trigger.`);
+          } else {
+            (window as any).debugLog('error', `❌ Failed to sync pattern: ${error}`);
+          }
+        }
+      }
     }
   }, [savePatterns]);
 

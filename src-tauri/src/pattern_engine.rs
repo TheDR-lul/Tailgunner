@@ -1,17 +1,17 @@
-/// Pattern Engine - "Синтезатор Ощущений"
-/// ADSR паттерны для создания сложных тактильных текстур
+/// Pattern Engine - "Sensation Synthesizer"
+/// ADSR patterns for creating complex tactile textures
 
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-/// Основной паттерн вибрации (ADSR + burst)
+/// Main vibration pattern (ADSR + burst)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VibrationPattern {
     pub name: String,
-    pub attack: EnvelopeStage,   // Мгновенный удар
-    pub hold: EnvelopeStage,     // Удержание
-    pub decay: EnvelopeStage,    // Затухание
-    pub burst: BurstConfig,      // Повторения
+    pub attack: EnvelopeStage,   // Instant hit
+    pub hold: EnvelopeStage,     // Hold
+    pub decay: EnvelopeStage,    // Decay
+    pub burst: BurstConfig,      // Repeat
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,13 +157,13 @@ pub enum GameEvent {
     Assist,
     BaseCapture,
     
-    // === КАСТОМНЫЕ ТРИГГЕРЫ ===
+    // === CUSTOM TRIGGERS ===
     CustomTrigger(String),
-    UserTriggered,  // Универсальное событие для UI паттернов
+    UserTriggered,  // Universal event for UI patterns
 }
 
 impl VibrationPattern {
-    /// Создание стандартных пресетов
+    /// Create standard presets
     pub fn preset_critical_hit() -> Self {
         Self {
             name: "Critical Hit".to_string(),
@@ -276,7 +276,7 @@ impl VibrationPattern {
         }
     }
 
-    /// Генерация точек паттерна для плавной интерполяции
+    /// Generate pattern points for smooth interpolation
     pub fn generate_points(&self, sample_rate_hz: u32) -> Vec<(Duration, f32)> {
         let mut points = Vec::new();
         let dt = Duration::from_millis(1000 / sample_rate_hz as u64);

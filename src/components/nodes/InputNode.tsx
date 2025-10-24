@@ -4,14 +4,17 @@ import { useTranslation } from 'react-i18next';
 import { Activity, Gauge, Zap, Wind, Droplet, Crosshair, Fuel, Thermometer, Settings, Users, Navigation } from 'lucide-react';
 
 interface InputNodeData {
-  label: string;
+  label?: string;
   indicator: string;
+  operator?: string;
   value?: number;
 }
 
 export function InputNode({ data, id, selected }: { data: InputNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [indicator, setIndicator] = useState(data.indicator || 'speed');
+  const [operator, setOperator] = useState(data.operator || '>');
+  const [value, setValue] = useState(data.value || 0);
   
   const INDICATORS = [
     // Flight Parameters
@@ -87,7 +90,9 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
   
   useEffect(() => {
     data.indicator = indicator;
-  }, [indicator, data]);
+    data.operator = operator;
+    data.value = value;
+  }, [indicator, operator, value, data]);
   
   return (
     <div 
@@ -132,11 +137,46 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
             </optgroup>
           ))}
         </select>
-        {data.value !== undefined && (
-          <div className="node-value" style={{ color: '#ff9933' }}>
-            {data.value.toFixed(1)} {selectedIndicator.unit}
-          </div>
-        )}
+        
+        <div style={{ display: 'flex', gap: '4px', marginTop: '8px', alignItems: 'center' }}>
+          <select 
+            value={operator}
+            onChange={(e) => setOperator(e.target.value)}
+            className="node-select"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              border: '1px solid rgba(255, 153, 51, 0.5)',
+              color: '#94a3b8',
+              flex: '0 0 45px'
+            }}
+          >
+            <option value=">">{'>'}</option>
+            <option value="<">{'<'}</option>
+            <option value=">=">{'≥'}</option>
+            <option value="<=">{'≤'}</option>
+            <option value="==">{'='}</option>
+          </select>
+          
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => setValue(parseFloat(e.target.value) || 0)}
+            className="node-input-field"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              border: '1px solid rgba(255, 153, 51, 0.5)',
+              color: '#ff9933',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              flex: 1
+            }}
+          />
+        </div>
+        
         <div style={{
           marginTop: '6px',
           fontSize: '9px',

@@ -55,14 +55,21 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
 
   // Update nodes and edges when initialData changes (e.g., when editing a pattern)
+  // OR clear them when creating a new pattern (initialData === undefined)
   useEffect(() => {
     if (initialData) {
       setPatternName(initialData.name || '');
       setNodes(initialData.nodes || []);
       setEdges(initialData.edges || []);
-      console.log('[Pattern Editor] Loaded pattern:', initialData.name, 'Nodes:', initialData.nodes?.length, 'Edges:', initialData.edges?.length);
+      console.log('[Pattern Editor] ✏️ Loaded pattern:', initialData.name, 'Nodes:', initialData.nodes?.length, 'Edges:', initialData.edges?.length);
+    } else if (isOpen) {
+      // Clear state when creating a new pattern
+      setPatternName('');
+      setNodes([]);
+      setEdges([]);
+      console.log('[Pattern Editor] ✨ Creating new pattern');
     }
-  }, [initialData, setNodes, setEdges]);
+  }, [initialData, isOpen, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),

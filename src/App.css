@@ -782,27 +782,43 @@ textarea:focus {
 
 .game-status-card {
   min-height: auto !important;
+  border-left: 3px solid rgba(255, 153, 51, 0.3);
 }
 
 .status-indicator {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 12px;
+  padding: 3px 10px;
+  border-radius: 10px;
   margin-top: 6px;
 }
 
+.status-indicator .status-dot {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  font-size: 10px;
+}
+
+.status-indicator .status-text {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
 .status-indicator.connected {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.15);
   color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .status-indicator.disconnected {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .game-stats {

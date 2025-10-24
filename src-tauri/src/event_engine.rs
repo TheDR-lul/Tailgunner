@@ -1,5 +1,5 @@
 /// Event Engine
-/// Детектор событий из состояния игры
+/// Detect events from game state
 
 use crate::pattern_engine::GameEvent;
 use crate::wt_telemetry::GameState;

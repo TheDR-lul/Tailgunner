@@ -1,5 +1,5 @@
-/// Динамические триггеры
-/// Автоматическая адаптация под конкретную технику на основе WT Vehicles API
+/// Dynamic triggers
+/// Automatic adaptation for specific vehicle based on WT Vehicles API
 
 use crate::wt_telemetry::GameState;
 use crate::wt_vehicles_api::{WTVehiclesAPI, VehicleLimits, DEFAULT_LIMITS};

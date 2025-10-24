@@ -1,13 +1,13 @@
 /// War Thunder Telemetry Reader
-/// Читает данные с localhost:8111 (официальный API WT)
-/// EAC-Safe: только HTTP-запросы, никакой инъекции в память
+/// Reads data from localhost:8111 (official WT API)
+/// EAC-Safe: only HTTP requests, no memory injection
 
 use anyhow::{Result, Context};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const WT_TELEMETRY_URL: &str = "http://127.0.0.1:8111";
-const POLL_INTERVAL_MS: u64 = 100; // 10 раз в секунду
+const POLL_INTERVAL_MS: u64 = 100; // 10 times per second
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
@@ -107,7 +107,7 @@ impl WTTelemetryReader {
         }
     }
 
-    /// Проверка доступности War Thunder
+    /// Check War Thunder availability
     #[allow(dead_code)]
     pub async fn is_game_running(&self) -> bool {
         let url = format!("{}/state", WT_TELEMETRY_URL);
@@ -118,9 +118,28 @@ impl WTTelemetryReader {
             .is_ok()
     }
 
-    /// Получение текущего состояния игры
-    /// /state содержит ВСЕ данные (type, valid, indicators)
+    /// Get current game state
+    /// WT API is split into 2 endpoints:
+    /// - /indicators → type, army, valid (vehicle information)
+    /// - /state → flight indicators (IAS, AoA, G-load, etc.)
     pub async fn get_state(&mut self) -> Result<GameState> {
+        // 1. Request /indicators for vehicle type
+        let indicators_url = format!("{}/indicators", WT_TELEMETRY_URL);
+        let indicators_response = self.client
+            .get(&indicators_url)
+            .send()
+            .await
+            .context("Failed to connect to War Thunder /indicators")?;
+
+        let indicators_json: serde_json::Value = indicators_response
+            .json()
+            .await
+            .context("Failed to parse WT /indicators")?;
+
+        log::debug!("[WT API] /indicators response:\n{}", 
+            serde_json::to_string_pretty(&indicators_json).unwrap_or_else(|_| "Failed to serialize".to_string()));
+
+        // 2. Request /state for flight indicators
         let state_url = format!("{}/state", WT_TELEMETRY_URL);
         let state_response = self.client
             .get(&state_url)
@@ -133,16 +152,14 @@ impl WTTelemetryReader {
             .await
             .context("Failed to parse WT /state")?;
 
-        log::trace!("[WT API] /state response: {}", serde_json::to_string_pretty(&state_json).unwrap_or_default());
-
-        // Парсим все данные из ОДНОГО эндпоинта
-        let state = self.parse_state(state_json)?;
+        // 3. Combine data from both endpoints
+        let state = self.parse_combined_state(indicators_json, state_json)?;
         self.last_state = Some(state.clone());
         
         Ok(state)
     }
 
-    /// Получение индикаторов
+    /// Get indicators
     #[allow(dead_code)]
     pub async fn get_indicators(&self) -> Result<Indicators> {
         let url = format!("{}/indicators", WT_TELEMETRY_URL);
@@ -161,14 +178,14 @@ impl WTTelemetryReader {
         Ok(indicators)
     }
 
-    /// Парсинг сырых данных WT в структуру
-    /// /state содержит ВСЕ данные в одном JSON
-    fn parse_state(&self, json: serde_json::Value) -> Result<GameState> {
-        let valid = json.get("valid").and_then(|v| v.as_bool()).unwrap_or(false);
+    /// Parse combined data from /indicators and /state
+    fn parse_combined_state(&self, indicators_json: serde_json::Value, state_json: serde_json::Value) -> Result<GameState> {
+        // 1. Parse type and army from /indicators
+        let valid = indicators_json.get("valid").and_then(|v| v.as_bool()).unwrap_or(false);
+        let type_str = indicators_json.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let army_str = indicators_json.get("army").and_then(|v| v.as_str()).unwrap_or("unknown");
         
-        let type_str = json.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
-        
-        log::info!("[WT Parser] RAW type from API: '{}', valid: {}", type_str, valid);
+        log::info!("[WT Parser] From /indicators: type='{}', army='{}', valid={}", type_str, army_str, valid);
         
         // Extract vehicle name from type string
         // Examples:
@@ -176,10 +193,85 @@ impl WTTelemetryReader {
         // - "rafale_c_f3" -> "rafale_c_f3"
         let vehicle_name = if type_str.contains('/') {
             let name = type_str.split('/').last().unwrap_or(type_str).to_string();
-            log::info!("[WT Parser] Extracted vehicle name from path: '{}'", name);
             name
         } else {
-            log::info!("[WT Parser] Using type string as vehicle name: '{}'", type_str);
+            type_str.to_string()
+        };
+        
+        // Detect vehicle type from army and type string
+        let type_ = match army_str {
+            "air" => VehicleType::Aircraft,
+            "ground" => VehicleType::Tank,
+            "ship" => VehicleType::Ship,
+            "helicopter" => VehicleType::Helicopter,
+            _ => {
+                // Fallback: try to detect from type_str
+                if type_str.contains("tankModels") || type_str.contains("tank_") {
+                    VehicleType::Tank
+                } else if type_str.contains("ship") || type_str.contains("boat") {
+                    VehicleType::Ship
+                } else if type_str.contains("helicopter") || type_str.contains("heli_") {
+                    VehicleType::Helicopter
+                } else if !type_str.is_empty() && type_str != "unknown" {
+                    VehicleType::Aircraft
+                } else {
+                    VehicleType::Unknown
+                }
+            }
+        };
+
+        let state = state_json.get("state")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        // 2. Parse indicators from /state
+        let indicators = self.parse_indicators(state_json);
+
+        // Reduced log spam - only log on vehicle change
+        use std::sync::Mutex;
+        use std::sync::OnceLock;
+        static LAST_VEHICLE: OnceLock<Mutex<String>> = OnceLock::new();
+        
+        let last_vehicle = LAST_VEHICLE.get_or_init(|| Mutex::new(String::new()));
+        let mut last = last_vehicle.lock().unwrap();
+        
+        if *last != vehicle_name {
+            log::error!("[WT Parser] ✅ Vehicle detected: '{}' ({:?}, army={})", 
+                vehicle_name, type_, army_str);
+            *last = vehicle_name.clone();
+        }
+
+        Ok(GameState {
+            valid,
+            type_,
+            vehicle_name,
+            indicators,
+            state,
+        })
+    }
+
+    /// Parse raw WT data to struct (LEGACY - used for tests)
+    /// /state contains ALL data in one JSON
+    #[allow(dead_code)]
+    fn parse_state(&self, json: serde_json::Value) -> Result<GameState> {
+        let valid = json.get("valid").and_then(|v| v.as_bool()).unwrap_or(false);
+        
+        let type_str = json.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
+        
+        // Use error! for visibility (temporary debug)
+        log::error!("[WT Parser DEBUG] 📋 Extracted type_str: '{}', valid: {}", type_str, valid);
+        
+        // Extract vehicle name from type string
+        // Examples:
+        // - "tankModels/sw_cv_90105_tml" -> "sw_cv_90105_tml"
+        // - "rafale_c_f3" -> "rafale_c_f3"
+        let vehicle_name = if type_str.contains('/') {
+            let name = type_str.split('/').last().unwrap_or(type_str).to_string();
+            log::error!("[WT Parser DEBUG] ✂️ Extracted from path: '{}'", name);
+            name
+        } else {
+            log::error!("[WT Parser DEBUG] ➡️ Using as-is: '{}'", type_str);
             type_str.to_string()
         };
         
@@ -202,10 +294,11 @@ impl WTTelemetryReader {
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default();
 
-        // Парсим indicators из ТОГО ЖЕ JSON (все данные в /state)
+        // Parse indicators from SAME JSON (all data in /state)
         let indicators = self.parse_indicators(json.clone());
 
-        log::info!("[WT Parser] ✅ Final Vehicle: '{}', Type: {:?}, Speed: {:.0} km/h", 
+        // Final debug log - use error! for visibility
+        log::error!("[WT Parser DEBUG] ✅ FINAL => Vehicle: '{}', Type: {:?}, Speed: {:.0} km/h", 
             vehicle_name, type_, indicators.speed);
 
         Ok(GameState {
@@ -217,8 +310,8 @@ impl WTTelemetryReader {
         })
     }
 
-    /// Парсинг indicators из JSON
-    /// Названия полей в WT API содержат запятые, пробелы и единицы измерения!
+    /// Parse indicators from JSON
+    /// WT API field names contain commas, spaces, and units!
     fn parse_indicators(&self, json: serde_json::Value) -> Indicators {
         let get_f32 = |key: &str| json.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
         let get_i32 = |key: &str| json.get(key).and_then(|v| v.as_i64()).unwrap_or(0) as i32;

@@ -38,15 +38,16 @@ function App() {
   }, []);
 
   const handleEditPattern = (pattern?: Pattern) => {
-    setEditingPattern(pattern);
+    // Explicitly set to undefined when creating new pattern, or to the pattern when editing
+    setEditingPattern(pattern || undefined);
     setIsEditorOpen(true);
   };
 
-  const handleSavePattern = (name: string, nodes: any[], edges: any[]) => {
+  const handleSavePattern = async (name: string, nodes: any[], edges: any[]) => {
     if (editingPattern) {
-      updatePattern(editingPattern.id, { name, nodes, edges });
+      await updatePattern(editingPattern.id, { name, nodes, edges });
     } else {
-      addPattern(name, nodes, edges);
+      await addPattern(name, nodes, edges);
     }
   };
 

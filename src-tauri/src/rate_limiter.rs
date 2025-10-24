@@ -1,5 +1,5 @@
 /// Rate Limiter
-/// Ограничение частоты отправки команд на устройства (QoS)
+/// Limit command rate to devices (QoS)
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};

@@ -1,14 +1,14 @@
-/// Event Triggers - Система триггеров для сложных условий
-/// Позволяет создавать кастомные события на основе значений индикаторов
+/// Event Triggers - System for complex trigger conditions
+/// Allows creating custom events based on indicator values
 
 use crate::wt_telemetry::GameState;
 use crate::pattern_engine::{GameEvent, VibrationPattern};
 use serde::{Deserialize, Serialize};
 
-/// Условие триггера
+/// Trigger condition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TriggerCondition {
-    // Сравнение значений
+    // Value comparison
     SpeedAbove(f32),
     SpeedBelow(f32),
     AltitudeAbove(f32),
@@ -16,31 +16,30 @@ pub enum TriggerCondition {
     RPMAbove(f32),
     TempAbove(f32),
     
-    // G-перегрузки
+    // G-load
     GLoadAbove(f32),
     GLoadBelow(f32),
     
-    // Угол атаки
+    // Angle of Attack
     AOAAbove(f32),
     AOABelow(f32),
     
-    // Скорость (разные типы)
+    // Speed (different types)
     IASAbove(f32),
     TASAbove(f32),
     MachAbove(f32),
     
-    // Топливо
-    FuelBelow(f32),        // процент
-    FuelTimeBelow(f32),    // минуты
+    // Fuel/Ammo
+    FuelBelow(f32),        // percentage
+    FuelTimeBelow(f32),    // minutes
     
-    // Боезапас
-    AmmoBelow(f32),        // процент
+    AmmoBelow(f32),        // percentage
     
-    // Повреждения
+    // Damage
     EngineDamageAbove(f32),
     ControlsDamageAbove(f32),
     
-    // Логические
+    // Logical
     And(Box<TriggerCondition>, Box<TriggerCondition>),
     Or(Box<TriggerCondition>, Box<TriggerCondition>),
     Not(Box<TriggerCondition>),
@@ -257,11 +256,26 @@ impl TriggerManager {
         let mut events = Vec::new();
         let now = std::time::Instant::now();
         
-        log::trace!("[Triggers] Checking {} triggers", self.triggers.len());
+        // Log current game state for debugging
+        static mut LAST_LOG_TIME: Option<std::time::Instant> = None;
+        let should_log = unsafe {
+            if let Some(last) = LAST_LOG_TIME {
+                now.duration_since(last).as_secs() >= 2 // Log every 2 seconds
+            } else {
+                true
+            }
+        };
+        
+        if should_log {
+            log::error!("[Triggers DEBUG] 🎮 Current state: Speed={:.0}, G-load={:.1}, Alt={:.0}", 
+                state.indicators.speed, state.indicators.g_load, state.indicators.altitude);
+            log::error!("[Triggers DEBUG] 📋 Active triggers: {}", 
+                self.triggers.iter().filter(|t| t.enabled).count());
+            unsafe { LAST_LOG_TIME = Some(now); }
+        }
         
         for trigger in &self.triggers {
             if !trigger.enabled {
-                log::trace!("[Triggers] Skipping disabled trigger: {}", trigger.name);
                 continue;
             }
             
@@ -269,17 +283,21 @@ impl TriggerManager {
             if let Some(last_time) = self.last_triggered.get(&trigger.id) {
                 let elapsed = now.duration_since(*last_time).as_millis() as u64;
                 if elapsed < trigger.cooldown_ms {
-                    log::trace!("[Triggers] {} on cooldown ({}/{}ms)", trigger.name, elapsed, trigger.cooldown_ms);
                     continue;
                 }
             }
             
             // Проверка условия
             let result = self.evaluate_condition(&trigger.condition, state);
-            log::debug!("[Triggers] {} - Condition: {:?}, Result: {}", trigger.name, trigger.condition, result);
+            
+            // Debug G-load triggers specifically
+            if matches!(trigger.condition, TriggerCondition::GLoadAbove(_) | TriggerCondition::GLoadBelow(_)) {
+                log::error!("[Triggers DEBUG] 🎯 G-load trigger '{}': {:?} => {} (current G: {:.2})", 
+                    trigger.name, trigger.condition, result, state.indicators.g_load);
+            }
             
             if result {
-                log::info!("[Triggers] ✅ TRIGGERED: {} -> {:?}", trigger.name, trigger.event);
+                log::error!("[Triggers DEBUG] ✅ TRIGGERED: '{}' -> {:?}", trigger.name, trigger.event);
                 // Возвращаем событие И паттерн (если есть)
                 events.push((trigger.event.clone(), trigger.pattern.clone()));
                 self.last_triggered.insert(trigger.id.clone(), now);
@@ -287,7 +305,7 @@ impl TriggerManager {
         }
         
         if !events.is_empty() {
-            log::info!("[Triggers] Total events triggered: {}", events.len());
+            log::error!("[Triggers DEBUG] 🎊 Total events triggered: {}", events.len());
         }
         
         events
@@ -369,7 +387,10 @@ impl TriggerManager {
     
     /// Добавление кастомного триггера
     pub fn add_trigger(&mut self, trigger: EventTrigger) {
+        log::error!("[Triggers] ➕ Adding trigger: '{}' (enabled: {}, condition: {:?})", 
+            trigger.name, trigger.enabled, trigger.condition);
         self.triggers.push(trigger);
+        log::error!("[Triggers] 📊 Total triggers now: {}", self.triggers.len());
     }
     
     /// Получение всех триггеров
