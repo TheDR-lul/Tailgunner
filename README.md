@@ -40,11 +40,17 @@ Node-based editor (similar to Blender/Unreal) for creating complex haptic patter
 - **🔄 Rotation** - For rotary devices (speed & direction)
 - **📡 Output** - Send to devices
 
-### 🎯 **Smart Profiles**
+### 🎯 **Smart Profiles & Dynamic Triggers**
 Automatic profile switching based on vehicle type:
 - **🛡️ Tank RB** - Immersive realism with engine rumble, hit feedback
 - **✈️ Aircraft** - G-force simulation, overspeed warnings, stall alerts
 - **🎮 Light Background** - Subtle feedback for all vehicle types
+
+**Advanced Trigger System:**
+- **Custom Curve Editor** - Draw your own vibration intensity curves
+- **Per-Trigger Settings** - Adjust cooldown, duration, and intensity individually
+- **Built-in Triggers** - Pre-configured for fuel warnings, engine damage, ammo alerts
+- **Profile Filtering** - Only shows events with active triggers for clarity
 
 ### 🔧 **Advanced Device Support**
 - **Buttplug.io Integration** - Universal device support via Intiface Central
@@ -59,6 +65,21 @@ Automatic profile switching based on vehicle type:
 - 🇬🇧 English (primary)
 - 🇷🇺 Russian
 - Easy to add more languages
+
+### 🎨 **Enhanced UI/UX**
+- **Interactive Curve Editor** - Draw custom vibration patterns with mouse
+  - Add/remove points with double-click
+  - Drag points to adjust intensity over time
+  - Real-time visual feedback
+  - Canvas-based rendering for smooth curves
+- **Smart Number Inputs** - Keyboard-friendly value editing
+  - Type values directly instead of only using arrows
+  - Backspace/Delete support
+  - Enter to confirm, Escape to cancel
+  - Auto-formatting with units (seconds, etc.)
+- **Filtered Views** - Cleaner interface
+  - Only shows triggers with configured events
+  - Hides empty profiles for clarity
 
 ---
 
@@ -112,9 +133,15 @@ npm run tauri build
 
 ### 4. **Configure Triggers**
 - Go to **Game Events** tab
-- Expand any profile (Tank RB, Aircraft, etc.)
-- Enable/disable triggers per event
-- Adjust cooldowns and thresholds
+- **All Triggers** - View and configure all available triggers
+  - Enable/disable individual triggers
+  - Adjust cooldown (seconds between activations)
+  - Customize vibration duration
+  - Draw custom intensity curves with the interactive editor
+- **Active Profiles** - Configure profile-specific event mappings
+  - Only shows events with configured triggers
+  - Per-profile customization for different vehicle types
+  - Real-time preview of trigger settings
 
 ---
 
@@ -133,8 +160,14 @@ npm run tauri build
 The engine that powers Tailgunner:
 - **Telemetry Reader** - Polls WT API at 100ms intervals
 - **Event Engine** - Detects game events (hits, damage, state changes)
-- **Trigger Manager** - Evaluates custom conditions
+- **Trigger Manager** - Evaluates custom conditions with persistent settings
+  - Custom curve point storage and serialization
+  - Per-trigger cooldown and pattern management
+  - Real-time condition evaluation with state history
 - **Profile Manager** - Switches haptic profiles based on vehicle
+- **Pattern Engine** - Converts curves to ADSR envelopes
+  - Custom curve-to-pattern conversion
+  - ADSR (Attack, Decay, Sustain, Release) generation
 - **Rate Limiter** - QoS to prevent device spam
 - **Device Manager** - Communicates with Buttplug.io
 
@@ -172,6 +205,15 @@ Visual node-based patterns are converted to Rust `EventTrigger` structures:
 [RPM Sensor] → [Condition: > 2000] → [Rotate: Continuous] → [Output]
 ```
 *Rotary device spins proportionally to engine RPM*
+
+### **Example 5: Custom Vibration Curve for Low Fuel**
+```
+Trigger: Low Fuel (<10%)
+Cooldown: 30.0s
+Duration: 2.5s
+Curve: Custom drawn curve (gentle ramp up → sustained pulse → fade out)
+```
+*Creates a unique sensation using the interactive curve editor*
 
 ---
 
@@ -269,17 +311,22 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## 🚀 Roadmap
 
-### **v0.2.0** *(Current)*
+### **v0.7.0** *(Current)*
 - ✅ 50+ game parameters
 - ✅ Multi-condition nodes
 - ✅ Linear & Rotate devices
 - ✅ Full localization (EN/RU)
+- ✅ Interactive vibration curve editor
+- ✅ Per-trigger cooldown/duration/intensity settings
+- ✅ Persistent trigger configuration
+- ✅ Profile filtering (shows only events with triggers)
+- ✅ Editable number inputs with keyboard support
 
-### **v0.3.0** *(Planned)*
+### **v0.8.0** *(Planned)*
 - 🔄 Lovense direct API support
 - 🔄 Community pattern library
-- 🔄 AI pattern generator
-- 🔄 VR headset integration
+- 🔄 Enhanced curve editor with presets
+- 🔄 Trigger import/export functionality
 
 ### **v1.0.0** *(Future)*
 - 🔮 Multi-game support (DCS, IL-2, etc.)
