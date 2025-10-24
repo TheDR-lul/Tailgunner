@@ -322,8 +322,7 @@ For commercial licensing inquiries, please contact the maintainers.
 
 ## 💬 Community
 
-- **Discord**: [Join our server](#) *(coming soon)*
-- **Reddit**: [r/Tailgunner](#) *(coming soon)*
+- **Reddit**:*(coming soon)*
 - **Pattern Library**: [Share your patterns](#) *(coming soon)*
 
 ---
