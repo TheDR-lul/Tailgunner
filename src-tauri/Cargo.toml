@@ -1,6 +1,6 @@
 [package]
 name = "butt_thunder"
-version = "0.1.0"
+version = "0.7.0"
 description = "Haptic feedback system for War Thunder via Buttplug.io"
 authors = ["Tailgunner Contributors"]
 license = "CC-BY-NC-SA-4.0"
