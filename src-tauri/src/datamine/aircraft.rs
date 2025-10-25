@@ -50,22 +50,52 @@ fn parse_aircraft_file(path: &PathBuf) -> Result<AircraftLimits> {
     
     
     // Extract values with fallbacks
-    // VNE: Try WingPlaneSweep0 (F-14), then WingPlane (JAS39), then VneControl, then root Vne
-    let vne = json.get("Aerodynamics")
-        .and_then(|a| a.get("WingPlaneSweep0"))
-        .and_then(|w| w.get("Strength"))
-        .and_then(|s| s.get("VNE"))
-        .and_then(|v| v.as_f64())
-        .or_else(|| {
-            json.get("Aerodynamics")
-                .and_then(|a| a.get("WingPlane"))
+    // VNE: Try WingPlaneSweep* (F-14 has 0/1/2), then WingPlane (JAS39), then VneControl
+    // For swept wing aircraft, collect all VNE values and use min/max as range
+    let mut vne_values: Vec<f32> = Vec::new();
+    
+    // Check all WingPlaneSweep positions (0, 1, 2, ...)
+    if let Some(aero) = json.get("Aerodynamics").and_then(|a| a.as_object()) {
+        for i in 0..10 {  // Check up to 10 positions
+            let key = format!("WingPlaneSweep{}", i);
+            if let Some(vne) = aero.get(&key)
                 .and_then(|w| w.get("Strength"))
                 .and_then(|s| s.get("VNE"))
-                .and_then(|v| v.as_f64())
-        })
-        .or_else(|| json.get("VneControl").and_then(|v| v.as_f64()))
-        .or_else(|| json.get("Vne").and_then(|v| v.as_f64()))
-        .unwrap_or(800.0) as f32;
+                .and_then(|v| v.as_f64()) {
+                vne_values.push(vne as f32);
+            }
+        }
+    }
+    
+    let (vne, vne_kmh_max) = if !vne_values.is_empty() {
+        // Found swept wing VNE values
+        let min_vne = vne_values.iter().copied().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max_vne = vne_values.iter().copied().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        
+        if (max_vne - min_vne).abs() > 10.0 {
+            log::info!("[Aircraft] {} - VNE range (swept wing): {} - {} km/h", identifier, min_vne, max_vne);
+            (min_vne, Some(max_vne))
+        } else {
+            log::info!("[Aircraft] {} - VNE single value: {} km/h", identifier, min_vne);
+            (min_vne, None)
+        }
+    } else {
+        // Fallback to standard paths
+        let vne_val = json.get("Aerodynamics")
+            .and_then(|a| a.get("WingPlane"))
+            .and_then(|w| w.get("Strength"))
+            .and_then(|s| s.get("VNE"))
+            .or_else(|| json.get("VneControl"))
+            .or_else(|| json.get("Vne"));
+        
+        if let Some(val) = vne_val.and_then(|v| v.as_f64()) {
+            log::info!("[Aircraft] {} - VNE single value: {} km/h", identifier, val);
+            (val as f32, None)
+        } else {
+            log::warn!("[Aircraft] {} - VNE not found, using fallback 800 km/h", identifier);
+            (800.0, None)
+        }
+    };
     
     let vne_mach = json.get("Aerodynamics")
         .and_then(|a| a.get("WingPlaneSweep0"))
@@ -196,12 +226,25 @@ fn parse_aircraft_file(path: &PathBuf) -> Result<AircraftLimits> {
         .and_then(|v| v.as_f64())
         .map(|v| v as f32);
     
-    let flaps_max_speed_kmh = json.get("Mass")
+    // Flap speed limits - ALL positions (L/T/C/...)
+    // Multiple values for different flap positions
+    // Can check current position via telemetry (localhost:8111)
+    let flaps_speeds_kmh: Vec<f32> = json.get("Mass")
         .and_then(|m| m.get("FlapsDestructionIndSpeedP"))
         .and_then(|arr| arr.as_array())
-        .and_then(|arr| arr.first())  // Take first flap position limit
-        .and_then(|v| v.as_f64())
-        .map(|v| v as f32);
+        .map(|arr| {
+            let mut speeds: Vec<f32> = arr.iter()
+                .filter_map(|v| v.as_f64())
+                .map(|v| v as f32)
+                .filter(|&v| v >= 50.0)  // Filter out junk values (0, 1, etc)
+                .collect();
+            
+            // Remove duplicates and sort
+            speeds.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            speeds.dedup();
+            speeds
+        })
+        .unwrap_or_default();
     
     // Engine data (optional)
     let max_rpm = json.get("Engine0")
@@ -223,11 +266,12 @@ fn parse_aircraft_file(path: &PathBuf) -> Result<AircraftLimits> {
         display_name: identifier.replace('_', " ").replace('-', " "),
         vne_kmh: vne,
         vne_mach,
+        vne_kmh_max,  // Range for swept wing aircraft
         max_speed_ground,
         stall_speed,
         flutter_speed,
         gear_max_speed_kmh,
-        flaps_max_speed_kmh,
+        flaps_speeds_kmh,  // All flap positions
         mass_kg,
         wing_overload_pos_n: wing_pos_n_opt,  // Option<f32> - None if not found
         wing_overload_neg_n: wing_neg_n_opt,  // Option<f32> - None if not found
@@ -236,6 +280,7 @@ fn parse_aircraft_file(path: &PathBuf) -> Result<AircraftLimits> {
         max_rpm,
         horse_power,
         vehicle_type,
+        data_source: "datamine".to_string(),  // Wiki data will be fetched on-demand
         last_updated: chrono::Utc::now().to_rfc3339(),
     })
 }

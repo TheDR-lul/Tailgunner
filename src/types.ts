@@ -41,11 +41,12 @@ export interface AircraftLimits {
   display_name: string;
   vne_kmh: number;
   vne_mach?: number;
+  vne_kmh_max?: number;  // Max Vne for swept wing aircraft (range: vne_kmh - vne_kmh_max)
   max_speed_ground: number;
   stall_speed: number;
   flutter_speed?: number;
   gear_max_speed_kmh?: number;
-  flaps_max_speed_kmh?: number;
+  flaps_speeds_kmh: number[];  // All flap positions [L, T, C, ...] - can be empty
   mass_kg: number;
   wing_overload_pos_n?: number; // Optional - may be null/undefined if data not available
   wing_overload_neg_n?: number; // Optional - may be null/undefined if data not available
@@ -54,6 +55,7 @@ export interface AircraftLimits {
   max_rpm?: number;
   horse_power?: number;
   vehicle_type: string;
+  data_source: string; // "datamine", "wiki", "datamine+wiki"
   last_updated: string;
 }
 

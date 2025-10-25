@@ -149,10 +149,10 @@ export function Dashboard() {
       
       setIsParsingDb(true);
       if ((window as any).debugLog) {
-        (window as any).debugLog('info', `🔄 Parsing from: ${selectedPath} (Wiki: ${enableWikiScraping ? 'ON' : 'OFF'})`);
+        (window as any).debugLog('info', `🔄 Parsing from: ${selectedPath}`);
       }
       
-      const stats = await api.datamineParse(selectedPath, enableWikiScraping);
+      const stats = await api.datamineParse(selectedPath);
       
       if ((window as any).debugLog) {
         (window as any).debugLog('success', 

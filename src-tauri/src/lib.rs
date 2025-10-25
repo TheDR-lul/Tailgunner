@@ -339,55 +339,120 @@ async fn get_vehicle_info(state: tauri::State<'_, AppState>) -> Result<Option<da
     log::info!("[Vehicle Info] ✅ Found vehicle data!");
     
     // 🌐 LAZY WIKI LOADING - fetch missing data on-demand
-    if let datamine::VehicleLimits::Ground(ref mut ground) = vehicle_data {
-        let needs_wiki = ground.max_speed_kmh.is_none() || ground.forward_gears.is_none();
-        
-        if needs_wiki {
-            log::info!("[Vehicle Info] 🌐 Fetching missing data from Wiki for '{}'...", identifier);
+    match vehicle_data {
+        // Ground vehicles - fetch speed and gears
+        datamine::VehicleLimits::Ground(ref mut ground) => {
+            let needs_wiki = ground.max_speed_kmh.is_none() || ground.forward_gears.is_none();
             
-            match datamine::wiki_scraper::scrape_ground_vehicle(&ground.identifier).await {
-                Ok(wiki_data) => {
-                    let mut updated = false;
-                    
-                    // Update missing fields
-                    if ground.max_speed_kmh.is_none() && wiki_data.max_speed_kmh.is_some() {
-                        ground.max_speed_kmh = wiki_data.max_speed_kmh;
-                        updated = true;
-                    }
-                    if ground.max_reverse_speed_kmh.is_none() && wiki_data.max_reverse_speed_kmh.is_some() {
-                        ground.max_reverse_speed_kmh = wiki_data.max_reverse_speed_kmh;
-                        updated = true;
-                    }
-                    if ground.forward_gears.is_none() && wiki_data.forward_gears.is_some() {
-                        ground.forward_gears = wiki_data.forward_gears;
-                        updated = true;
-                    }
-                    if ground.reverse_gears.is_none() && wiki_data.reverse_gears.is_some() {
-                        ground.reverse_gears = wiki_data.reverse_gears;
-                        updated = true;
-                    }
-                    
-                    if updated {
-                        ground.data_source = "datamine+wiki".to_string();
+            if needs_wiki {
+                log::info!("[Vehicle Info] 🌐 Fetching missing ground data from Wiki for '{}'...", identifier);
+                
+                match datamine::wiki_scraper::scrape_ground_vehicle(&ground.identifier).await {
+                    Ok(wiki_data) => {
+                        let mut updated = false;
                         
-                        // Save to database for next time
-                        if let Err(e) = db.update_ground_wiki_data(
-                            &ground.identifier,
-                            ground.max_speed_kmh,
-                            ground.max_reverse_speed_kmh,
-                            ground.forward_gears,
-                            ground.reverse_gears,
-                        ) {
-                            log::warn!("[Vehicle Info] ⚠️ Failed to save Wiki data: {}", e);
-                        } else {
-                            log::info!("[Vehicle Info] ✅ Wiki data cached for future use");
+                        // Update missing fields
+                        if ground.max_speed_kmh.is_none() && wiki_data.max_speed_kmh.is_some() {
+                            ground.max_speed_kmh = wiki_data.max_speed_kmh;
+                            updated = true;
+                        }
+                        if ground.max_reverse_speed_kmh.is_none() && wiki_data.max_reverse_speed_kmh.is_some() {
+                            ground.max_reverse_speed_kmh = wiki_data.max_reverse_speed_kmh;
+                            updated = true;
+                        }
+                        if ground.forward_gears.is_none() && wiki_data.forward_gears.is_some() {
+                            ground.forward_gears = wiki_data.forward_gears;
+                            updated = true;
+                        }
+                        if ground.reverse_gears.is_none() && wiki_data.reverse_gears.is_some() {
+                            ground.reverse_gears = wiki_data.reverse_gears;
+                            updated = true;
+                        }
+                        
+                        if updated {
+                            ground.data_source = "datamine+wiki".to_string();
+                            
+                            // Save to database for next time
+                            if let Err(e) = db.update_ground_wiki_data(
+                                &ground.identifier,
+                                ground.max_speed_kmh,
+                                ground.max_reverse_speed_kmh,
+                                ground.forward_gears,
+                                ground.reverse_gears,
+                            ) {
+                                log::warn!("[Vehicle Info] ⚠️ Failed to save Wiki data: {}", e);
+                            } else {
+                                log::info!("[Vehicle Info] ✅ Wiki data cached for future use");
+                            }
                         }
                     }
-                }
-                Err(e) => {
-                    log::warn!("[Vehicle Info] ⚠️ Wiki scraping failed: {}", e);
+                    Err(e) => {
+                        log::warn!("[Vehicle Info] ⚠️ Wiki scraping failed: {}", e);
+                    }
                 }
             }
+        },
+        
+        // Aircraft - fetch G-load limits and speed limits
+        datamine::VehicleLimits::Aircraft(ref mut aircraft) => {
+            let needs_wiki = aircraft.max_positive_g.is_none() 
+                || aircraft.max_negative_g.is_none()
+                || aircraft.flaps_speeds_kmh.is_empty()
+                || aircraft.gear_max_speed_kmh.is_none() || aircraft.gear_max_speed_kmh == Some(0.0);
+            
+            if needs_wiki {
+                log::info!("[Vehicle Info] 🌐 Fetching missing aircraft G-load from Wiki for '{}'...", identifier);
+                
+                match datamine::wiki_scraper::scrape_aircraft_vehicle(&aircraft.identifier).await {
+                    Ok(wiki_data) => {
+                        let mut updated = false;
+                        
+                        // Update missing G-load fields
+                        if aircraft.max_positive_g.is_none() && wiki_data.max_positive_g.is_some() {
+                            aircraft.max_positive_g = wiki_data.max_positive_g;
+                            updated = true;
+                            log::info!("[Vehicle Info] ✅ Wiki G-load: +{}G / {}G",
+                                wiki_data.max_positive_g.unwrap(),
+                                wiki_data.max_negative_g.unwrap_or(0.0)
+                            );
+                        }
+                        if aircraft.max_negative_g.is_none() && wiki_data.max_negative_g.is_some() {
+                            aircraft.max_negative_g = wiki_data.max_negative_g;
+                            updated = true;
+                        }
+                        
+                        // Update missing speed limits
+                        if aircraft.flaps_speeds_kmh.is_empty() && !wiki_data.flaps_speeds_kmh.is_empty() {
+                            aircraft.flaps_speeds_kmh = wiki_data.flaps_speeds_kmh.clone();
+                            updated = true;
+                            log::info!("[Vehicle Info] ✅ Wiki Flap Speeds: {:?} km/h",
+                                wiki_data.flaps_speeds_kmh
+                            );
+                        }
+                        if (aircraft.gear_max_speed_kmh.is_none() || aircraft.gear_max_speed_kmh == Some(0.0))
+                            && wiki_data.gear_max_speed_kmh.is_some() {
+                            aircraft.gear_max_speed_kmh = wiki_data.gear_max_speed_kmh;
+                            updated = true;
+                            log::info!("[Vehicle Info] ✅ Wiki Gear Speed: {} km/h",
+                                wiki_data.gear_max_speed_kmh.unwrap()
+                            );
+                        }
+                        
+                        if updated {
+                            aircraft.data_source = "datamine+wiki".to_string();
+                            // TODO: Save to database (need to add update_aircraft_wiki_data function)
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("[Vehicle Info] ⚠️ Wiki scraping failed: {}", e);
+                    }
+                }
+            }
+        },
+        
+        // Ships - no Wiki scraping yet
+        datamine::VehicleLimits::Ship(_) => {
+            // No Wiki scraping for ships yet
         }
     }
     

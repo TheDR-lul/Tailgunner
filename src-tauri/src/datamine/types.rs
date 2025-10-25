@@ -17,13 +17,14 @@ pub struct AircraftLimits {
     pub display_name: String,
     
     // Speed limits (km/h)
-    pub vne_kmh: f32,              // Never Exceed Speed
+    pub vne_kmh: f32,              // Never Exceed Speed (or min for swept wing range)
     pub vne_mach: Option<f32>,     // Max Mach number
+    pub vne_kmh_max: Option<f32>,  // Max Vne for swept wing aircraft (range: vne_kmh - vne_kmh_max)
     pub max_speed_ground: f32,     // Max speed at ground level
     pub stall_speed: f32,          // Stall speed
     pub flutter_speed: Option<f32>, // Flutter warning speed
     pub gear_max_speed_kmh: Option<f32>, // Gear retraction/extension speed limit
-    pub flaps_max_speed_kmh: Option<f32>, // Flaps extension speed limit
+    pub flaps_speeds_kmh: Vec<f32>, // Flaps speed limits for different positions [L, T, C, ...]
     
     // G-load limits
     pub mass_kg: f32,                     // Takeoff mass
@@ -38,6 +39,7 @@ pub struct AircraftLimits {
     
     // Metadata
     pub vehicle_type: String,      // fighter, bomber, attacker, etc
+    pub data_source: String,       // "datamine", "wiki", "datamine+wiki"
     pub last_updated: String,
 }
 

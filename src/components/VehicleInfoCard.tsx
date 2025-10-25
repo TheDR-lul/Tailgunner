@@ -128,29 +128,48 @@ export const VehicleInfoCard: React.FC = () => {
     
     return (
       <div className="card" style={{ maxWidth: '480px' }}>
-        <div className="card-header" style={{ paddingBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <h2 style={{ margin: 0, fontSize: '15px' }}>{data.display_name}</h2>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ 
+                fontSize: '20px', 
+                lineHeight: 1,
+                filter: 'drop-shadow(0 2px 4px rgba(99, 102, 241, 0.3))'
+              }}>
+                ✈️
+              </div>
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{data.display_name}</h2>
+            </div>
             <span style={{ 
               fontSize: '9px', 
-              padding: '2px 6px', 
-              background: 'rgba(99, 102, 241, 0.15)', 
-              borderRadius: '3px',
-              color: 'var(--primary)',
+              padding: '3px 7px', 
+              background: 'rgba(99, 102, 241, 0.12)', 
+              border: '1px solid rgba(99, 102, 241, 0.25)',
+              borderRadius: '4px',
+              color: '#818cf8',
               fontWeight: 600,
+              letterSpacing: '0.5px',
               lineHeight: 1
             }}>
-              ✈️ AIRCRAFT
+              AIRCRAFT
             </span>
-          </div>
+                </div>
                 </div>
         <div className="card-content" style={{ padding: '16px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
             <StatItem 
               icon={<CircleAlert size={16} />} 
               label="Vne (Wing Rip Speed)" 
-              value={`${Math.round(data.vne_kmh)} km/h`}
-              desc="Exceeding this speed will tear wings off"
+              value={
+                data.vne_kmh_max 
+                  ? `${Math.round(data.vne_kmh)} — ${Math.round(data.vne_kmh_max)} km/h`
+                  : `${Math.round(data.vne_kmh)} km/h`
+              }
+              desc={
+                data.vne_kmh_max 
+                  ? "Swept-wing range: varies with wing sweep angle"
+                  : "Exceeding this speed will tear wings off"
+              }
               color="#ef4444"
             />
             <StatItem 
@@ -191,7 +210,7 @@ export const VehicleInfoCard: React.FC = () => {
               desc="Minimum speed to maintain flight"
               color="#06b6d4"
             />
-            {data.gear_max_speed_kmh && (
+            {data.gear_max_speed_kmh && data.gear_max_speed_kmh > 0 && (
               <StatItem 
                 icon={<Shield size={16} />} 
                 label="Gear Speed Limit (IAS)" 
@@ -200,12 +219,31 @@ export const VehicleInfoCard: React.FC = () => {
                 color="#8b5cf6"
               />
             )}
-            {data.flaps_max_speed_kmh && (
+            {data.flaps_speeds_kmh && data.flaps_speeds_kmh.length > 0 && (
               <StatItem 
                 icon={<Wind size={16} />} 
-                label="Flap Speed Limit (IAS)" 
-                value={`${Math.round(data.flaps_max_speed_kmh)} km/h`}
-                desc="Maximum speed for flaps extension"
+                label="Flap Speed Limits (IAS)" 
+                value={
+                  (() => {
+                    // Normalize to 3 positions: L / T / C
+                    const positions = ['L', 'T', 'C'];
+                    const speeds = data.flaps_speeds_kmh;
+                    
+                    if (speeds.length === 1) {
+                      return `${Math.round(speeds[0])} km/h`;
+                    } else if (speeds.length === 2) {
+                      return `${Math.round(speeds[0])} / — / ${Math.round(speeds[1])} km/h`;
+                    } else if (speeds.length >= 3) {
+                      return speeds.slice(0, 3).map(s => Math.round(s)).join(' / ') + ' km/h';
+                    }
+                    return speeds.map(s => Math.round(s)).join(' / ') + ' km/h';
+                  })()
+                }
+                desc={
+                  data.flaps_speeds_kmh.length > 1
+                    ? `Different positions: L / T / C (telemetry shows current position)`
+                    : "Maximum speed for flaps extension"
+                }
                 color="#14b8a6"
               />
             )}
@@ -218,9 +256,24 @@ export const VehicleInfoCard: React.FC = () => {
                 color="#10b981"
               />
             )}
-                </div>
               </div>
+          
+          {/* Data source indicator */}
+          {data.data_source && data.data_source !== 'datamine' && (
+            <div style={{ 
+              marginTop: '8px', 
+              padding: '4px 8px', 
+              fontSize: '9px', 
+              color: 'var(--text-muted)', 
+              background: 'rgba(20, 184, 166, 0.1)',
+              borderRadius: '3px',
+              textAlign: 'center'
+            }}>
+              🌐 Enhanced with Wiki data
             </div>
+          )}
+        </div>
+      </div>
     );
 };
 
@@ -249,27 +302,38 @@ const GroundCard: React.FC<{ data: GroundLimits }> = ({ data }) => {
                 </div>
         )}
                 </div>
-    </div>
+              </div>
   );
   
   return (
-    <div className="card" style={{ maxWidth: '420px' }}>
-      <div className="card-header" style={{ paddingBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, fontSize: '15px' }}>{data.display_name}</h2>
+    <div className="card" style={{ maxWidth: '480px' }}>
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ 
+              fontSize: '20px', 
+              lineHeight: 1,
+              filter: 'drop-shadow(0 2px 4px rgba(34, 197, 94, 0.3))'
+            }}>
+              🪖
+            </div>
+            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{data.display_name}</h2>
+          </div>
           <span style={{ 
             fontSize: '9px', 
-            padding: '2px 6px', 
-            background: 'rgba(34, 197, 94, 0.15)', 
-            borderRadius: '3px',
-            color: '#22c55e',
+            padding: '3px 7px', 
+            background: 'rgba(34, 197, 94, 0.12)', 
+            border: '1px solid rgba(34, 197, 94, 0.25)',
+            borderRadius: '4px',
+            color: '#4ade80',
             fontWeight: 600,
+            letterSpacing: '0.5px',
             lineHeight: 1
           }}>
-            🚜 {data.vehicle_type}
+            GROUND
           </span>
-              </div>
-            </div>
+        </div>
+      </div>
       <div className="card-content" style={{ padding: '8px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px' }}>
           {data.crew_count && (
@@ -391,20 +455,31 @@ const ShipCard: React.FC<{ data: ShipLimits }> = ({ data }) => {
   );
   
   return (
-    <div className="card" style={{ maxWidth: '450px' }}>
-      <div className="card-header" style={{ paddingBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, fontSize: '15px' }}>{data.display_name}</h2>
+    <div className="card" style={{ maxWidth: '480px' }}>
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ 
+              fontSize: '20px', 
+              lineHeight: 1,
+              filter: 'drop-shadow(0 2px 4px rgba(14, 165, 233, 0.3))'
+            }}>
+              ⚓
+            </div>
+            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{data.display_name}</h2>
+          </div>
           <span style={{ 
             fontSize: '9px', 
-            padding: '2px 6px', 
-            background: 'rgba(59, 130, 246, 0.15)', 
-            borderRadius: '3px',
-            color: '#3b82f6',
+            padding: '3px 7px', 
+            background: 'rgba(14, 165, 233, 0.12)', 
+            border: '1px solid rgba(14, 165, 233, 0.25)',
+            borderRadius: '4px',
+            color: '#38bdf8',
             fontWeight: 600,
+            letterSpacing: '0.5px',
             lineHeight: 1
           }}>
-            ⚓ {data.ship_class}
+            {data.ship_class}
           </span>
         </div>
       </div>

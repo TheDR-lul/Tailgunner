@@ -72,12 +72,36 @@ export function GameStatus() {
   return (
     <div className="card game-status-card">
       <div className="card-header">
-        <div>
-          <h2>{t('game_status.title') || 'War Thunder'}</h2>
-          <div className={`status-indicator ${status.connected ? 'connected' : 'disconnected'}`}>
-            <span className="status-dot">{status.connected ? '🟢' : '🔴'}</span>
-            <span className="status-text">{status.connected ? t('game_status.connected') : t('game_status.disconnected')}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ 
+              fontSize: '20px', 
+              lineHeight: 1,
+              filter: status.connected 
+                ? 'drop-shadow(0 2px 4px rgba(34, 197, 94, 0.4))' 
+                : 'drop-shadow(0 2px 4px rgba(239, 68, 68, 0.4))'
+            }}>
+              {status.connected ? '🎮' : '🎮'}
+            </div>
+            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{t('game_status.title') || 'War Thunder'}</h2>
           </div>
+          <span style={{ 
+            fontSize: '9px', 
+            padding: '3px 7px', 
+            background: status.connected ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)', 
+            border: status.connected ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)',
+            borderRadius: '4px',
+            color: status.connected ? '#4ade80' : '#f87171',
+            fontWeight: 600,
+            letterSpacing: '0.5px',
+            lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <span>{status.connected ? '●' : '●'}</span>
+            {status.connected ? t('game_status.connected') || 'CONNECTED' : t('game_status.disconnected') || 'OFFLINE'}
+          </span>
         </div>
       </div>
 

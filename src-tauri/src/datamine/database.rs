@@ -46,11 +46,12 @@ impl VehicleDatabase {
                 display_name TEXT NOT NULL,
                 vne_kmh REAL NOT NULL,
                 vne_mach REAL,
+                vne_kmh_max REAL,
                 max_speed_ground REAL NOT NULL,
                 stall_speed REAL NOT NULL,
                 flutter_speed REAL,
                 gear_max_speed_kmh REAL,
-                flaps_max_speed_kmh REAL,
+                flaps_speeds_kmh TEXT,
                 mass_kg REAL NOT NULL,
                 wing_overload_pos_n REAL,
                 wing_overload_neg_n REAL,
@@ -59,6 +60,7 @@ impl VehicleDatabase {
                 max_rpm REAL,
                 horse_power REAL,
                 vehicle_type TEXT NOT NULL,
+                data_source TEXT NOT NULL,
                 last_updated TEXT NOT NULL
             );
             
@@ -111,20 +113,25 @@ impl VehicleDatabase {
         let tx = self.conn.transaction()?;
         
         for ac in aircraft {
+            // Serialize flaps_speeds_kmh to JSON
+            let flaps_json = serde_json::to_string(&ac.flaps_speeds_kmh)
+                .unwrap_or_else(|_| "[]".to_string());
+            
             tx.execute(
                 "INSERT OR REPLACE INTO aircraft VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
                 )",
                 params![
                     ac.identifier,
                     ac.display_name,
                     ac.vne_kmh,
                     ac.vne_mach,
+                    ac.vne_kmh_max,
                     ac.max_speed_ground,
                     ac.stall_speed,
                     ac.flutter_speed,
                     ac.gear_max_speed_kmh,
-                    ac.flaps_max_speed_kmh,
+                    flaps_json,
                     ac.mass_kg,
                     ac.wing_overload_pos_n,
                     ac.wing_overload_neg_n,
@@ -133,6 +140,7 @@ impl VehicleDatabase {
                     ac.max_rpm,
                     ac.horse_power,
                     ac.vehicle_type,
+                    ac.data_source,
                     ac.last_updated,
                 ],
             )?;
@@ -277,25 +285,32 @@ impl VehicleDatabase {
         )?;
         
         let aircraft = stmt.query_row(params![identifier], |row| {
+            // Deserialize flaps_speeds_kmh from JSON
+            let flaps_json: String = row.get(9)?;
+            let flaps_speeds_kmh: Vec<f32> = serde_json::from_str(&flaps_json)
+                .unwrap_or_default();
+            
             Ok(AircraftLimits {
                 identifier: row.get(0)?,
                 display_name: row.get(1)?,
                 vne_kmh: row.get(2)?,
                 vne_mach: row.get(3)?,
-                max_speed_ground: row.get(4)?,
-                stall_speed: row.get(5)?,
-                flutter_speed: row.get(6)?,
-                gear_max_speed_kmh: row.get(7)?,
-                flaps_max_speed_kmh: row.get(8)?,
-                mass_kg: row.get(9)?,
-                wing_overload_pos_n: row.get(10)?,
-                wing_overload_neg_n: row.get(11)?,
-                max_positive_g: row.get(12)?,
-                max_negative_g: row.get(13)?,
-                max_rpm: row.get(14)?,
-                horse_power: row.get(15)?,
-                vehicle_type: row.get(16)?,
-                last_updated: row.get(17)?,
+                vne_kmh_max: row.get(4)?,
+                max_speed_ground: row.get(5)?,
+                stall_speed: row.get(6)?,
+                flutter_speed: row.get(7)?,
+                gear_max_speed_kmh: row.get(8)?,
+                flaps_speeds_kmh,
+                mass_kg: row.get(10)?,
+                wing_overload_pos_n: row.get(11)?,
+                wing_overload_neg_n: row.get(12)?,
+                max_positive_g: row.get(13)?,
+                max_negative_g: row.get(14)?,
+                max_rpm: row.get(15)?,
+                horse_power: row.get(16)?,
+                vehicle_type: row.get(17)?,
+                data_source: row.get(18)?,
+                last_updated: row.get(19)?,
             })
         })?;
         
