@@ -468,6 +468,33 @@ async fn datamine_auto_init() -> Result<String, String> {
         stats.aircraft_count, stats.ground_count, stats.ships_count))
 }
 
+/// Force rebuild database (delete + reparse)
+#[tauri::command]
+async fn datamine_rebuild() -> Result<datamine::ParseStats, String> {
+    log::info!("[Datamine] FORCE REBUILD: deleting old database...");
+    
+    // Delete database file
+    let db_path = dirs::data_local_dir()
+        .ok_or_else(|| "Failed to get local data directory".to_string())?
+        .join("Tailgunner")
+        .join("vehicle_limits.db");
+    
+    if db_path.exists() {
+        std::fs::remove_file(&db_path)
+            .map_err(|e| format!("Failed to delete database: {}", e))?;
+        log::info!("[Datamine] ✅ Old database deleted");
+    }
+    
+    // Find game
+    let game_path = datamine::Datamine::auto_detect()
+        .map_err(|_| "War Thunder installation not found".to_string())?;
+    
+    log::info!("[Datamine] Found game at: {:?}", game_path);
+    
+    // Rebuild
+    datamine_parse(game_path.to_string_lossy().to_string()).await
+}
+
 pub fn run() {
     // Initialize logger
     // Set default log level: DEBUG для нашего кода, WARN для библиотек
@@ -517,6 +544,7 @@ pub fn run() {
             datamine_get_limits,
             datamine_get_stats,
             datamine_auto_init,
+            datamine_rebuild,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

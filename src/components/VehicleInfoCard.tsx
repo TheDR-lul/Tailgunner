@@ -18,13 +18,6 @@ export const VehicleInfoCard: React.FC = () => {
         if (data) {
           setVehicleData(data);
           setError(null);
-          
-          if ((window as any).debugLog) {
-            const name = 'Aircraft' in data ? data.Aircraft.display_name :
-                        'Ground' in data ? data.Ground.display_name :
-                        'Ship' in data ? data.Ship.display_name : 'Unknown';
-            (window as any).debugLog('success', `✅ Vehicle data loaded: ${name}`);
-          }
         } else {
           setVehicleData(null);
           setError(null);
@@ -54,18 +47,18 @@ export const VehicleInfoCard: React.FC = () => {
 
   // Always show card with placeholder when no data
   if (error) {
-  return (
-    <div className="card">
-      <div className="card-header">
-        <h2>{t('vehicle_info.title', 'Vehicle Information')}</h2>
-      </div>
-      <div className="card-content">
-        <div style={{ textAlign: 'center', color: '#ef4444', padding: '12px', fontSize: '13px' }}>
-          {error}
+    return (
+      <div className="card">
+        <div className="card-header">
+          <h2>{t('vehicle_info.title', 'Vehicle Information')}</h2>
+        </div>
+        <div className="card-content">
+          <div style={{ textAlign: 'center', color: '#ef4444', padding: '12px', fontSize: '13px' }}>
+            {error}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
   }
 
   if (!vehicleData) {
@@ -99,432 +92,309 @@ export const VehicleInfoCard: React.FC = () => {
   return null;
 };
 
-// Aircraft info card
-const AircraftCard: React.FC<{ data: AircraftLimits }> = ({ data }) => {
-  const { t } = useTranslation();
-  
-  return (
-    <div className="card">
-      <div className="card-header">
-        <div>
-          <h2>{data.display_name}</h2>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+// Aircraft info card - Dashboard Style
+  const AircraftCard: React.FC<{ data: AircraftLimits }> = ({ data }) => {
+    const StatItem = ({ icon, label, value, desc, color }: { 
+      icon: React.ReactNode, 
+      label: string, 
+      value: string, 
+      desc?: string,
+      color: string 
+    }) => (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '8px',
+        padding: '8px',
+        background: 'var(--bg-secondary)',
+        borderRadius: '6px',
+      }}>
+        <div style={{ color, flexShrink: 0 }}>{icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.2, marginBottom: '3px' }}>
+            {label}
+          </div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color, lineHeight: 1.2 }}>
+            {value}
+          </div>
+          {desc && (
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', lineHeight: 1.2, marginTop: '2px', opacity: 0.8 }}>
+              {desc}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+    
+    return (
+      <div className="card" style={{ maxWidth: '480px' }}>
+        <div className="card-header" style={{ paddingBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0, fontSize: '15px' }}>{data.display_name}</h2>
             <span style={{ 
-              fontSize: '11px', 
-              padding: '4px 8px', 
-              background: 'rgba(99, 102, 241, 0.2)', 
-              borderRadius: 'var(--radius-sm)',
-              color: 'var(--primary)'
+              fontSize: '9px', 
+              padding: '2px 6px', 
+              background: 'rgba(99, 102, 241, 0.15)', 
+              borderRadius: '3px',
+              color: 'var(--primary)',
+              fontWeight: 600,
+              lineHeight: 1
             }}>
-              ✈️ Aircraft
+              ✈️ AIRCRAFT
             </span>
           </div>
         </div>
+        <div className="card-content" style={{ padding: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+            <StatItem 
+              icon={<CircleAlert size={16} />} 
+              label="Vne (Wing Rip Speed)" 
+              value={`${Math.round(data.vne_kmh)} km/h`}
+              desc="Exceeding this speed will tear wings off"
+              color="#ef4444"
+            />
+            <StatItem 
+              icon={<Gauge size={16} />} 
+              label="G-Load Limits" 
+              value={`+${data.max_positive_g.toFixed(1)}G / ${data.max_negative_g.toFixed(1)}G`}
+              desc="Maximum overload before structural failure"
+              color="#f59e0b"
+            />
+            {data.flutter_speed && (
+              <StatItem 
+                icon={<Wind size={16} />} 
+                label="Flutter Speed" 
+                value={`${Math.round(data.flutter_speed)} km/h`}
+                desc="Speed at which wing flutter begins"
+                color="#f97316"
+              />
+            )}
+            <StatItem 
+              icon={<Shield size={16} />} 
+              label="Empty Mass" 
+              value={`${(data.mass_kg / 1000).toFixed(1)} t`}
+              desc="Aircraft weight without fuel"
+              color="#a855f7"
+            />
+            <StatItem 
+              icon={<Wind size={16} />} 
+              label="Stall Speed" 
+              value={`${Math.round(data.stall_speed)} km/h`}
+              desc="Minimum speed to maintain flight"
+              color="#06b6d4"
+            />
+            {data.gear_max_speed_kmh && (
+              <StatItem 
+                icon={<Shield size={16} />} 
+                label="Gear Speed Limit (IAS)" 
+                value={`${Math.round(data.gear_max_speed_kmh)} km/h`}
+                desc="Maximum speed for gear operation"
+                color="#8b5cf6"
+              />
+            )}
+            {data.flaps_max_speed_kmh && (
+              <StatItem 
+                icon={<Wind size={16} />} 
+                label="Flap Speed Limit (IAS)" 
+                value={`${Math.round(data.flaps_max_speed_kmh)} km/h`}
+                desc="Maximum speed for flaps extension"
+                color="#14b8a6"
+              />
+            )}
+            {data.horse_power && (
+              <StatItem 
+                icon={<Zap size={16} />} 
+                label="Engine Power" 
+                value={`${Math.round(data.horse_power)} HP`}
+                desc="Total engine horsepower"
+                color="#10b981"
+              />
+            )}
+          </div>
+        </div>
       </div>
-      <div className="card-content">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-          {/* Vne (Wing Rip Speed) */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <CircleAlert size={18} style={{ color: '#ef4444', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Vne (Wing Rip)
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#ef4444' }}>
-                {Math.round(data.vne_kmh)} km/h
-              </div>
-            </div>
-          </div>
+    );
+};
 
-          {/* Flutter Speed */}
-          {data.flutter_speed && (
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              padding: '10px',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)'
-            }}>
-              <Wind size={18} style={{ color: '#f97316', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                  Flutter Speed
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#f97316' }}>
-                  {Math.round(data.flutter_speed)} km/h
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Max G-Load */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Gauge size={18} style={{ color: '#f59e0b', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                G-Load Limits
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f59e0b' }}>
-                +{data.max_positive_g.toFixed(1)}G / {data.max_negative_g.toFixed(1)}G
-              </div>
-            </div>
-          </div>
-
-          {/* Engine Power */}
-          {data.horse_power && (
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              padding: '10px',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)'
-            }}>
-              <Zap size={18} style={{ color: '#10b981', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                  Engine Power
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>
-                  {Math.round(data.horse_power)} HP
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Mass */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Shield size={18} style={{ color: '#a855f7', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Mass
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#a855f7' }}>
-                {(data.mass_kg / 1000).toFixed(1)} t
-              </div>
-            </div>
-          </div>
-
-          {/* Stall Speed */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Wind size={18} style={{ color: '#06b6d4', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Stall Speed
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#06b6d4' }}>
-                {Math.round(data.stall_speed)} km/h
-              </div>
-            </div>
-          </div>
+// Ground vehicle info card - COMPACT VERSION
+const GroundCard: React.FC<{ data: GroundLimits }> = ({ data }) => {
+  const StatItem = ({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) => (
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: '6px',
+      padding: '6px 8px',
+      background: 'var(--bg-secondary)',
+      borderRadius: '4px',
+    }}>
+      <div style={{ color, flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', lineHeight: 1, marginBottom: '2px' }}>
+          {label}
+        </div>
+        <div style={{ fontSize: '12px', fontWeight: 600, color, lineHeight: 1 }}>
+          {value}
         </div>
       </div>
     </div>
   );
-};
-
-// Ground vehicle info card
-const GroundCard: React.FC<{ data: GroundLimits }> = ({ data }) => {
-  const { t } = useTranslation();
   
   return (
-    <div className="card">
-      <div className="card-header">
-        <Info size={20} />
-        <span>{data.display_name}</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+    <div className="card" style={{ maxWidth: '420px' }}>
+      <div className="card-header" style={{ paddingBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0, fontSize: '15px' }}>{data.display_name}</h2>
           <span style={{ 
-            fontSize: '11px', 
-            padding: '4px 8px', 
-            background: 'rgba(34, 197, 94, 0.2)', 
-            borderRadius: 'var(--radius-sm)',
-            color: '#22c55e'
+            fontSize: '9px', 
+            padding: '2px 6px', 
+            background: 'rgba(34, 197, 94, 0.15)', 
+            borderRadius: '3px',
+            color: '#22c55e',
+            fontWeight: 600,
+            lineHeight: 1
           }}>
             🚜 {data.vehicle_type}
           </span>
         </div>
       </div>
-      <div className="card-content">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-          {/* Max Speed */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Wind size={18} style={{ color: '#06b6d4', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Max Speed
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#06b6d4' }}>
-                {Math.round(data.max_speed_kmh)} km/h
-              </div>
-            </div>
-          </div>
-
-          {/* Engine Power */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Zap size={18} style={{ color: '#10b981', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Engine Power
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>
-                {Math.round(data.horse_power)} HP
-              </div>
-            </div>
-          </div>
-
-          {/* Mass */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Shield size={18} style={{ color: '#a855f7', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Mass
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#a855f7' }}>
-                {(data.mass_kg / 1000).toFixed(1)} t
-              </div>
-            </div>
-          </div>
-
-          {/* Armor */}
+      <div className="card-content" style={{ padding: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+          <StatItem 
+            icon={<Wind size={14} />} 
+            label="Max Speed" 
+            value={`${Math.round(data.max_speed_kmh)} km/h`}
+            color="#06b6d4"
+          />
+          <StatItem 
+            icon={<Zap size={14} />} 
+            label="Engine Power" 
+            value={`${Math.round(data.horse_power)} HP`}
+            color="#10b981"
+          />
+          <StatItem 
+            icon={<Shield size={14} />} 
+            label="Mass" 
+            value={`${(data.mass_kg / 1000).toFixed(1)} t`}
+            color="#a855f7"
+          />
           {data.armor_thickness_mm && (
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              padding: '10px',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border)'
-            }}>
-              <Shield size={18} style={{ color: '#f59e0b', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                  Armor
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#f59e0b' }}>
-                  {Math.round(data.armor_thickness_mm)} mm
-                </div>
-              </div>
-            </div>
+            <StatItem 
+              icon={<Shield size={14} />} 
+              label="Armor" 
+              value={`${Math.round(data.armor_thickness_mm)} mm`}
+              color="#f59e0b"
+            />
           )}
-
-          {/* Hull HP */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Gauge size={18} style={{ color: '#ef4444', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Hull HP
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#ef4444' }}>
-                {Math.round(data.hull_hp)}
-              </div>
-            </div>
-          </div>
+          <StatItem 
+            icon={<Gauge size={14} />} 
+            label="Hull HP" 
+            value={`${Math.round(data.hull_hp)}`}
+            color="#ef4444"
+          />
         </div>
       </div>
     </div>
   );
 };
 
-// Ship info card
+// Ship info card - COMPACT VERSION
 const ShipCard: React.FC<{ data: ShipLimits }> = ({ data }) => {
-  const { t } = useTranslation();
-  
   const criticalCompartments = data.compartments.filter(c => c.critical);
   const totalHp = data.compartments.reduce((sum, c) => sum + c.hp, 0);
   
+  const StatItem = ({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) => (
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: '6px',
+      padding: '6px 8px',
+      background: 'var(--bg-secondary)',
+      borderRadius: '4px',
+    }}>
+      <div style={{ color, flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', lineHeight: 1, marginBottom: '2px' }}>
+          {label}
+        </div>
+        <div style={{ fontSize: '12px', fontWeight: 600, color, lineHeight: 1 }}>
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+  
   return (
-    <div className="card">
-      <div className="card-header">
-        <Info size={20} />
-        <span>{data.display_name}</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+    <div className="card" style={{ maxWidth: '450px' }}>
+      <div className="card-header" style={{ paddingBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0, fontSize: '15px' }}>{data.display_name}</h2>
           <span style={{ 
-            fontSize: '11px', 
-            padding: '4px 8px', 
-            background: 'rgba(59, 130, 246, 0.2)', 
-            borderRadius: 'var(--radius-sm)',
-            color: '#3b82f6'
+            fontSize: '9px', 
+            padding: '2px 6px', 
+            background: 'rgba(59, 130, 246, 0.15)', 
+            borderRadius: '3px',
+            color: '#3b82f6',
+            fontWeight: 600,
+            lineHeight: 1
           }}>
             ⚓ {data.ship_class}
           </span>
         </div>
       </div>
-      <div className="card-content">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-          {/* Max Speed */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Anchor size={18} style={{ color: '#06b6d4', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Max Speed
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#06b6d4' }}>
-                {Math.round(data.max_speed_knots)} knots
-              </div>
-            </div>
-          </div>
-
-          {/* Compartments */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Shield size={18} style={{ color: '#a855f7', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Compartments
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#a855f7' }}>
-                {data.compartments.length}
-              </div>
-            </div>
-          </div>
-
-          {/* Total HP */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <Gauge size={18} style={{ color: '#10b981', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Total HP
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>
-                {Math.round(totalHp)}
-              </div>
-            </div>
-          </div>
-
-          {/* Critical Modules */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            padding: '10px',
-            background: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)'
-          }}>
-            <CircleAlert size={18} style={{ color: '#ef4444', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                Critical Modules
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#ef4444' }}>
-                {criticalCompartments.length}
-              </div>
-            </div>
-          </div>
+      <div className="card-content" style={{ padding: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+          <StatItem 
+            icon={<Anchor size={14} />} 
+            label="Max Speed" 
+            value={`${Math.round(data.max_speed_knots)} knots`}
+            color="#06b6d4"
+          />
+          <StatItem 
+            icon={<Shield size={14} />} 
+            label="Compartments" 
+            value={`${data.compartments.length}`}
+            color="#a855f7"
+          />
+          <StatItem 
+            icon={<Gauge size={14} />} 
+            label="Total HP" 
+            value={`${Math.round(totalHp)}`}
+            color="#10b981"
+          />
+          <StatItem 
+            icon={<CircleAlert size={14} />} 
+            label="Critical Modules" 
+            value={`${criticalCompartments.length}`}
+            color="#ef4444"
+          />
         </div>
-
-        {/* Critical compartments list */}
+        
         {criticalCompartments.length > 0 && (
-          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 500 }}>
               Critical Modules
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-              {criticalCompartments.map((comp, idx) => (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+              {criticalCompartments.slice(0, 5).map((comp, idx) => (
                 <span 
                   key={idx}
                   style={{ 
-                    fontSize: '10px', 
-                    padding: '2px 6px', 
+                    fontSize: '9px', 
+                    padding: '2px 5px', 
                     background: 'rgba(239, 68, 68, 0.1)', 
-                    borderRadius: '4px',
-                    color: 'var(--text-secondary)'
+                    borderRadius: '3px',
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1
                   }}
                 >
-                  {comp.name.replace('_dm', '')} ({Math.round(comp.hp)} HP)
+                  {comp.name.replace('_dm', '')} ({Math.round(comp.hp)})
                 </span>
               ))}
+              {criticalCompartments.length > 5 && (
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                  +{criticalCompartments.length - 5} more
+                </span>
+              )}
             </div>
           </div>
         )}

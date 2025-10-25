@@ -89,6 +89,10 @@ export const api = {
     return invoke<string>('datamine_auto_init');
   },
 
+  async datamineRebuild(): Promise<{ aircraft_count: number; ground_count: number; ships_count: number }> {
+    return invoke('datamine_rebuild');
+  },
+
   async datamineFindGame(): Promise<string> {
     return invoke<string>('datamine_find_game');
   },

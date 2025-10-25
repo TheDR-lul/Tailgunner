@@ -48,6 +48,8 @@ impl VehicleDatabase {
                 max_speed_ground REAL NOT NULL,
                 stall_speed REAL NOT NULL,
                 flutter_speed REAL,
+                gear_max_speed_kmh REAL,
+                flaps_max_speed_kmh REAL,
                 mass_kg REAL NOT NULL,
                 wing_overload_pos_n REAL NOT NULL,
                 wing_overload_neg_n REAL NOT NULL,
@@ -104,7 +106,7 @@ impl VehicleDatabase {
         for ac in aircraft {
             tx.execute(
                 "INSERT OR REPLACE INTO aircraft VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18
                 )",
                 params![
                     ac.identifier,
@@ -114,6 +116,8 @@ impl VehicleDatabase {
                     ac.max_speed_ground,
                     ac.stall_speed,
                     ac.flutter_speed,
+                    ac.gear_max_speed_kmh,
+                    ac.flaps_max_speed_kmh,
                     ac.mass_kg,
                     ac.wing_overload_pos_n,
                     ac.wing_overload_neg_n,
@@ -268,15 +272,17 @@ impl VehicleDatabase {
                 max_speed_ground: row.get(4)?,
                 stall_speed: row.get(5)?,
                 flutter_speed: row.get(6)?,
-                mass_kg: row.get(7)?,
-                wing_overload_pos_n: row.get(8)?,
-                wing_overload_neg_n: row.get(9)?,
-                max_positive_g: row.get(10)?,
-                max_negative_g: row.get(11)?,
-                max_rpm: row.get(12)?,
-                horse_power: row.get(13)?,
-                vehicle_type: row.get(14)?,
-                last_updated: row.get(15)?,
+                gear_max_speed_kmh: row.get(7)?,
+                flaps_max_speed_kmh: row.get(8)?,
+                mass_kg: row.get(9)?,
+                wing_overload_pos_n: row.get(10)?,
+                wing_overload_neg_n: row.get(11)?,
+                max_positive_g: row.get(12)?,
+                max_negative_g: row.get(13)?,
+                max_rpm: row.get(14)?,
+                horse_power: row.get(15)?,
+                vehicle_type: row.get(16)?,
+                last_updated: row.get(17)?,
             })
         })?;
         

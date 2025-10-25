@@ -44,6 +44,8 @@ export interface AircraftLimits {
   max_speed_ground: number;
   stall_speed: number;
   flutter_speed?: number;
+  gear_max_speed_kmh?: number;
+  flaps_max_speed_kmh?: number;
   mass_kg: number;
   wing_overload_pos_n: number;
   wing_overload_neg_n: number;

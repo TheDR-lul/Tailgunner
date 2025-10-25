@@ -100,42 +100,17 @@ impl Datamine {
         
         // 3. Check TEMP directory (кешированная распаковка)
         let temp_base = std::env::temp_dir().join("tailgunner_datamine");
-        let temp_unpacked = temp_base.join("aces.vromfs.bin_u");
-        if temp_unpacked.exists() && temp_unpacked.join("gamedata").exists() {
-            log::info!("[Datamine] ✅ Using cached unpacked files from TEMP: {:?}", temp_unpacked);
-            return Ok(temp_unpacked);
+        let temp_aces = temp_base.join("aces.vromfs.bin_u");
+        
+        // Check if aces.vromfs.bin is already unpacked (contains all needed data in Steam version)
+        if temp_aces.exists() && temp_aces.join("gamedata").exists() {
+            log::info!("[Datamine] ✅ Using cached unpacked files from TEMP: {:?}", temp_aces);
+            return Ok(temp_aces);
         }
         
-        // 4. Try to find and unpack VROMFS archive → TEMP
+        // 4. Try to find and unpack BOTH VROMFS archives → TEMP
         log::info!("[Datamine] 📦 Looking for VROMFS archives to unpack...");
-        if let Some(vromfs_archive) = vromfs::find_vromfs_archive(&self.game_path) {
-            log::info!("[Datamine] 🔓 Found archive: {:?}", vromfs_archive);
-            log::info!("[Datamine] 📂 Will unpack to TEMP (EAC-safe, not touching game files)");
-            
-            // Try to unpack to TEMP
-            match vromfs::unpack_vromfs(&vromfs_archive) {
-                Ok(unpacked_path) => {
-                    log::info!("[Datamine] ✅ Successfully unpacked to: {:?}", unpacked_path);
-                    return Ok(unpacked_path);
-                }
-                Err(e) => {
-                    log::error!("[Datamine] ❌ Unpack failed: {}", e);
-                    return Err(e);
-                }
-            }
-        }
-        
-        Err(anyhow::anyhow!(
-            "Cannot find or unpack game data files.\n\
-            Checked:\n\
-            1. {:?}/aces.vromfs.bin_u (pre-unpacked by game)\n\
-            2. {:?}/gamedata (loose files)\n\
-            3. %TEMP%/tailgunner_datamine/aces.vromfs.bin_u (cached)\n\
-            4. {:?}/aces.vromfs.bin (archive to unpack)\n\
-            \n\
-            Please ensure War Thunder is properly installed.",
-            self.game_path, self.game_path, self.game_path
-        ))
+        vromfs::unpack_all_required_archives(&self.game_path)
     }
     
     /// Search for game installation paths

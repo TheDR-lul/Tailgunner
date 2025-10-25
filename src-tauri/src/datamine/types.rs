@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 
 /// Vehicle limits for haptic feedback
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
 pub enum VehicleLimits {
     Aircraft(AircraftLimits),
     Ground(GroundLimits),
@@ -23,6 +22,8 @@ pub struct AircraftLimits {
     pub max_speed_ground: f32,     // Max speed at ground level
     pub stall_speed: f32,          // Stall speed
     pub flutter_speed: Option<f32>, // Flutter warning speed
+    pub gear_max_speed_kmh: Option<f32>, // Gear retraction/extension speed limit
+    pub flaps_max_speed_kmh: Option<f32>, // Flaps extension speed limit
     
     // G-load limits
     pub mass_kg: f32,              // Takeoff mass
@@ -44,7 +45,10 @@ impl AircraftLimits {
     /// Calculate G-limits from wing overload and mass
     pub fn calculate_g_limits(wing_overload_n: f32, mass_kg: f32) -> f32 {
         const GRAVITY: f32 = 9.81;
-        wing_overload_n / (mass_kg * GRAVITY)
+        // War Thunder uses ~68% of empty mass for G-load calculation
+        // This represents structural mass of the wing, not full aircraft mass
+        const STRUCTURAL_MASS_FACTOR: f32 = 0.68;
+        wing_overload_n / (mass_kg * STRUCTURAL_MASS_FACTOR * GRAVITY)
     }
     
     /// Estimate flutter speed if not provided (typically ~95% of Vne)

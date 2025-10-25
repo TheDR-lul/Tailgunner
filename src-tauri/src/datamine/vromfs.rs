@@ -140,3 +140,46 @@ pub fn find_vromfs_archive(game_path: &Path) -> Option<PathBuf> {
     log::warn!("[VROMFS] ⚠️ No aces.vromfs.bin found in: {:?}", game_path);
     None
 }
+
+/// Find gamedata.vromfs.bin in War Thunder installation
+pub fn find_gamedata_vromfs(game_path: &Path) -> Option<PathBuf> {
+    let candidates = vec![
+        game_path.join("gamedata.vromfs.bin"),
+        game_path.join("content").join("gamedata.vromfs.bin"),
+    ];
+    
+    for candidate in candidates {
+        if candidate.exists() {
+            log::info!("[VROMFS] 📦 Found gamedata archive: {:?}", candidate);
+            return Some(candidate);
+        }
+    }
+    
+    log::warn!("[VROMFS] ⚠️ No gamedata.vromfs.bin found in: {:?}", game_path);
+    None
+}
+
+/// Unpack aces.vromfs.bin (and gamedata.vromfs.bin if exists) to TEMP
+/// Returns path to unpacked aces.vromfs.bin_u directory
+pub fn unpack_all_required_archives(game_path: &Path) -> Result<PathBuf> {
+    log::info!("[VROMFS] 📦 Unpacking required War Thunder archives...");
+    
+    // 1. Unpack aces.vromfs.bin (FM data + damage_model in Steam version)
+    let aces_unpacked = if let Some(aces_archive) = find_vromfs_archive(game_path) {
+        log::info!("[VROMFS] 🔓 Unpacking aces.vromfs.bin (flight models + damage data)...");
+        unpack_vromfs(&aces_archive)?
+    } else {
+        bail!("aces.vromfs.bin not found!");
+    };
+    
+    // 2. Try to unpack gamedata.vromfs.bin (if exists in standalone version)
+    if let Some(gamedata_archive) = find_gamedata_vromfs(game_path) {
+        log::info!("[VROMFS] 🔓 Unpacking gamedata.vromfs.bin (additional models)...");
+        let _ = unpack_vromfs(&gamedata_archive);
+    } else {
+        log::info!("[VROMFS] ℹ️ gamedata.vromfs.bin not found (normal for Steam version)");
+    }
+    
+    log::info!("[VROMFS] ✅ Using data from: {:?}", aces_unpacked);
+    Ok(aces_unpacked)
+}

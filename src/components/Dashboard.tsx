@@ -106,6 +106,32 @@ export function Dashboard() {
     }
   };
 
+  const handleRebuildDatabase = async () => {
+    try {
+      setIsParsingDb(true);
+      if ((window as any).debugLog) {
+        (window as any).debugLog('info', '🔄 Force rebuilding database (deleting old + reparse)...');
+      }
+      
+      const stats = await api.datamineRebuild();
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('success', 
+          `✅ Database rebuilt: ${stats.aircraft_count} aircraft, ${stats.ground_count} ground, ${stats.ships_count} ships`);
+      }
+      
+      // Refresh stats
+      setDbStats([stats.aircraft_count, stats.ground_count, stats.ships_count]);
+    } catch (error: any) {
+      if ((window as any).debugLog) {
+        const errorMsg = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
+        (window as any).debugLog('error', `❌ Rebuild failed: ${errorMsg}`);
+      }
+    } finally {
+      setIsParsingDb(false);
+    }
+  };
+
   const handleManualSelect = async () => {
     try {
       if ((window as any).debugLog) {
@@ -224,7 +250,7 @@ export function Dashboard() {
               </div>
               <button 
                 className="btn btn-secondary btn-sm" 
-                onClick={handleInitDatabase}
+                onClick={handleRebuildDatabase}
                 disabled={isParsingDb}
                 style={{ width: '100%' }}
               >
