@@ -287,26 +287,26 @@ We welcome contributions! Areas of interest:
 
 ## 📝 License
 
-**Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**
+**GNU General Public License v3.0 or later (GPL-3.0-or-later)**
 
-This project is **free and open source** for personal, educational, and non-commercial use.
+This project is **free and open source software** licensed under the GPL-3.0.
 
 ✅ **You CAN:**
-- Use the software for personal gaming and entertainment
-- Modify and customize for your own use
-- Share modifications with the community
-- Use in educational settings
-- Contribute improvements back to the project
+- Use the software for any purpose (personal, commercial, educational)
+- Study and modify the source code
+- Share and distribute the software
+- Distribute your modifications
+- Use in commercial products
 
-❌ **You CANNOT:**
-- Use in commercial products or services
-- Sell the software or derivative works
-- Offer as a paid service
-- Use to generate revenue in any form
+⚠️ **You MUST:**
+- Keep the same GPL-3.0 license for derivative works
+- Provide source code when distributing
+- State changes made to the original code
+- Include copyright and license notices
 
 See [LICENSE](LICENSE) for full details.
 
-For commercial licensing inquiries, please contact the maintainers.
+This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are welcome to redistribute it under certain conditions.
 
 ---
 
