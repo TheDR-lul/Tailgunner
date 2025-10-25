@@ -79,6 +79,7 @@ export function Dashboard() {
     }
   };
 
+
   const handleInitDatabase = async () => {
     try {
       setIsParsingDb(true);

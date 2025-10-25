@@ -182,7 +182,13 @@
     "OilOverheated": "Oil Overheated",
     "Crashed": "Crashed",
     "AmmunitionExploded": "Ammunition Exploded",
-    "TargetDestroyed": "Target Destroyed"
+    "TargetDestroyed": "Target Destroyed",
+    "EnemySetAfire": "Enemy Set on Fire",
+    "TakingDamage": "Taking Damage",
+    "SeverelyDamaged": "Severely Damaged",
+    "ShotDown": "Shot Down",
+    "Achievement": "Achievement Unlocked",
+    "ChatMessage": "Chat Message"
   },
   "debug": {
     "title": "Debug Console",

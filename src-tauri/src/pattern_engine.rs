@@ -166,6 +166,14 @@ pub enum GameEvent {
     Assist,
     BaseCapture,
     
+    // === HUD EVENTS ===
+    EnemySetAfire,        // Player set enemy on fire
+    TakingDamage,         // Player taking damage from enemy
+    SeverelyDamaged,      // Player severely damaged
+    ShotDown,             // Player shot down
+    Achievement,          // Achievement unlocked
+    ChatMessage,          // Any chat message (pattern matching on text)
+    
     // === CUSTOM TRIGGERS ===
     CustomTrigger(String),
     UserTriggered,  // Universal event for UI patterns

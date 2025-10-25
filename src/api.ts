@@ -29,6 +29,41 @@ export const api = {
     }
   },
 
+  // Player identity management
+  async getPlayerNames(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('get_player_names');
+    } catch (error) {
+      console.error('Failed to get player names:', error);
+      return [];
+    }
+  },
+
+  async setPlayerNames(names: string[]): Promise<void> {
+    try {
+      await invoke('set_player_names', { names });
+    } catch (error) {
+      console.error('Failed to set player names:', error);
+    }
+  },
+
+  async getClanTags(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('get_clan_tags');
+    } catch (error) {
+      console.error('Failed to get clan tags:', error);
+      return [];
+    }
+  },
+
+  async setClanTags(tags: string[]): Promise<void> {
+    try {
+      await invoke('set_clan_tags', { tags });
+    } catch (error) {
+      console.error('Failed to set clan tags:', error);
+    }
+  },
+
   // Get devices
   async getDevices(): Promise<DeviceInfo[]> {
     try {

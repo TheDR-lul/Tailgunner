@@ -13,6 +13,8 @@ import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { GameStatus } from "./components/GameStatus";
 import { EventConfiguration } from "./components/EventConfiguration";
 import { VehicleInfoCard } from "./components/VehicleInfoCard";
+import { PlayerIdentityModal } from "./components/PlayerIdentityModal";
+import { User } from "lucide-react";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
 
@@ -20,6 +22,7 @@ function App() {
   const { t } = useTranslation();
   const [isRunning, setIsRunning] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
   const [editingPattern, setEditingPattern] = useState<Pattern | undefined>();
   
   const { addPattern, updatePattern } = usePatterns();
@@ -81,6 +84,13 @@ function App() {
           </div>
           
           <div className="header-actions">
+            <button
+              onClick={() => setIsPlayerModalOpen(true)}
+              className="player-identity-btn"
+              title="Player Identity"
+            >
+              <User size={18} />
+            </button>
             <LanguageSwitcher />
             <div className={`status-chip ${isRunning ? 'running' : 'stopped'}`}>
               <span className="status-indicator"></span>
@@ -123,6 +133,12 @@ function App() {
         }}
         onSave={handleSavePattern}
         initialData={editingPattern}
+      />
+
+      {/* Player identity modal */}
+      <PlayerIdentityModal 
+        isOpen={isPlayerModalOpen}
+        onClose={() => setIsPlayerModalOpen(false)}
       />
     </div>
   );

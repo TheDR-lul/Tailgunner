@@ -257,6 +257,30 @@ impl HapticEngine {
                             log::warn!("[HUD] 🛢️ Oil overheated!");
                             GameEvent::OilOverheated
                         }
+                        HudEvent::SetAfire(victim) => {
+                            log::info!("[HUD] 🔥 Set enemy on fire: {}", victim);
+                            GameEvent::EnemySetAfire
+                        }
+                        HudEvent::TakeDamage(attacker) => {
+                            log::warn!("[HUD] 💥 Taking damage from: {}", attacker);
+                            GameEvent::TakingDamage
+                        }
+                        HudEvent::SeverelyDamaged(attacker) => {
+                            log::warn!("[HUD] 💔 Severely damaged by: {}", attacker);
+                            GameEvent::SeverelyDamaged
+                        }
+                        HudEvent::ShotDown(attacker) => {
+                            log::warn!("[HUD] ✈️💥 Shot down by: {}", attacker);
+                            GameEvent::ShotDown
+                        }
+                        HudEvent::Achievement(name) => {
+                            log::info!("[HUD] 🏆 Achievement: {}", name);
+                            GameEvent::Achievement
+                        }
+                        HudEvent::ChatMessage(text) => {
+                            log::debug!("[HUD] 💬 Chat message: {}", text);
+                            GameEvent::ChatMessage
+                        }
                     }
                 }).collect();
                 
@@ -396,6 +420,26 @@ impl HapticEngine {
     /// Check running status
     pub async fn is_running(&self) -> bool {
         *self.running.read().await
+    }
+    
+    /// Get current player names (for filtering HUD events)
+    pub async fn get_player_names(&self) -> Vec<String> {
+        self.telemetry.read().await.get_player_names()
+    }
+    
+    /// Set player names (for filtering HUD events)
+    pub async fn set_player_names(&self, names: Vec<String>) {
+        self.telemetry.write().await.set_player_names(names);
+    }
+    
+    /// Get current clan tags (for filtering HUD events)
+    pub async fn get_clan_tags(&self) -> Vec<String> {
+        self.telemetry.read().await.get_clan_tags()
+    }
+    
+    /// Set clan tags (for filtering HUD events)
+    pub async fn set_clan_tags(&self, tags: Vec<String>) {
+        self.telemetry.write().await.set_clan_tags(tags);
     }
 
     /// Get managers (for UI)

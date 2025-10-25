@@ -17,12 +17,18 @@ pub struct HudMessage {
     pub time: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HudEvent {
-    Kill(String),           // Killed enemy vehicle name
+    Kill(String),              // Killed enemy vehicle name
     Crashed,
     EngineOverheated,
     OilOverheated,
+    SetAfire(String),          // Set enemy on fire (enemy name)
+    TakeDamage(String),        // Taking damage from attacker (attacker name)
+    SeverelyDamaged(String),   // Severely damaged by attacker
+    ShotDown(String),          // Shot down by attacker
+    Achievement(String),       // Achievement unlocked (achievement name)
+    ChatMessage(String),       // Any chat message (full text)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,7 +131,9 @@ pub struct WTTelemetryReader {
     cache_duration_ms: u64,
     last_hud_evt_id: u32,
     last_hud_dmg_id: u32,
-    player_name: Option<String>,  // Player name for filtering own events
+    player_names: Vec<String>,  // Player names for filtering own events
+    clan_tags: Vec<String>,      // Player clan tags for filtering
+    hud_initialized: bool,  // Flag to skip old events on first connect
 }
 
 impl WTTelemetryReader {
@@ -142,7 +150,39 @@ impl WTTelemetryReader {
             cache_duration_ms: 50, // Cache for 50ms (20 Hz max poll rate)
             last_hud_evt_id: 0,
             last_hud_dmg_id: 0,
-            player_name: None,
+            player_names: Vec::new(),
+            clan_tags: Vec::new(),
+            hud_initialized: false,
+        }
+    }
+    
+    /// Get current player names
+    pub fn get_player_names(&self) -> Vec<String> {
+        self.player_names.clone()
+    }
+    
+    /// Set player names
+    pub fn set_player_names(&mut self, names: Vec<String>) {
+        self.player_names = names.clone();
+        if !names.is_empty() {
+            log::info!("[HUD] 🎮 Player names set: {:?}", names);
+        } else {
+            log::info!("[HUD] 🎮 Player names cleared");
+        }
+    }
+    
+    /// Get current clan tags
+    pub fn get_clan_tags(&self) -> Vec<String> {
+        self.clan_tags.clone()
+    }
+    
+    /// Set clan tags
+    pub fn set_clan_tags(&mut self, tags: Vec<String>) {
+        self.clan_tags = tags.clone();
+        if !tags.is_empty() {
+            log::info!("[HUD] 🏷️ Clan tags set: {:?}", tags);
+        } else {
+            log::info!("[HUD] 🏷️ Clan tags cleared");
         }
     }
 
@@ -254,6 +294,18 @@ impl WTTelemetryReader {
         
         let mut events = Vec::new();
         
+        // Parse event messages
+        if let Some(event_array) = json.get("event").and_then(|v| v.as_array()) {
+            for msg_value in event_array {
+                let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                
+                // Update last seen ID
+                if id > self.last_hud_evt_id {
+                    self.last_hud_evt_id = id;
+                }
+            }
+        }
+        
         // Parse damage messages (contain kill feed, crashes, overheats)
         if let Some(damage_array) = json.get("damage").and_then(|v| v.as_array()) {
             for msg_value in damage_array {
@@ -265,14 +317,53 @@ impl WTTelemetryReader {
                     self.last_hud_dmg_id = id;
                 }
                 
-                // Parse player events
+                // Skip parsing events on first connect (ignore old events)
+                if !self.hud_initialized {
+                    continue;
+                }
+                
+                // Try to parse as specific player event
                 if let Some(event) = self.parse_hud_message(msg) {
                     events.push(event);
+                } else if !msg.is_empty() {
+                    // If not a specific event, treat as generic chat message
+                    // Skip system messages (disconnects, etc)
+                    if !msg.contains("has disconnected") && 
+                       !msg.contains("NET_PLAYER_") &&
+                       !msg.contains("td! kd?") {
+                        log::debug!("[HUD Event] 💬 CHAT: {}", msg);
+                        events.push(HudEvent::ChatMessage(msg.to_string()));
+                    }
                 }
             }
         }
         
+        // Mark HUD as initialized after first call
+        if !self.hud_initialized {
+            self.hud_initialized = true;
+            log::info!("[HUD] ✅ Initialized, old events ignored");
+        }
+        
         Ok(events)
+    }
+    
+    /// Check if message contains player identity
+    fn is_player_message(&self, msg: &str) -> bool {
+        // Check if any of our player names match
+        for name in &self.player_names {
+            if msg.contains(name) {
+                return true;
+            }
+        }
+        
+        // Check if any of our clan tags match
+        for tag in &self.clan_tags {
+            if msg.contains(tag) {
+                return true;
+            }
+        }
+        
+        false
     }
     
     /// Parse HUD message to detect player events
@@ -287,48 +378,112 @@ impl WTTelemetryReader {
         }
         
         if msg.contains("has crashed") {
-            // Only detect if it's the player's crash (not another player)
-            // Format: "=DEST= _WingsOfPrey_ (Rafale C) has crashed."
-            // We can't reliably detect player name, so only detect crashes with specific patterns
-            // For now, detect all crashes - user can filter if needed
-            return Some(HudEvent::Crashed);
+            // Only detect player crashes
+            if self.is_player_message(msg) {
+                return Some(HudEvent::Crashed);
+            }
+            return None;
         }
         
-        if msg.contains("destroyed") {
-            // Check if player name is set for more accurate filtering
-            if let Some(player_name) = &self.player_name {
-                if msg.contains(player_name) {
-                    // Extract enemy vehicle name
-                    if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
-                        let enemy = destroyed_part.trim().to_string();
-                        log::info!("[HUD Event] 🎯 KILL: {}", enemy);
-                        return Some(HudEvent::Kill(enemy));
-                    }
-                }
-            } else {
-                // Without player name, try to detect by pattern
-                // "=DEST= text" format is common but not universal
-                // Best heuristic: if message contains "destroyed" and has format "A destroyed B"
-                // and A is not "[ai]", it's likely a player kill
+        // Achievements: "has achieved" or "has delivered"
+        if msg.contains("has achieved") || msg.contains("has delivered") {
+            if self.is_player_message(msg) {
+                // Extract achievement name
+                let achievement = if msg.contains("has achieved") {
+                    msg.split("has achieved").nth(1).unwrap_or("").trim()
+                } else {
+                    msg.split("has delivered").nth(1).unwrap_or("").trim()
+                };
                 
-                // Skip AI kills
-                if msg.contains("[ai]") {
-                    return None;
+                if !achievement.is_empty() {
+                    log::info!("[HUD Event] 🏆 ACHIEVEMENT: {}", achievement);
+                    return Some(HudEvent::Achievement(achievement.to_string()));
                 }
-                
-                // Check if this is a kill message with proper format
-                let parts: Vec<&str> = msg.split("destroyed").collect();
+            }
+            return None;
+        }
+        
+        // Set enemy on fire
+        if msg.contains("set afire") {
+            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
+                let parts: Vec<&str> = msg.split("set afire").collect();
                 if parts.len() == 2 {
-                    // Format: "Player1 (Vehicle1) destroyed Player2 (Vehicle2)"
-                    // Extract enemy name
-                    let enemy = parts[1].trim().to_string();
+                    let attacker = parts[0].trim();
+                    let victim = parts[1].trim();
                     
-                    // Skip if enemy is empty or starts with lowercase (likely continuation of sentence)
-                    if !enemy.is_empty() && enemy.chars().next().unwrap_or(' ').is_uppercase() {
-                        log::info!("[HUD Event] 🎯 KILL (heuristic): {}", enemy);
-                        return Some(HudEvent::Kill(enemy));
+                    // Player set enemy on fire
+                    if self.is_player_message(attacker) {
+                        log::info!("[HUD Event] 🔥 SET AFIRE: {}", victim);
+                        return Some(HudEvent::SetAfire(victim.to_string()));
+                    }
+                    
+                    // Player was set on fire
+                    if self.is_player_message(victim) {
+                        log::info!("[HUD Event] 💥 TAKING FIRE from: {}", attacker);
+                        return Some(HudEvent::TakeDamage(attacker.to_string()));
                     }
                 }
+            }
+            return None;
+        }
+        
+        // Severely damaged
+        if msg.contains("severely damaged") {
+            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
+                let parts: Vec<&str> = msg.split("severely damaged").collect();
+                if parts.len() == 2 {
+                    let attacker = parts[0].trim();
+                    let victim = parts[1].trim();
+                    
+                    // Player was severely damaged
+                    if self.is_player_message(victim) {
+                        log::info!("[HUD Event] 💔 SEVERELY DAMAGED by: {}", attacker);
+                        return Some(HudEvent::SeverelyDamaged(attacker.to_string()));
+                    }
+                }
+            }
+            return None;
+        }
+        
+        // Shot down
+        if msg.contains("shot down") {
+            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
+                let parts: Vec<&str> = msg.split("shot down").collect();
+                if parts.len() == 2 {
+                    let attacker = parts[0].trim();
+                    let victim = parts[1].trim();
+                    
+                    // Player was shot down
+                    if self.is_player_message(victim) {
+                        log::info!("[HUD Event] ✈️💥 SHOT DOWN by: {}", attacker);
+                        return Some(HudEvent::ShotDown(attacker.to_string()));
+                    }
+                }
+            }
+            return None;
+        }
+        
+        // Destroyed (kill)
+        if msg.contains("destroyed") {
+            // Check if player identity is set
+            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
+                // ONLY count kills if our player identity is the attacker
+                if let Some(before_destroyed) = msg.split("destroyed").next() {
+                    if self.is_player_message(before_destroyed) {
+                        // Extract enemy vehicle name
+                        if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
+                            let enemy = destroyed_part.trim().to_string();
+                            log::info!("[HUD Event] 🎯 KILL: {}", enemy);
+                            return Some(HudEvent::Kill(enemy));
+                        }
+                    }
+                }
+                // If player identity doesn't match, this is someone else's kill - ignore
+                return None;
+            } else {
+                // Without player identity, we can't reliably filter
+                // Skip to avoid false positives from other players' kills
+                return None;
             }
         }
         

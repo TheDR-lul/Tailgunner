@@ -55,6 +55,32 @@ async fn is_running(state: tauri::State<'_, AppState>) -> Result<bool, String> {
 }
 
 #[tauri::command]
+async fn get_player_names(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let engine = state.engine.lock().await;
+    Ok(engine.get_player_names().await)
+}
+
+#[tauri::command]
+async fn set_player_names(state: tauri::State<'_, AppState>, names: Vec<String>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.set_player_names(names.clone()).await;
+    Ok(format!("Player names set: {:?}", names))
+}
+
+#[tauri::command]
+async fn get_clan_tags(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let engine = state.engine.lock().await;
+    Ok(engine.get_clan_tags().await)
+}
+
+#[tauri::command]
+async fn set_clan_tags(state: tauri::State<'_, AppState>, tags: Vec<String>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.set_clan_tags(tags.clone()).await;
+    Ok(format!("Clan tags set: {:?}", tags))
+}
+
+#[tauri::command]
 async fn get_devices(state: tauri::State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
     let engine = state.engine.lock().await;
     Ok(engine.get_device_manager().get_devices().await)
@@ -637,6 +663,10 @@ pub fn run() {
             start_engine,
             stop_engine,
             is_running,
+            get_player_names,
+            set_player_names,
+            get_clan_tags,
+            set_clan_tags,
             get_devices,
             scan_devices,
             get_profiles,
