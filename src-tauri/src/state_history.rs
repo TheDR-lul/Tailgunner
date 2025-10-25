@@ -156,6 +156,7 @@ impl StateHistory {
     }
     
     /// Get minimum value over time window
+    #[allow(dead_code)]
     pub fn min<F>(&self, window_seconds: f32, extractor: F) -> Option<f32>
     where
         F: Fn(&StateSnapshot) -> f32,
@@ -165,10 +166,11 @@ impl StateHistory {
         self.buffer.iter()
             .filter(|s| s.timestamp >= cutoff)
             .map(&extractor)
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .min_by(|a, b| a.partial_cmp(b).expect("NaN in state history"))
     }
     
     /// Get maximum value over time window
+    #[allow(dead_code)]
     pub fn max<F>(&self, window_seconds: f32, extractor: F) -> Option<f32>
     where
         F: Fn(&StateSnapshot) -> f32,
@@ -178,10 +180,11 @@ impl StateHistory {
         self.buffer.iter()
             .filter(|s| s.timestamp >= cutoff)
             .map(&extractor)
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .max_by(|a, b| a.partial_cmp(b).expect("NaN in state history"))
     }
     
     /// Clear all history
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.buffer.clear();
     }
@@ -199,7 +202,9 @@ impl Default for StateHistory {
 pub fn speed_extractor(s: &StateSnapshot) -> f32 { s.speed }
 pub fn altitude_extractor(s: &StateSnapshot) -> f32 { s.altitude }
 pub fn g_load_extractor(s: &StateSnapshot) -> f32 { s.g_load }
+#[allow(dead_code)]
 pub fn aoa_extractor(s: &StateSnapshot) -> f32 { s.aoa }
+#[allow(dead_code)]
 pub fn rpm_extractor(s: &StateSnapshot) -> f32 { s.rpm }
 pub fn fuel_extractor(s: &StateSnapshot) -> f32 { s.fuel }
 

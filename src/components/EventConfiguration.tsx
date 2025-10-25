@@ -317,9 +317,11 @@ export function EventConfiguration() {
             {profiles.map((profile) => {
               const isExpanded = expandedProfile === profile.id;
               // Only show events that have at least one trigger
-              const patterns = Object.entries(profile.event_mappings).filter(([eventName]) => 
-                getTriggersForEvent(eventName).length > 0
-              );
+              const patterns = profile.event_mappings 
+                ? Object.entries(profile.event_mappings).filter(([eventName]) => 
+                    getTriggersForEvent(eventName).length > 0
+                  )
+                : [];
               
               // Skip profiles with no events that have triggers
               if (patterns.length === 0) return null;
@@ -335,13 +337,13 @@ export function EventConfiguration() {
                     onClick={() => setExpandedProfile(isExpanded ? null : profile.id)}
                   >
                     <div className="profile-name">
-                      <span style={{ fontSize: '18px' }}>{vehicleIcons[profile.vehicle_type]}</span>
+                      <span style={{ fontSize: '18px' }}>{profile.vehicle_type ? vehicleIcons[profile.vehicle_type] : '🎮'}</span>
                       <span>{t(`profiles.${profile.id}`)}</span>
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span className="profile-badge">
-                        {getModeLabel(profile.game_mode)}
+                        {getModeLabel(profile.game_mode || 'any')}
                       </span>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         {patterns.length} {t('profiles.patterns_count')}

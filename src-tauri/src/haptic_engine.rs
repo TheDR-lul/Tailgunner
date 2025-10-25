@@ -5,7 +5,6 @@ use crate::{
     device_manager::DeviceManager,
     event_engine::EventEngine,
     event_triggers::TriggerManager,
-    dynamic_triggers::DynamicTriggerManager,
     vehicle_limits::VehicleLimitsManager,
     pattern_engine::{VibrationPattern, GameEvent},
     profile_manager::ProfileManager,
@@ -49,7 +48,6 @@ pub struct HapticEngine {
     event_engine: Arc<RwLock<EventEngine>>,
     profile_manager: Arc<RwLock<ProfileManager>>,
     pub trigger_manager: Arc<RwLock<TriggerManager>>,  // pub for access from lib.rs
-    dynamic_trigger_manager: Arc<DynamicTriggerManager>,
     vehicle_limits_manager: Arc<VehicleLimitsManager>,
     rate_limiter: Arc<RateLimiter>,
     running: Arc<RwLock<bool>>,
@@ -70,14 +68,19 @@ impl HapticEngine {
             log::warn!("[Triggers] Failed to load settings: {}", e);
         }
         
+        // Initialize vehicle limits manager
+        let vehicle_limits_manager = Arc::new(
+            VehicleLimitsManager::new()
+                .expect("Failed to initialize VehicleLimitsManager (database error)")
+        );
+        
         Self {
             telemetry: Arc::new(RwLock::new(WTTelemetryReader::new())),
             device_manager: Arc::new(DeviceManager::new()),
             event_engine: Arc::new(RwLock::new(EventEngine::new())),
             profile_manager: Arc::new(RwLock::new(ProfileManager::new())),
             trigger_manager: Arc::new(RwLock::new(trigger_manager)),
-            dynamic_trigger_manager: Arc::new(DynamicTriggerManager::new()),
-            vehicle_limits_manager: Arc::new(VehicleLimitsManager::new()),
+            vehicle_limits_manager,
             rate_limiter: Arc::new(RateLimiter::new()),
             running: Arc::new(RwLock::new(false)),
             current_intensity: Arc::new(RwLock::new(0.0)),
@@ -107,7 +110,6 @@ impl HapticEngine {
         let event_engine = Arc::clone(&self.event_engine);
         let profile_manager = Arc::clone(&self.profile_manager);
         let trigger_manager = Arc::clone(&self.trigger_manager);
-        let dynamic_trigger_manager = Arc::clone(&self.dynamic_trigger_manager);
         let rate_limiter = Arc::clone(&self.rate_limiter);
         let running = Arc::clone(&self.running);
         let current_intensity = Arc::clone(&self.current_intensity);
@@ -143,7 +145,7 @@ impl HapticEngine {
                             );
                             state
                         },
-                        Err(e) => {
+                        Err(_) => {
                             // Game not running or connection lost
                             connection_lost_counter += 1;
                             

@@ -7,6 +7,7 @@ use std::collections::HashSet;
 
 pub struct EventEngine {
     previous_state: Option<GameState>,
+    #[allow(dead_code)]
     active_events: HashSet<String>,
 }
 
@@ -181,6 +182,7 @@ impl EventEngine {
     }
 
     /// Сброс состояния (например, при выходе из боя)
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         self.previous_state = None;
         self.active_events.clear();

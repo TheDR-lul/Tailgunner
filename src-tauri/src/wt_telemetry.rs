@@ -9,6 +9,7 @@ use std::time::Duration;
 const WT_TELEMETRY_URL: &str = "http://127.0.0.1:8111";
 const POLL_INTERVAL_MS: u64 = 100; // 10 times per second
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HudMessage {
     pub id: u32,
@@ -132,7 +133,7 @@ impl WTTelemetryReader {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_millis(200))
             .build()
-            .unwrap();
+            .expect("Failed to create HTTP client");
         
         Self {
             client,
@@ -182,9 +183,6 @@ impl WTTelemetryReader {
             .json()
             .await
             .context("Failed to parse WT /indicators")?;
-
-        log::debug!("[WT API] /indicators response:\n{}", 
-            serde_json::to_string_pretty(&indicators_json).unwrap_or_else(|_| "Failed to serialize".to_string()));
 
         // 2. Request /state for flight indicators
         let state_url = format!("{}/state", WT_TELEMETRY_URL);
@@ -419,7 +417,8 @@ impl WTTelemetryReader {
         static LAST_VEHICLE: OnceLock<Mutex<String>> = OnceLock::new();
         
         let last_vehicle = LAST_VEHICLE.get_or_init(|| Mutex::new(String::new()));
-        let mut last = last_vehicle.lock().unwrap();
+        let mut last = last_vehicle.lock()
+            .expect("LAST_VEHICLE mutex poisoned");
         
         if *last != vehicle_name {
             log::error!("[WT Parser] ✅ Vehicle detected: '{}' ({:?}, army={})", 

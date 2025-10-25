@@ -6,11 +6,10 @@ mod event_engine;
 mod profile_manager;
 mod haptic_engine;
 mod event_triggers;
-mod wt_vehicles_api;
-mod dynamic_triggers;
 mod ui_patterns;
 mod vehicle_limits;
 mod state_history;
+mod datamine;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -307,24 +306,37 @@ async fn save_trigger_settings(state: tauri::State<'_, AppState>) -> Result<Stri
 }
 
 #[tauri::command]
-async fn get_vehicle_info(state: tauri::State<'_, AppState>) -> Result<wt_vehicles_api::VehicleData, String> {
+async fn get_vehicle_info(state: tauri::State<'_, AppState>) -> Result<Option<datamine::VehicleLimits>, String> {
     let engine = state.engine.lock().await;
     let status = engine.get_game_status().await
         .map_err(|e| format!("Failed to get game status: {}", e))?;
     
     if !status.connected || status.vehicle_name.is_empty() || status.vehicle_name == "N/A" {
-        return Err("No vehicle connected".to_string());
+        log::debug!("[Vehicle Info] No vehicle connected");
+        return Ok(None);
     }
     
-    log::info!("[Vehicle Info] Fetching data for vehicle: '{}'", status.vehicle_name);
+    log::info!("[Vehicle Info] 🔍 Fetching data for vehicle: '{}'", status.vehicle_name);
     
-    // Get vehicle data from API (using search endpoint)
-    let api = wt_vehicles_api::WTVehiclesAPI::new();
-    api.search_vehicle(&status.vehicle_name).await
-        .map_err(|e| {
-            log::error!("[Vehicle Info] Failed for '{}': {}", status.vehicle_name, e);
-            format!("Failed to fetch vehicle data: {}", e)
-        })
+    // Get vehicle limits from datamine database
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| format!("Database error: {}", e))?;
+    
+    // Use vehicle_name AS IS (fuzzy search will handle variations)
+    let identifier = status.vehicle_name.clone();
+    
+    log::info!("[Vehicle Info] 🔎 Searching for: '{}'", identifier);
+    
+    let result = db.get_limits(&identifier);
+    
+    if result.is_none() {
+        log::error!("[Vehicle Info] ❌ NO DATA FOUND for vehicle: '{}'", identifier);
+        log::error!("[Vehicle Info] Check datamine database or run: datamine_parse");
+    } else {
+        log::info!("[Vehicle Info] ✅ Found vehicle data!");
+    }
+    
+    Ok(result)
 }
 
 #[tauri::command]
@@ -377,8 +389,95 @@ async fn toggle_pattern(
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+// Datamine commands
+#[tauri::command]
+async fn datamine_find_game() -> Result<String, String> {
+    datamine::Datamine::auto_detect()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn datamine_parse(game_path: String) -> Result<datamine::ParseStats, String> {
+    log::info!("[Datamine] Starting parse from: {}", game_path);
+    
+    let path = std::path::PathBuf::from(game_path);
+    
+    let mut dm = datamine::Datamine::new(path)
+        .map_err(|e| e.to_string())?;
+    
+    // Parse in background thread
+    let result = tokio::task::spawn_blocking(move || {
+        dm.parse_all()
+    }).await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    
+    log::info!("[Datamine] Parse complete: {} aircraft, {} ground, {} ships",
+        result.aircraft_count, result.ground_count, result.ships_count);
+    
+    Ok(result)
+}
+
+#[tauri::command]
+async fn datamine_get_limits(identifier: String) -> Result<Option<datamine::VehicleLimits>, String> {
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    Ok(db.get_limits(&identifier))
+}
+
+#[tauri::command]
+async fn datamine_get_stats() -> Result<(usize, usize, usize), String> {
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    db.get_stats().map_err(|e| e.to_string())
+}
+
+/// Auto-initialize datamine: find game, check database, build if needed
+#[tauri::command]
+async fn datamine_auto_init() -> Result<String, String> {
+    log::info!("[Datamine] Starting auto-initialization");
+    
+    // Check if database exists and has data
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    let (aircraft, ground, ships) = db.get_stats()
+        .map_err(|e| e.to_string())?;
+    
+    if aircraft > 0 || ground > 0 || ships > 0 {
+        log::info!("[Datamine] Database exists: {} aircraft, {} ground, {} ships", aircraft, ground, ships);
+        return Ok(format!("Database loaded: {} aircraft, {} ground, {} ships", aircraft, ground, ships));
+    }
+    
+    // Database is empty, try to build it
+    log::info!("[Datamine] Database empty, attempting auto-build");
+    
+    // Find War Thunder installation
+    let game_path = datamine::Datamine::auto_detect()
+        .map_err(|_| "War Thunder installation not found. Please use manual parse.".to_string())?;
+    
+    log::info!("[Datamine] Found game at: {:?}", game_path);
+    
+    // Build database
+    let stats = datamine_parse(game_path.to_string_lossy().to_string()).await?;
+    
+    Ok(format!("Database built: {} aircraft, {} ground, {} ships", 
+        stats.aircraft_count, stats.ground_count, stats.ships_count))
+}
+
 pub fn run() {
     // Initialize logger
+    // Set default log level: DEBUG для нашего кода, WARN для библиотек
+    if std::env::var("RUST_LOG").is_err() {
+        #[cfg(debug_assertions)]
+        std::env::set_var("RUST_LOG", "butt_thunder_lib=debug,warn");
+        
+        #[cfg(not(debug_assertions))]
+        std::env::set_var("RUST_LOG", "butt_thunder_lib=info,warn");
+    }
     env_logger::init();
 
     let engine = Arc::new(Mutex::new(HapticEngine::new()));
@@ -413,6 +512,11 @@ pub fn run() {
             export_pattern,
             export_all_patterns,
             import_pattern,
+            datamine_find_game,
+            datamine_parse,
+            datamine_get_limits,
+            datamine_get_stats,
+            datamine_auto_init,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

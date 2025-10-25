@@ -24,6 +24,21 @@ function App() {
   
   const { addPattern, updatePattern } = usePatterns();
 
+  // Auto-initialize datamine on startup
+  useEffect(() => {
+    const initDatamine = async () => {
+      try {
+        console.log("[Datamine] Auto-initializing...");
+        const result = await api.datamineAutoInit();
+        console.log("[Datamine]", result);
+      } catch (error) {
+        console.warn("[Datamine] Auto-init failed:", error);
+      }
+    };
+    
+    initDatamine();
+  }, []);
+
   // Check system status (NOT auto-connect!)
   useEffect(() => {
     const interval = setInterval(async () => {

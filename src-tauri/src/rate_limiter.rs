@@ -23,14 +23,16 @@ impl RateLimiter {
     /// Проверка, можно ли отправить команду
     pub fn should_send(&self) -> bool {
         let now = Instant::now();
-        let last = *self.last_send.lock().unwrap();
+        let last = *self.last_send.lock()
+            .expect("RateLimiter mutex poisoned");
         
         now.duration_since(last) >= self.min_interval
     }
 
     /// Отметка об отправке команды
     pub fn mark_sent(&self) {
-        *self.last_send.lock().unwrap() = Instant::now();
+        *self.last_send.lock()
+            .expect("RateLimiter mutex poisoned") = Instant::now();
     }
 
     /// Попытка отправки (возвращает true если можно)
@@ -44,9 +46,11 @@ impl RateLimiter {
     }
 
     /// Время до следующей возможной отправки
+    #[allow(dead_code)]
     pub fn time_until_next(&self) -> Duration {
         let now = Instant::now();
-        let last = *self.last_send.lock().unwrap();
+        let last = *self.last_send.lock()
+            .expect("RateLimiter mutex poisoned");
         let elapsed = now.duration_since(last);
         
         if elapsed >= self.min_interval {

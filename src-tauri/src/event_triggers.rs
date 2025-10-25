@@ -429,6 +429,7 @@ impl TriggerManager {
     }
     
     /// Evaluate trigger condition
+    #[allow(dead_code)]
     fn evaluate_condition(&self, condition: &TriggerCondition, state: &GameState) -> bool {
         let ind = &state.indicators;
         
@@ -560,6 +561,7 @@ impl TriggerManager {
     }
     
     /// Update trigger settings (cooldown, pattern, etc.)
+    #[allow(dead_code)]
     pub fn update_trigger(&mut self, id: &str, cooldown_ms: Option<u64>, pattern: Option<Option<VibrationPattern>>) -> Result<(), String> {
         if let Some(trigger) = self.triggers.iter_mut().find(|t| t.id == id) {
             if let Some(cooldown) = cooldown_ms {

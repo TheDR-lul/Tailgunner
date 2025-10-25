@@ -183,13 +183,15 @@ impl VibrationPattern {
         points.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
         
         // Get start and end points
-        let start_point = points.first().unwrap();
-        let end_point = points.last().unwrap();
+        let start_point = points.first()
+            .expect("Curve must have at least one point");
+        let end_point = points.last()
+            .expect("Curve must have at least one point");
         
         // Find peak intensity point
         let peak_point = points.iter()
             .max_by(|a, b| a.y.partial_cmp(&b.y).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap();
+            .expect("Curve must have at least one point for peak calculation");
         
         // Calculate durations based on point positions
         let attack_duration = (peak_point.x * total_duration_ms as f32) as u64;

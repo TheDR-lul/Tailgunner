@@ -83,5 +83,41 @@ export const api = {
       };
     }
   },
+
+  // Datamine methods
+  async datamineAutoInit(): Promise<string> {
+    return invoke<string>('datamine_auto_init');
+  },
+
+  async datamineFindGame(): Promise<string> {
+    return invoke<string>('datamine_find_game');
+  },
+
+  async datamineParse(gamePath: string): Promise<{
+    aircraft_count: number;
+    ground_count: number;
+    ships_count: number;
+  }> {
+    return invoke('datamine_parse', { gamePath });
+  },
+
+  async datamineGetStats(): Promise<[number, number, number]> {
+    return invoke('datamine_get_stats');
+  },
+
+  // File dialog
+  async selectFolder(): Promise<string | null> {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: 'Select War Thunder installation folder',
+    });
+    
+    if (selected && typeof selected === 'string') {
+      return selected;
+    }
+    return null;
+  },
 };
 

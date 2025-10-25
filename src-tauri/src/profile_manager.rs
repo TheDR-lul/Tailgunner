@@ -193,11 +193,13 @@ impl ProfileManager {
     }
 
     /// Add custom profile
+    #[allow(dead_code)]
     pub fn add_profile(&mut self, profile: Profile) {
         self.profiles.push(profile);
     }
 
     /// Remove profile
+    #[allow(dead_code)]
     pub fn remove_profile(&mut self, id: &str) {
         self.profiles.retain(|p| p.id != id);
         if self.active_profile.as_deref() == Some(id) {
@@ -206,6 +208,7 @@ impl ProfileManager {
     }
 
     /// Toggle profile on/off
+    #[allow(dead_code)]
     pub fn toggle_profile(&mut self, id: &str, enabled: bool) {
         if let Some(profile) = self.profiles.iter_mut().find(|p| p.id == id) {
             profile.enabled = enabled;

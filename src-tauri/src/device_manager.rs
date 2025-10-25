@@ -22,6 +22,7 @@ pub enum DeviceType {
     Lovense,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct LovenseDevice {
     id: String,
@@ -209,6 +210,7 @@ impl DeviceManager {
     }
 
     /// Check connection status
+    #[allow(dead_code)]
     pub async fn is_connected(&self) -> bool {
         self.buttplug_client.read().await.is_some()
     }
@@ -276,7 +278,7 @@ impl DeviceManager {
         
         log::debug!("🎮 Sending Lovense vibration: {} (intensity: {})", lovense_intensity, intensity);
         
-        for (id, device) in lovense_devices.iter() {
+        for (_id, device) in lovense_devices.iter() {
             let url = format!("http://{}:{}/Vibrate?v={}", device.ip_address, device.port, lovense_intensity);
             
             match self.http_client.post(&url).send().await {
@@ -306,12 +308,14 @@ impl DeviceManager {
     }
     
     /// Enable/disable Lovense integration
+    #[allow(dead_code)]
     pub fn set_lovense_enabled(&mut self, enabled: bool) {
         self.lovense_enabled = enabled;
         log::info!("🔧 Lovense integration: {}", if enabled { "ENABLED" } else { "DISABLED" });
     }
     
     /// Get Lovense connection status
+    #[allow(dead_code)]
     pub async fn is_lovense_connected(&self) -> bool {
         !self.lovense_devices.read().await.is_empty()
     }
