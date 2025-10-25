@@ -60,15 +60,21 @@ export interface AircraftLimits {
 export interface GroundLimits {
   identifier: string;
   display_name: string;
-  max_speed_kmh: number;
-  max_reverse_speed_kmh: number;
-  mass_kg: number;
-  horse_power: number;
-  max_rpm: number;
-  min_rpm: number;
-  hull_hp: number;
-  armor_thickness_mm?: number;
+  max_speed_kmh?: number;
+  max_reverse_speed_kmh?: number;
+  mass_kg?: number;
+  horse_power?: number;
+  max_rpm?: number;
+  min_rpm?: number;
+  crew_hp?: number;
+  crew_count?: number;
+  main_gun_caliber_mm?: number;
+  main_gun_fire_rate?: number;
+  ammo_count?: number;
+  forward_gears?: number;
+  reverse_gears?: number;
   vehicle_type: string;
+  data_source: string; // "datamine", "wiki", "datamine+wiki"
   last_updated: string;
 }
 

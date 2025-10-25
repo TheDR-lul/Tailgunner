@@ -3,6 +3,7 @@
 use anyhow::Result;
 use rusqlite::{Connection, params};
 use std::path::PathBuf;
+use anyhow::anyhow;
 use crate::datamine::types::*;
 
 pub struct VehicleDatabase {
@@ -64,15 +65,21 @@ impl VehicleDatabase {
             CREATE TABLE IF NOT EXISTS ground (
                 identifier TEXT PRIMARY KEY,
                 display_name TEXT NOT NULL,
-                max_speed_kmh REAL NOT NULL,
-                max_reverse_speed_kmh REAL NOT NULL,
-                mass_kg REAL NOT NULL,
-                horse_power REAL NOT NULL,
-                max_rpm REAL NOT NULL,
-                min_rpm REAL NOT NULL,
-                hull_hp REAL NOT NULL,
-                armor_thickness_mm REAL,
+                max_speed_kmh REAL,
+                max_reverse_speed_kmh REAL,
+                mass_kg REAL,
+                horse_power REAL,
+                max_rpm REAL,
+                min_rpm REAL,
+                crew_hp REAL,
+                crew_count INTEGER,
+                main_gun_caliber_mm REAL,
+                main_gun_fire_rate REAL,
+                ammo_count INTEGER,
+                forward_gears INTEGER,
+                reverse_gears INTEGER,
                 vehicle_type TEXT NOT NULL,
+                data_source TEXT NOT NULL,
                 last_updated TEXT NOT NULL
             );
             
@@ -142,7 +149,7 @@ impl VehicleDatabase {
         for v in vehicles {
             tx.execute(
                 "INSERT OR REPLACE INTO ground VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18
                 )",
                 params![
                     v.identifier,
@@ -153,9 +160,15 @@ impl VehicleDatabase {
                     v.horse_power,
                     v.max_rpm,
                     v.min_rpm,
-                    v.hull_hp,
-                    v.armor_thickness_mm,
+                    v.crew_hp,
+                    v.crew_count,
+                    v.main_gun_caliber_mm,
+                    v.main_gun_fire_rate,
+                    v.ammo_count,
+                    v.forward_gears,
+                    v.reverse_gears,
                     v.vehicle_type,
+                    v.data_source,
                     v.last_updated,
                 ],
             )?;
@@ -305,10 +318,16 @@ impl VehicleDatabase {
                 horse_power: row.get(5)?,
                 max_rpm: row.get(6)?,
                 min_rpm: row.get(7)?,
-                hull_hp: row.get(8)?,
-                armor_thickness_mm: row.get(9)?,
-                vehicle_type: row.get(10)?,
-                last_updated: row.get(11)?,
+                crew_hp: row.get(8)?,
+                crew_count: row.get(9)?,
+                main_gun_caliber_mm: row.get(10)?,
+                main_gun_fire_rate: row.get(11)?,
+                ammo_count: row.get(12)?,
+                forward_gears: row.get(13)?,
+                reverse_gears: row.get(14)?,
+                vehicle_type: row.get(15)?,
+                data_source: row.get(16)?,
+                last_updated: row.get(17)?,
             })
         })?;
         
@@ -338,6 +357,56 @@ impl VehicleDatabase {
         })?;
         
         Ok(ship)
+    }
+    
+    /// Update ground vehicle with Wiki data (lazy loading)
+    pub fn update_ground_wiki_data(
+        &self,
+        identifier: &str,
+        max_speed_kmh: Option<f32>,
+        max_reverse_speed_kmh: Option<f32>,
+        forward_gears: Option<u8>,
+        reverse_gears: Option<u8>,
+    ) -> Result<()> {
+        let mut update_parts = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        
+        if max_speed_kmh.is_some() {
+            update_parts.push("max_speed_kmh = ?");
+            params.push(Box::new(max_speed_kmh));
+        }
+        if max_reverse_speed_kmh.is_some() {
+            update_parts.push("max_reverse_speed_kmh = ?");
+            params.push(Box::new(max_reverse_speed_kmh));
+        }
+        if forward_gears.is_some() {
+            update_parts.push("forward_gears = ?");
+            params.push(Box::new(forward_gears));
+        }
+        if reverse_gears.is_some() {
+            update_parts.push("reverse_gears = ?");
+            params.push(Box::new(reverse_gears));
+        }
+        
+        if !update_parts.is_empty() {
+            update_parts.push("data_source = ?");
+            params.push(Box::new("datamine+wiki"));
+            
+            params.push(Box::new(identifier.to_string()));
+            
+            let sql = format!(
+                "UPDATE ground SET {} WHERE identifier = ?",
+                update_parts.join(", ")
+            );
+            
+            let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+            
+            self.conn.execute(&sql, params_refs.as_slice())?;
+            
+            log::info!("[Database] 🌐 Updated '{}' with Wiki data", identifier);
+        }
+        
+        Ok(())
     }
     
     /// Get total count of vehicles

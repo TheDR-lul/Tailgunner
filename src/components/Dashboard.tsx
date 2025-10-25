@@ -110,7 +110,7 @@ export function Dashboard() {
     try {
       setIsParsingDb(true);
       if ((window as any).debugLog) {
-        (window as any).debugLog('info', '🔄 Force rebuilding database (deleting old + reparse)...');
+        (window as any).debugLog('info', '🔄 Force rebuilding database...');
       }
       
       const stats = await api.datamineRebuild();
@@ -149,10 +149,10 @@ export function Dashboard() {
       
       setIsParsingDb(true);
       if ((window as any).debugLog) {
-        (window as any).debugLog('info', `🔄 Parsing from: ${selectedPath}`);
+        (window as any).debugLog('info', `🔄 Parsing from: ${selectedPath} (Wiki: ${enableWikiScraping ? 'ON' : 'OFF'})`);
       }
       
-      const stats = await api.datamineParse(selectedPath);
+      const stats = await api.datamineParse(selectedPath, enableWikiScraping);
       
       if ((window as any).debugLog) {
         (window as any).debugLog('success', 
@@ -248,6 +248,21 @@ export function Dashboard() {
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>⚓ Ships</div>
                 </div>
               </div>
+              
+              {/* Info about lazy loading */}
+              <div style={{ 
+                marginBottom: '12px', 
+                padding: '8px 12px', 
+                background: 'rgba(20, 184, 166, 0.1)', 
+                borderRadius: '6px',
+                border: '1px solid rgba(20, 184, 166, 0.2)',
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+                lineHeight: 1.4
+              }}>
+                <span style={{ color: '#14b8a6', fontWeight: 600 }}>🌐 Smart Loading:</span> Missing data (like tank speed) will be fetched from Wiki automatically when you select a vehicle in-game and cached for future use.
+              </div>
+              
               <button 
                 className="btn btn-secondary btn-sm" 
                 onClick={handleRebuildDatabase}
@@ -272,6 +287,7 @@ export function Dashboard() {
                   Build from War Thunder files to show vehicle data
                 </div>
               </div>
+              
               <button 
                 className="btn btn-primary btn-sm" 
                 onClick={handleInitDatabase}

@@ -327,16 +327,71 @@ async fn get_vehicle_info(state: tauri::State<'_, AppState>) -> Result<Option<da
     
     log::info!("[Vehicle Info] 🔎 Searching for: '{}'", identifier);
     
-    let result = db.get_limits(&identifier);
+    let mut vehicle_data = match db.get_limits(&identifier) {
+        Some(data) => data,
+        None => {
+            log::error!("[Vehicle Info] ❌ NO DATA FOUND for vehicle: '{}'", identifier);
+            log::error!("[Vehicle Info] Check datamine database or run: datamine_parse");
+            return Ok(None);
+        }
+    };
     
-    if result.is_none() {
-        log::error!("[Vehicle Info] ❌ NO DATA FOUND for vehicle: '{}'", identifier);
-        log::error!("[Vehicle Info] Check datamine database or run: datamine_parse");
-    } else {
-        log::info!("[Vehicle Info] ✅ Found vehicle data!");
+    log::info!("[Vehicle Info] ✅ Found vehicle data!");
+    
+    // 🌐 LAZY WIKI LOADING - fetch missing data on-demand
+    if let datamine::VehicleLimits::Ground(ref mut ground) = vehicle_data {
+        let needs_wiki = ground.max_speed_kmh.is_none() || ground.forward_gears.is_none();
+        
+        if needs_wiki {
+            log::info!("[Vehicle Info] 🌐 Fetching missing data from Wiki for '{}'...", identifier);
+            
+            match datamine::wiki_scraper::scrape_ground_vehicle(&ground.identifier).await {
+                Ok(wiki_data) => {
+                    let mut updated = false;
+                    
+                    // Update missing fields
+                    if ground.max_speed_kmh.is_none() && wiki_data.max_speed_kmh.is_some() {
+                        ground.max_speed_kmh = wiki_data.max_speed_kmh;
+                        updated = true;
+                    }
+                    if ground.max_reverse_speed_kmh.is_none() && wiki_data.max_reverse_speed_kmh.is_some() {
+                        ground.max_reverse_speed_kmh = wiki_data.max_reverse_speed_kmh;
+                        updated = true;
+                    }
+                    if ground.forward_gears.is_none() && wiki_data.forward_gears.is_some() {
+                        ground.forward_gears = wiki_data.forward_gears;
+                        updated = true;
+                    }
+                    if ground.reverse_gears.is_none() && wiki_data.reverse_gears.is_some() {
+                        ground.reverse_gears = wiki_data.reverse_gears;
+                        updated = true;
+                    }
+                    
+                    if updated {
+                        ground.data_source = "datamine+wiki".to_string();
+                        
+                        // Save to database for next time
+                        if let Err(e) = db.update_ground_wiki_data(
+                            &ground.identifier,
+                            ground.max_speed_kmh,
+                            ground.max_reverse_speed_kmh,
+                            ground.forward_gears,
+                            ground.reverse_gears,
+                        ) {
+                            log::warn!("[Vehicle Info] ⚠️ Failed to save Wiki data: {}", e);
+                        } else {
+                            log::info!("[Vehicle Info] ✅ Wiki data cached for future use");
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("[Vehicle Info] ⚠️ Wiki scraping failed: {}", e);
+                }
+            }
+        }
     }
     
-    Ok(result)
+    Ok(Some(vehicle_data))
 }
 
 #[tauri::command]
@@ -400,18 +455,16 @@ async fn datamine_find_game() -> Result<String, String> {
 #[tauri::command]
 async fn datamine_parse(game_path: String) -> Result<datamine::ParseStats, String> {
     log::info!("[Datamine] Starting parse from: {}", game_path);
+    log::info!("[Datamine] Wiki data will be fetched on-demand when vehicles are selected");
     
     let path = std::path::PathBuf::from(game_path);
     
     let mut dm = datamine::Datamine::new(path)
         .map_err(|e| e.to_string())?;
     
-    // Parse in background thread
-    let result = tokio::task::spawn_blocking(move || {
-        dm.parse_all()
-    }).await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| e.to_string())?;
+    // Parse (now async, without Wiki)
+    let result = dm.parse_all().await
+        .map_err(|e| e.to_string())?;
     
     log::info!("[Datamine] Parse complete: {} aircraft, {} ground, {} ships",
         result.aircraft_count, result.ground_count, result.ships_count);
@@ -491,7 +544,7 @@ async fn datamine_rebuild() -> Result<datamine::ParseStats, String> {
     
     log::info!("[Datamine] Found game at: {:?}", game_path);
     
-    // Rebuild
+    // Rebuild (Wiki data will be fetched on-demand)
     datamine_parse(game_path.to_string_lossy().to_string()).await
 }
 

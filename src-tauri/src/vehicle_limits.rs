@@ -62,8 +62,15 @@ impl VehicleLimitsManager {
                     }
                 }
                 VehicleLimits::Ground(ground) => {
-                    log::info!("[Vehicle Limits]   Max Speed: {} km/h", ground.max_speed_kmh);
-                    log::info!("[Vehicle Limits]   Power: {} HP", ground.horse_power);
+                    if let Some(speed) = ground.max_speed_kmh {
+                        log::info!("[Vehicle Limits]   Max Speed: {} km/h", speed);
+                    }
+                    if let Some(hp) = ground.horse_power {
+                        log::info!("[Vehicle Limits]   Power: {} HP", hp);
+                    }
+                    if let Some(mass) = ground.mass_kg {
+                        log::info!("[Vehicle Limits]   Mass: {:.1} t", mass / 1000.0);
+                    }
                 }
                 VehicleLimits::Ship(ship) => {
                     log::info!("[Vehicle Limits]   Max Speed: {} knots", ship.max_speed_knots);
@@ -188,20 +195,22 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
 fn generate_ground_triggers(ground: &crate::datamine::types::GroundLimits) -> Vec<EventTrigger> {
     let mut triggers = Vec::new();
     
-    // Max speed warning (98% of max)
-    let warning_speed = ground.max_speed_kmh * 0.98;
-    triggers.push(EventTrigger {
-        id: "dynamic_ground_maxspeed".to_string(),
-        name: format!("Max Speed ({:.0}+ km/h)", warning_speed),
-        description: format!("Approaching maximum speed of {} km/h", ground.max_speed_kmh),
-        condition: TriggerCondition::SpeedAbove(warning_speed),
-        event: GameEvent::Overspeed,
-        cooldown_ms: 5000,
-        enabled: false,
-        is_builtin: false,
-        pattern: None,
-        curve_points: None,
-    });
+    // Max speed warning (98% of max) - only if data available
+    if let Some(max_speed) = ground.max_speed_kmh {
+        let warning_speed = max_speed * 0.98;
+        triggers.push(EventTrigger {
+            id: "dynamic_ground_maxspeed".to_string(),
+            name: format!("Max Speed ({:.0}+ km/h)", warning_speed),
+            description: format!("Approaching maximum speed of {:.0} km/h", max_speed),
+            condition: TriggerCondition::SpeedAbove(warning_speed),
+            event: GameEvent::Overspeed,
+            cooldown_ms: 5000,
+            enabled: false,
+            is_builtin: false,
+            pattern: None,
+            curve_points: None,
+        });
+    }
     
     triggers
 }

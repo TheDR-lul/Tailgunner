@@ -10,6 +10,7 @@ pub mod naval;
 pub mod database;
 pub mod types;
 pub mod vromfs;
+pub mod wiki_scraper;
 
 use anyhow::Result;
 use std::path::PathBuf;
@@ -36,8 +37,8 @@ impl Datamine {
             .ok_or_else(|| anyhow::anyhow!("War Thunder installation not found"))
     }
     
-    /// Parse all vehicle data from game files
-    pub fn parse_all(&mut self) -> Result<ParseStats> {
+    /// Parse all vehicle data from game files (without Wiki)
+    pub async fn parse_all(&mut self) -> Result<ParseStats> {
         log::info!("[Datamine] Starting full parse from: {:?}", self.game_path);
         
         let start = std::time::Instant::now();
@@ -50,8 +51,8 @@ impl Datamine {
         let aircraft = aircraft::parse_aircraft(&parse_path)?;
         self.db.save_aircraft(&aircraft)?;
         
-        // Parse ground vehicles
-        let ground = ground::parse_ground(&parse_path)?;
+        // Parse ground vehicles (Wiki data will be fetched on-demand)
+        let ground = ground::parse_ground(&parse_path).await?;
         self.db.save_ground(&ground)?;
         
         // Parse ships

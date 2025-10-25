@@ -64,21 +64,33 @@ pub struct GroundLimits {
     pub display_name: String,
     
     // Speed and mass
-    pub max_speed_kmh: f32,
-    pub max_reverse_speed_kmh: f32,
-    pub mass_kg: f32,
+    pub max_speed_kmh: Option<f32>,
+    pub max_reverse_speed_kmh: Option<f32>,
+    pub mass_kg: Option<f32>,
     
     // Engine
-    pub horse_power: f32,
-    pub max_rpm: f32,
-    pub min_rpm: f32,
+    pub horse_power: Option<f32>,
+    pub max_rpm: Option<f32>,
+    pub min_rpm: Option<f32>,
     
     // Durability
-    pub hull_hp: f32,
-    pub armor_thickness_mm: Option<f32>,
+    pub crew_hp: Option<f32>,
+    
+    // Crew
+    pub crew_count: Option<u8>,
+    
+    // Weapon
+    pub main_gun_caliber_mm: Option<f32>,
+    pub main_gun_fire_rate: Option<f32>,  // shots per second
+    pub ammo_count: Option<u32>,
+    
+    // Transmission
+    pub forward_gears: Option<u8>,
+    pub reverse_gears: Option<u8>,
     
     // Metadata
     pub vehicle_type: String,      // heavyVehicle, mediumVehicle, etc
+    pub data_source: String,       // "datamine", "wiki", "datamine+wiki"
     pub last_updated: String,
 }
 
