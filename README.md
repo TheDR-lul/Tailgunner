@@ -1,5 +1,5 @@
 # 🎯 Tailgunner
-## powered by A.S.S. (Adaptive Sensory System)
+## Powered by A.S.S. (Adaptive Sensory System)
 
 **Transform your War Thunder experience into a full-body immersion system!**
 
