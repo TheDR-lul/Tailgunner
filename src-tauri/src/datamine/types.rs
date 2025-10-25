@@ -26,11 +26,11 @@ pub struct AircraftLimits {
     pub flaps_max_speed_kmh: Option<f32>, // Flaps extension speed limit
     
     // G-load limits
-    pub mass_kg: f32,              // Takeoff mass
-    pub wing_overload_pos_n: f32,  // Positive G limit (Newtons)
-    pub wing_overload_neg_n: f32,  // Negative G limit (Newtons)
-    pub max_positive_g: f32,       // Calculated +G
-    pub max_negative_g: f32,       // Calculated -G
+    pub mass_kg: f32,                     // Takeoff mass
+    pub wing_overload_pos_n: Option<f32>, // Positive G limit (Newtons) - None if not found
+    pub wing_overload_neg_n: Option<f32>, // Negative G limit (Newtons) - None if not found
+    pub max_positive_g: Option<f32>,      // Calculated +G - None if CritOverload not available
+    pub max_negative_g: Option<f32>,      // Calculated -G - None if CritOverload not available
     
     // Engine
     pub max_rpm: Option<f32>,

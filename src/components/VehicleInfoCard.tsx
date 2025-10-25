@@ -156,8 +156,16 @@ export const VehicleInfoCard: React.FC = () => {
             <StatItem 
               icon={<Gauge size={16} />} 
               label="G-Load Limits" 
-              value={`+${data.max_positive_g.toFixed(1)}G / ${data.max_negative_g.toFixed(1)}G`}
-              desc="Maximum overload before structural failure"
+              value={
+                data.max_positive_g != null && data.max_negative_g != null
+                  ? `+${data.max_positive_g.toFixed(1)}G / ${data.max_negative_g.toFixed(1)}G`
+                  : "N/A"
+              }
+              desc={
+                data.max_positive_g != null 
+                  ? "Maximum overload before structural failure"
+                  : "G-load data not available for this aircraft"
+              }
               color="#f59e0b"
             />
             {data.flutter_speed && (

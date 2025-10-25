@@ -123,7 +123,8 @@ fn parse_aircraft_file(path: &PathBuf) -> Result<AircraftLimits> {
     // 2. Aerodynamics.WingPlane.Strength.CritOverload (modern jets like JAS39)
     // 3. Strength.CritOverload (older jets)
     // 4. WingCritOverload (older aircraft like BF-109)
-    let wing_neg_n = json.get("Aerodynamics")
+    // If not found anywhere - return None (will show "N/A" in UI)
+    let wing_neg_n_opt = json.get("Aerodynamics")
         .and_then(|a| a.get("WingPlaneSweep0"))
         .and_then(|w| w.get("Strength"))
         .and_then(|s| s.get("CritOverload"))
@@ -148,9 +149,9 @@ fn parse_aircraft_file(path: &PathBuf) -> Result<AircraftLimits> {
                 .and_then(|arr| arr.get(0))
                 .and_then(|v| v.as_f64())
         })
-        .unwrap_or(-100000.0) as f32;
+        .map(|v| v as f32);
     
-    let wing_pos_n = json.get("Aerodynamics")
+    let wing_pos_n_opt = json.get("Aerodynamics")
         .and_then(|a| a.get("WingPlaneSweep0"))
         .and_then(|w| w.get("Strength"))
         .and_then(|s| s.get("CritOverload"))
@@ -175,67 +176,16 @@ fn parse_aircraft_file(path: &PathBuf) -> Result<AircraftLimits> {
                 .and_then(|arr| arr.get(1))
                 .and_then(|v| v.as_f64())
         })
-        .unwrap_or(200000.0) as f32;
+        .map(|v| v as f32);
     
-    let max_positive_g = AircraftLimits::calculate_g_limits(wing_pos_n, mass_kg);
-    let max_negative_g = AircraftLimits::calculate_g_limits(wing_neg_n, mass_kg); // Keep negative!
-    
-    // DEBUG: Log G-load calculation for buccaneer_s1
-    if identifier == "buccaneer_s1" {
-        log::warn!("[Aircraft] 🔍 BUCCANEER S1 - G-load calculation:");
-        log::warn!("[Aircraft]   Mass (EmptyMass): {} kg", mass_kg);
-        log::warn!("[Aircraft]   CritOverload: [{}, {}] N", wing_neg_n, wing_pos_n);
-        log::warn!("[Aircraft]   Calculated G-Load: +{:.1}G / {:.1}G", max_positive_g, max_negative_g);
-        log::warn!("[Aircraft]   Aerodynamics exists: {}", json.get("Aerodynamics").is_some());
-        
-        // Dump ALL Aerodynamics keys for old aircraft
-        if let Some(aero) = json.get("Aerodynamics") {
-            if let Some(obj) = aero.as_object() {
-                let keys: Vec<&String> = obj.keys().collect();
-                log::warn!("[Aircraft]   Aerodynamics keys ({} total): {:?}", keys.len(), keys);
-                
-                // Check for Wing0, Wing1, Wing2 (old format)
-                for i in 0..3 {
-                    let key = format!("Wing{}", i);
-                    if let Some(wing) = aero.get(&key) {
-                        log::warn!("[Aircraft]   {} exists!", key);
-                        if let Some(wing_obj) = wing.as_object() {
-                            log::warn!("[Aircraft]     {}.keys: {:?}", key, wing_obj.keys().collect::<Vec<_>>());
-                            if let Some(strength) = wing.get("Strength") {
-                                log::warn!("[Aircraft]     {}.Strength: {:?}", key, strength);
-                            }
-                        }
-                    }
-                }
-                
-                // Check Fuselage, Stab, Fin for Strength/CritOverload
-                for part in ["Fuselage", "Stab", "Fin"] {
-                    if let Some(part_obj) = aero.get(part) {
-                        log::warn!("[Aircraft]   {} exists!", part);
-                        if let Some(obj) = part_obj.as_object() {
-                            log::warn!("[Aircraft]     {}.keys: {:?}", part, obj.keys().collect::<Vec<_>>());
-                            if let Some(strength) = part_obj.get("Strength") {
-                                log::warn!("[Aircraft]     {}.Strength: {:?}", part, strength);
-                            }
-                            if let Some(crit) = part_obj.get("CritOverload") {
-                                log::warn!("[Aircraft]     {}.CritOverload: {:?}", part, crit);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Check Passport.IAS for stall speed
-        if let Some(passport) = json.get("Passport") {
-            if let Some(ias) = passport.get("IAS") {
-                log::warn!("[Aircraft]   Passport.IAS: {:?}", ias);
-            }
-            if let Some(alt) = passport.get("Alt") {
-                log::warn!("[Aircraft]   Passport.Alt: {:?}", alt);
-            }
-        }
-    }
+    // Calculate G-limits only if CritOverload data exists
+    let (max_positive_g, max_negative_g) = match (wing_pos_n_opt, wing_neg_n_opt) {
+        (Some(wing_pos_n), Some(wing_neg_n)) => (
+            Some(AircraftLimits::calculate_g_limits(wing_pos_n, mass_kg)),
+            Some(AircraftLimits::calculate_g_limits(wing_neg_n, mass_kg)),
+        ),
+        _ => (None, None), // Data not available - will show "N/A"
+    };
     
     // Flutter speed (estimate if not provided)
     let flutter_speed = Some(AircraftLimits::estimate_flutter_speed(vne));
@@ -279,10 +229,10 @@ fn parse_aircraft_file(path: &PathBuf) -> Result<AircraftLimits> {
         gear_max_speed_kmh,
         flaps_max_speed_kmh,
         mass_kg,
-        wing_overload_pos_n: wing_pos_n,
-        wing_overload_neg_n: wing_neg_n,
-        max_positive_g,
-        max_negative_g,
+        wing_overload_pos_n: wing_pos_n_opt,  // Option<f32> - None if not found
+        wing_overload_neg_n: wing_neg_n_opt,  // Option<f32> - None if not found
+        max_positive_g,  // Option<f32> - None if CritOverload not available
+        max_negative_g,  // Option<f32> - None if CritOverload not available
         max_rpm,
         horse_power,
         vehicle_type,

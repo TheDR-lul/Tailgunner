@@ -47,8 +47,16 @@ impl VehicleLimitsManager {
             match &limits {
                 VehicleLimits::Aircraft(aircraft) => {
                     log::info!("[Vehicle Limits]   Vne: {} km/h", aircraft.vne_kmh);
-                    log::info!("[Vehicle Limits]   Max +G: {:.1}G", aircraft.max_positive_g);
-                    log::info!("[Vehicle Limits]   Max -G: {:.1}G", aircraft.max_negative_g);
+                    if let Some(g) = aircraft.max_positive_g {
+                        log::info!("[Vehicle Limits]   Max +G: {:.1}G", g);
+                    } else {
+                        log::info!("[Vehicle Limits]   Max +G: N/A");
+                    }
+                    if let Some(g) = aircraft.max_negative_g {
+                        log::info!("[Vehicle Limits]   Max -G: {:.1}G", g);
+                    } else {
+                        log::info!("[Vehicle Limits]   Max -G: N/A");
+                    }
                     if let Some(flutter) = aircraft.flutter_speed {
                         log::info!("[Vehicle Limits]   Flutter: {} km/h", flutter);
                     }
@@ -139,35 +147,39 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
         curve_points: None,
     });
     
-    // Max +G Warning (95% of max)
-    let warning_g = aircraft.max_positive_g * 0.95;
-    triggers.push(EventTrigger {
-        id: "dynamic_high_g".to_string(),
-        name: format!("High G Warning ({:.1}+ G)", warning_g),
-        description: format!("Approaching max +G of {:.1}G", aircraft.max_positive_g),
-        condition: TriggerCondition::GLoadAbove(warning_g),
-        event: GameEvent::OverG,
-        cooldown_ms: 3000,
-        enabled: false,
-        is_builtin: false,
-        pattern: None,
-        curve_points: None,
-    });
+    // Max +G Warning (95% of max) - only if data available
+    if let Some(max_g) = aircraft.max_positive_g {
+        let warning_g = max_g * 0.95;
+        triggers.push(EventTrigger {
+            id: "dynamic_high_g".to_string(),
+            name: format!("High G Warning ({:.1}+ G)", warning_g),
+            description: format!("Approaching max +G of {:.1}G", max_g),
+            condition: TriggerCondition::GLoadAbove(warning_g),
+            event: GameEvent::OverG,
+            cooldown_ms: 3000,
+            enabled: false,
+            is_builtin: false,
+            pattern: None,
+            curve_points: None,
+        });
+    }
     
-    // Max -G Warning (95% of max)
-    let warning_g_neg = aircraft.max_negative_g * 0.95;
-    triggers.push(EventTrigger {
-        id: "dynamic_negative_g".to_string(),
-        name: format!("Negative G Warning ({:.1} G)", warning_g_neg),
-        description: format!("Approaching max -G of {:.1}G", aircraft.max_negative_g),
-        condition: TriggerCondition::GLoadBelow(warning_g_neg),
-        event: GameEvent::OverG,
-        cooldown_ms: 3000,
-        enabled: false,
-        is_builtin: false,
-        pattern: None,
-        curve_points: None,
-    });
+    // Max -G Warning (95% of max) - only if data available
+    if let Some(max_g_neg) = aircraft.max_negative_g {
+        let warning_g_neg = max_g_neg * 0.95;
+        triggers.push(EventTrigger {
+            id: "dynamic_negative_g".to_string(),
+            name: format!("Negative G Warning ({:.1} G)", warning_g_neg),
+            description: format!("Approaching max -G of {:.1}G", max_g_neg),
+            condition: TriggerCondition::GLoadBelow(warning_g_neg),
+            event: GameEvent::OverG,
+            cooldown_ms: 3000,
+            enabled: false,
+            is_builtin: false,
+            pattern: None,
+            curve_points: None,
+        });
+    }
     
     triggers
 }

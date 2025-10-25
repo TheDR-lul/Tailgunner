@@ -47,10 +47,10 @@ export interface AircraftLimits {
   gear_max_speed_kmh?: number;
   flaps_max_speed_kmh?: number;
   mass_kg: number;
-  wing_overload_pos_n: number;
-  wing_overload_neg_n: number;
-  max_positive_g: number;
-  max_negative_g: number;
+  wing_overload_pos_n?: number; // Optional - may be null/undefined if data not available
+  wing_overload_neg_n?: number; // Optional - may be null/undefined if data not available
+  max_positive_g?: number;      // Optional - will be null if CritOverload not available
+  max_negative_g?: number;      // Optional - will be null if CritOverload not available
   max_rpm?: number;
   horse_power?: number;
   vehicle_type: string;
