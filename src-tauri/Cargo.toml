@@ -3,7 +3,7 @@ name = "butt_thunder"
 version = "0.7.0"
 description = "Haptic feedback system for War Thunder via Buttplug.io"
 authors = ["Tailgunner Contributors"]
-license = "CC-BY-NC-SA-4.0"
+license = "GPL-3.0-or-later"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
