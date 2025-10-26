@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
+import { Map } from 'lucide-react';
 import './MiniMap.css';
 
 interface MapObject {
@@ -104,7 +105,7 @@ export function MiniMap() {
     return () => window.removeEventListener('localStorageChange', handleStorageChange);
   }, []);
 
-  // Update canvas size based on wrapper size (ALWAYS SQUARE)
+  // Update canvas size based on wrapper size - FORCE SQUARE 1:1
   useEffect(() => {
     const wrapper = canvasWrapperRef.current;
     if (!wrapper) return;
@@ -162,28 +163,83 @@ export function MiniMap() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Get click position in canvas space (0..1)
+    // Get click position relative to canvas
     const rect = canvas.getBoundingClientRect();
-    const canvasX = (e.clientX - rect.left) / rect.width;
-    const canvasY = (e.clientY - rect.top) / rect.height;
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
 
-    // Convert from screen space to map space (accounting for zoom/pan)
-    // The canvas transform is: translate(center + pan), then scale(zoom)
-    // To invert: first unscale, then untranslate
-    const centerX = 0.5;
-    const centerY = 0.5;
+    // Convert from canvas pixel coords to map space (0..1)
+    // Account for zoom and pan transforms
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Save current transform
+    ctx.save();
     
-    // Undo translation (in scaled space)
-    const scaledX = canvasX - centerX - panOffset.x / canvas.width;
-    const scaledY = canvasY - centerY - panOffset.y / canvas.height;
+    // Apply same transforms as drawing
+    if (followPlayer && mapData.player_position) {
+      const mapWidth = mapData.info.map_max[0] - mapData.info.map_min[0];
+      const mapHeight = mapData.info.map_max[1] - mapData.info.map_min[1];
+      const worldX = mapData.player_position[0] * mapWidth + mapData.info.map_min[0];
+      const worldY = (1 - mapData.player_position[1]) * mapHeight + mapData.info.map_min[1];
+      
+      let canvasX, canvasY;
+      if (mapMode === 'full') {
+        canvasX = (worldX - mapData.info.map_min[0]) / mapWidth * canvas.width;
+        canvasY = (mapData.info.map_max[1] - worldY) / mapHeight * canvas.height;
+      } else {
+        canvasX = (worldX - mapData.info.grid_zero[0]) / mapData.info.grid_size[0] * canvas.width;
+        canvasY = (mapData.info.grid_zero[1] - worldY) / mapData.info.grid_size[1] * canvas.height;
+      }
+      
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-canvasX, -canvasY);
+    } else {
+      ctx.translate(panOffset.x, panOffset.y);
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+    }
+
+    // Get inverse transform
+    const transform = ctx.getTransform();
+    const inverse = transform.inverse();
     
-    // Undo scaling
-    const mapX = scaledX / zoomLevel + centerX;
-    const mapY = scaledY / zoomLevel + centerY;
+    // Transform click coords
+    const transformedPoint = new DOMPoint(clickX, clickY).matrixTransform(inverse);
+    
+    ctx.restore();
+
+    // Convert canvas coords to normalized map coords (0..1)
+    let mapX, mapY;
+    if (mapMode === 'full') {
+      mapX = transformedPoint.x / canvas.width;
+      mapY = transformedPoint.y / canvas.height;
+    } else {
+      mapX = transformedPoint.x / canvas.width;
+      mapY = transformedPoint.y / canvas.height;
+    }
+
+    // Convert to API coords (full map 0..1)
+    const mapWidth = mapData.info.map_max[0] - mapData.info.map_min[0];
+    const mapHeight = mapData.info.map_max[1] - mapData.info.map_min[1];
+    
+    let worldX, worldY;
+    if (mapMode === 'full') {
+      worldX = mapX * mapWidth + mapData.info.map_min[0];
+      worldY = mapData.info.map_max[1] - mapY * mapHeight;
+    } else {
+      worldX = mapX * mapData.info.grid_size[0] + mapData.info.grid_zero[0];
+      worldY = mapData.info.grid_zero[1] - mapY * mapData.info.grid_size[1];
+    }
+    
+    const apiX = (worldX - mapData.info.map_min[0]) / mapWidth;
+    const apiY = 1 - (worldY - mapData.info.map_min[1]) / mapHeight;
 
     // Clamp to 0..1
-    const clampedX = Math.max(0, Math.min(1, mapX));
-    const clampedY = Math.max(0, Math.min(1, mapY));
+    const clampedX = Math.max(0, Math.min(1, apiX));
+    const clampedY = Math.max(0, Math.min(1, apiY));
 
     if (activeTool === 'measure') {
       if (!measurePoint) {
@@ -499,11 +555,11 @@ export function MiniMap() {
     }
 
     // Draw markers and measurements (after zoom/pan transform)
-    drawMarkersAndMeasurements(ctx, canvas, playerObj, mapData.info);
+    drawMarkersAndMeasurements(ctx, canvas, playerObj, mapData.info, zoomLevel);
 
     // Restore transform
     ctx.restore();
-  }, [mapData, mapImage, mapMode, zoomLevel, panOffset, followPlayer, markers, measurePoint]);
+  }, [mapData, mapImage, mapMode, zoomLevel, panOffset, followPlayer, markers, measurePoint, measurement, activeTool, canvasSize]);
 
   const calculateNearbyUnits = (
     player: MapObject,
@@ -749,7 +805,8 @@ export function MiniMap() {
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
     player: MapObject | undefined,
-    info: MapInfo
+    info: MapInfo,
+    currentZoom: number
   ) => {
     // Helper to convert map coords (0..1) to canvas coords
     const toCanvasCoords = (x: number, y: number) => {
@@ -769,41 +826,44 @@ export function MiniMap() {
       return { x: visibleX * canvas.width, y: visibleY * canvas.height };
     };
 
-    // Draw measurement line and points
+    // Draw measurement line and points (scale inversely with zoom)
     if (measurement) {
       const point1Pos = toCanvasCoords(measurement.point1.x, measurement.point1.y);
       const point2Pos = toCanvasCoords(measurement.point2.x, measurement.point2.y);
 
+      // Inverse scale - smaller when zoomed in
+      const scale = 1 / currentZoom;
+
       ctx.save();
       // Draw line between points
       ctx.strokeStyle = '#ff9933';
-      ctx.lineWidth = 2 / zoomLevel;
-      ctx.setLineDash([5 / zoomLevel, 5 / zoomLevel]);
+      ctx.lineWidth = 2 * scale;
+      ctx.setLineDash([5 * scale, 5 * scale]);
       ctx.beginPath();
       ctx.moveTo(point1Pos.x, point1Pos.y);
       ctx.lineTo(point2Pos.x, point2Pos.y);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Draw point 1 (start)
+      // Draw point 1 (start) - smaller
       ctx.fillStyle = '#ff9933';
       ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2 / zoomLevel;
+      ctx.lineWidth = 1.5 * scale;
       ctx.beginPath();
-      ctx.arc(point1Pos.x, point1Pos.y, 5 / zoomLevel, 0, Math.PI * 2);
+      ctx.arc(point1Pos.x, point1Pos.y, 3 * scale, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Draw point 2 (end) with crosshair
+      // Draw point 2 (end) with crosshair - smaller
       ctx.beginPath();
-      ctx.arc(point2Pos.x, point2Pos.y, 5 / zoomLevel, 0, Math.PI * 2);
+      ctx.arc(point2Pos.x, point2Pos.y, 3 * scale, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
       // Draw crosshair on end point
-      const crossSize = 10 / zoomLevel;
+      const crossSize = 6 * scale;
       ctx.strokeStyle = '#ff9933';
-      ctx.lineWidth = 1.5 / zoomLevel;
+      ctx.lineWidth = 1.5 * scale;
       ctx.beginPath();
       ctx.moveTo(point2Pos.x - crossSize, point2Pos.y);
       ctx.lineTo(point2Pos.x + crossSize, point2Pos.y);
@@ -811,48 +871,164 @@ export function MiniMap() {
       ctx.lineTo(point2Pos.x, point2Pos.y + crossSize);
       ctx.stroke();
 
+      // Draw measurement info text above end point
+      const fontSize = Math.max(6, 11 * scale); // Min 6px, more aggressive scaling
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      
+      const distance = `${measurement.distance.toFixed(0)}m`;
+      const bearing = `${measurement.bearing.toFixed(0)}°`;
+      const gridRef = measurement.gridRef !== '?' ? measurement.gridRef : '';
+      
+      const line1 = `${distance} @ ${bearing}`;
+      const line2 = gridRef;
+      
+      // Draw background for better readability (transparent)
+      const padding = 4 * scale;
+      const line1Width = ctx.measureText(line1).width;
+      const line2Width = line2 ? ctx.measureText(line2).width : 0;
+      const maxWidth = Math.max(line1Width, line2Width);
+      const boxWidth = maxWidth + padding * 2;
+      const boxHeight = (line2 ? 26 : 16) * scale;
+      
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(
+        point2Pos.x - boxWidth / 2,
+        point2Pos.y - crossSize - boxHeight - 4 * scale,
+        boxWidth,
+        boxHeight
+      );
+      
+      // Draw text with stroke for better readability
+      ctx.lineWidth = 2 * scale;
+      
+      // Line 1: distance @ bearing
+      ctx.strokeStyle = '#000';
+      ctx.strokeText(line1, point2Pos.x, point2Pos.y - crossSize - 4 * scale);
+      ctx.fillStyle = '#ff9933';
+      ctx.fillText(line1, point2Pos.x, point2Pos.y - crossSize - 4 * scale);
+      
+      // Line 2: grid reference
+      if (line2) {
+        ctx.strokeStyle = '#000';
+        ctx.strokeText(line2, point2Pos.x, point2Pos.y - crossSize - 4 * scale - 12 * scale);
+        ctx.fillStyle = '#64c8ff';
+        ctx.fillText(line2, point2Pos.x, point2Pos.y - crossSize - 4 * scale - 12 * scale);
+      }
+
       ctx.restore();
     } else if (measurePoint && activeTool === 'measure') {
-      // Only start point set for 'measure' tool, draw it
+      // Only start point set for 'measure' tool, draw it - smaller
       const pointPos = toCanvasCoords(measurePoint.x, measurePoint.y);
+      
+      const scale = 1 / currentZoom;
       
       ctx.save();
       ctx.fillStyle = '#ff9933';
       ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2 / zoomLevel;
+      ctx.lineWidth = 1.5 * scale;
       ctx.beginPath();
-      ctx.arc(pointPos.x, pointPos.y, 5 / zoomLevel, 0, Math.PI * 2);
+      ctx.arc(pointPos.x, pointPos.y, 3 * scale, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
     }
 
-    // Draw markers
+    // Draw markers (scale inversely with zoom)
     for (const marker of markers) {
       const pos = toCanvasCoords(marker.x, marker.y);
+      
+      const scale = 1 / currentZoom;
       
       ctx.save();
       ctx.fillStyle = marker.color || '#ff9933';
       ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2 / zoomLevel;
+      ctx.lineWidth = 1.5 * scale;
       
-      // Draw marker pin
-      const size = 8 / zoomLevel;
+      // Draw marker pin - smaller
+      const size = 4 * scale;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Draw label if exists
-      if (marker.label) {
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 3 / zoomLevel;
-        ctx.font = `${12 / zoomLevel}px sans-serif`;
+      // Calculate marker info (distance from player, bearing, grid)
+      if (player && player.x !== undefined && player.y !== undefined) {
+        const mapWidth = info.map_max[0] - info.map_min[0];
+        const mapHeight = info.map_max[1] - info.map_min[1];
+        
+        // Convert player and marker coords to world space
+        const playerWorldX = player.x * mapWidth + info.map_min[0];
+        const playerWorldY = (1 - player.y) * mapHeight + info.map_min[1];
+        const markerWorldX = marker.x * mapWidth + info.map_min[0];
+        const markerWorldY = (1 - marker.y) * mapHeight + info.map_min[1];
+        
+        // Calculate distance
+        const dx = markerWorldX - playerWorldX;
+        const dy = markerWorldY - playerWorldY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Calculate bearing
+        const angleFromX = Math.atan2(dy, dx) * (180 / Math.PI);
+        const bearing = (90 - angleFromX + 360) % 360;
+        
+        // Calculate grid reference
+        let gridRef = '';
+        if (mapMode === 'current') {
+          const posX = markerWorldX - info.grid_zero[0];
+          const posY = info.grid_zero[1] - markerWorldY;
+          const gridX = Math.floor(posX / info.grid_steps[0]);
+          const gridY = Math.floor(posY / info.grid_steps[1]);
+          if (gridY >= 0 && gridY < 26) {
+            const letter = String.fromCharCode(65 + gridY);
+            gridRef = `${letter}-${gridX + 1}`;
+          }
+        }
+        
+        // Draw info text above marker
+        const fontSize = Math.max(5, 10 * scale); // Min 5px
+        ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.strokeText(marker.label, pos.x, pos.y - size - 2 / zoomLevel);
-        ctx.fillText(marker.label, pos.x, pos.y - size - 2 / zoomLevel);
+        
+        const distText = `${distance.toFixed(0)}m`;
+        const bearText = `${bearing.toFixed(0)}°`;
+        const line1 = `${distText} @ ${bearText}`;
+        const line2 = gridRef;
+        
+        // Draw background
+        const padding = 3 * scale;
+        const line1Width = ctx.measureText(line1).width;
+        const line2Width = line2 ? ctx.measureText(line2).width : 0;
+        const maxWidth = Math.max(line1Width, line2Width);
+        const boxWidth = maxWidth + padding * 2;
+        const boxHeight = (line2 ? 22 : 13) * scale;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(
+          pos.x - boxWidth / 2,
+          pos.y - size - boxHeight - 3 * scale,
+          boxWidth,
+          boxHeight
+        );
+        
+        // Draw text
+        ctx.lineWidth = 1.5 * scale;
+        
+        // Line 1: distance @ bearing
+        ctx.strokeStyle = '#000';
+        ctx.strokeText(line1, pos.x, pos.y - size - 3 * scale);
+        ctx.fillStyle = '#ff9933';
+        ctx.fillText(line1, pos.x, pos.y - size - 3 * scale);
+        
+        // Line 2: grid reference
+        if (line2) {
+          ctx.strokeStyle = '#000';
+          ctx.strokeText(line2, pos.x, pos.y - size - 3 * scale - 10 * scale);
+          ctx.fillStyle = '#64c8ff';
+          ctx.fillText(line2, pos.x, pos.y - size - 3 * scale - 10 * scale);
+        }
       }
       
       ctx.restore();
@@ -921,70 +1097,69 @@ export function MiniMap() {
 
   return (
     <div className="minimap-container">
-      <div style={{ display: 'flex', gap: '16px', width: '100%' }}>
+      <div style={{ display: 'flex', gap: '16px', width: '100%', alignItems: 'flex-start' }}>
         {/* Left side - Map Canvas */}
-        <div style={{ flex: '0 0 auto' }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           <div className="minimap-header">
-        <h3>{t('map.title')}</h3>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
-              className={`btn btn-${mapMode === 'current' ? 'primary' : 'secondary'}`}
-              onClick={() => setMapMode('current')}
-              disabled={!isEnabled}
-              title="Current vehicle view"
-              style={{ fontSize: '11px', padding: '4px 8px' }}
-            >
-              Current
-            </button>
-            <button
-              className={`btn btn-${mapMode === 'full' ? 'primary' : 'secondary'}`}
-              onClick={() => setMapMode('full')}
-              disabled={!isEnabled}
-              title="Full map view"
-              style={{ fontSize: '11px', padding: '4px 8px' }}
-            >
-              Full
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
-              className={`btn btn-${followPlayer ? 'primary' : 'secondary'}`}
-              onClick={() => {
-                setFollowPlayer(!followPlayer);
-                if (!followPlayer) {
+            <div className="minimap-title">
+              <Map size={18} />
+              <h3>{t('map.title')}</h3>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button
+                className={`btn btn-${mapMode === 'current' ? 'primary' : 'secondary'}`}
+                onClick={() => setMapMode('current')}
+                disabled={!isEnabled}
+                title="Current vehicle view"
+                style={{ fontSize: '11px', padding: '4px 8px' }}
+              >
+                Current
+              </button>
+              <button
+                className={`btn btn-${mapMode === 'full' ? 'primary' : 'secondary'}`}
+                onClick={() => setMapMode('full')}
+                disabled={!isEnabled}
+                title="Full map view"
+                style={{ fontSize: '11px', padding: '4px 8px' }}
+              >
+                Full
+              </button>
+              <button
+                className={`btn btn-${followPlayer ? 'primary' : 'secondary'}`}
+                onClick={() => {
+                  setFollowPlayer(!followPlayer);
+                  if (!followPlayer) {
+                    setPanOffset({ x: 0, y: 0 });
+                  }
+                }}
+                disabled={!isEnabled}
+                title="Center map on player"
+                style={{ fontSize: '11px', padding: '4px 8px' }}
+              >
+                📍 Follow
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setZoomLevel(1.0);
                   setPanOffset({ x: 0, y: 0 });
-                }
-              }}
-              disabled={!isEnabled}
-              title="Center map on player"
-              style={{ fontSize: '11px', padding: '4px 8px' }}
-            >
-              📍 Follow
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setZoomLevel(1.0);
-                setPanOffset({ x: 0, y: 0 });
-                setFollowPlayer(false);
-              }}
-              disabled={!isEnabled}
-              title="Reset view"
-              style={{ fontSize: '11px', padding: '4px 8px' }}
-            >
-              🔄 Reset
-            </button>
+                  setFollowPlayer(false);
+                }}
+                disabled={!isEnabled}
+                title="Reset view"
+                style={{ fontSize: '11px', padding: '4px 8px' }}
+              >
+                🔄 Reset
+              </button>
+              <button 
+                className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
+                onClick={() => setIsEnabled(!isEnabled)}
+                title={t('map.rb_warning')}
+              >
+                {isEnabled ? t('map.enabled') : t('map.disabled')}
+              </button>
+            </div>
           </div>
-          <button 
-            className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
-            onClick={() => setIsEnabled(!isEnabled)}
-            title={t('map.rb_warning')}
-          >
-            {isEnabled ? t('map.enabled') : t('map.disabled')}
-          </button>
-        </div>
-      </div>
       <div 
         className="minimap-canvas-wrapper" 
         ref={canvasWrapperRef}
@@ -1010,16 +1185,18 @@ export function MiniMap() {
         </div>
 
         {/* Right side - Tools & Info */}
-        {isEnabled && mapData && (
         <div style={{
-          flex: '1',
+          flex: '0 0 auto',
+          width: '280px',
+          minWidth: '250px',
+          maxWidth: '350px',
           padding: '16px',
           paddingLeft: '0',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          maxHeight: '600px',
           overflowY: 'auto',
+          maxHeight: '100%',
         }}>
           {/* Player Info */}
           <div style={{ 
@@ -1029,64 +1206,72 @@ export function MiniMap() {
             <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '8px' }}>
               👤 Player Info
             </h4>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              {mapData.player_grid && (
-                <div style={{ color: '#22c55e', fontWeight: 'bold' }}>
-                  🎯 Grid: {mapData.player_grid}
-                </div>
-              )}
-              {mapData.player_heading !== null && (
-                <div>🧭 {mapData.player_heading.toFixed(0)}° {getCompassDirection(mapData.player_heading)}</div>
-              )}
-            </div>
+            {isEnabled && mapData ? (
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                {mapData.player_grid && (
+                  <div style={{ color: '#22c55e', fontWeight: 'bold' }}>
+                    🎯 Grid: {mapData.player_grid}
+                  </div>
+                )}
+                {mapData.player_heading !== null && (
+                  <div>🧭 {mapData.player_heading.toFixed(0)}° {getCompassDirection(mapData.player_heading)}</div>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                —
+              </div>
+            )}
           </div>
 
           {/* Tools */}
-          <div style={{ 
-            borderBottom: '1px solid var(--border)', 
-            paddingBottom: '12px' 
-          }}>
-            <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '8px' }}>
-              🛠️ Tools
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <button
-                className={`btn btn-${activeTool === 'measure' ? 'primary' : 'secondary'}`}
-                onClick={() => {
-                  setActiveTool(activeTool === 'measure' ? 'none' : 'measure');
-                  if (activeTool === 'measure') clearMarkers();
-                }}
-                style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
-              >
-                📏 Measure (2 points)
-              </button>
-              <button
-                className={`btn btn-${activeTool === 'distance' ? 'primary' : 'secondary'}`}
-                onClick={() => {
-                  setActiveTool(activeTool === 'distance' ? 'none' : 'distance');
-                  if (activeTool === 'distance') clearMarkers();
-                }}
-                style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
-              >
-                📏 Distance from Player
-              </button>
-              <button
-                className={`btn btn-${activeTool === 'marker' ? 'primary' : 'secondary'}`}
-                onClick={() => setActiveTool(activeTool === 'marker' ? 'none' : 'marker')}
-                style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
-              >
-                📍 Place Marker
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={clearMarkers}
-                disabled={markers.length === 0 && !measurePoint && !measurement}
-                style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
-              >
-                🗑️ Clear All
-              </button>
+          {isEnabled && (
+            <div style={{ 
+              borderBottom: '1px solid var(--border)', 
+              paddingBottom: '12px' 
+            }}>
+              <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                🛠️ Tools
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <button
+                  className={`btn btn-${activeTool === 'measure' ? 'primary' : 'secondary'}`}
+                  onClick={() => {
+                    setActiveTool(activeTool === 'measure' ? 'none' : 'measure');
+                    if (activeTool === 'measure') clearMarkers();
+                  }}
+                  style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
+                >
+                  📏 Measure (2 points)
+                </button>
+                <button
+                  className={`btn btn-${activeTool === 'distance' ? 'primary' : 'secondary'}`}
+                  onClick={() => {
+                    setActiveTool(activeTool === 'distance' ? 'none' : 'distance');
+                    if (activeTool === 'distance') clearMarkers();
+                  }}
+                  style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
+                >
+                  📏 Distance from Player
+                </button>
+                <button
+                  className={`btn btn-${activeTool === 'marker' ? 'primary' : 'secondary'}`}
+                  onClick={() => setActiveTool(activeTool === 'marker' ? 'none' : 'marker')}
+                  style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
+                >
+                  📍 Place Marker
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={clearMarkers}
+                  disabled={markers.length === 0 && !measurePoint && !measurement}
+                  style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
+                >
+                  🗑️ Clear All
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Measurement Info */}
           {measurement && (
@@ -1138,53 +1323,54 @@ export function MiniMap() {
           )}
 
           {/* Enemies & Allies in columns */}
-          <div style={{ 
-            borderTop: '1px solid var(--border)', 
-            paddingTop: '12px',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '12px'
-          }}>
-            {/* Enemies Column */}
-            <div>
-              <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#ff6666', fontSize: '12px' }}>
-                🎯 Nearest Enemies
-              </div>
-              {nearestEnemies.length > 0 ? (
-                nearestEnemies.map((enemy, idx) => (
-                  <div key={idx} style={{ fontSize: '10px', color: '#ff6666', marginBottom: '4px' }}>
-                    {idx + 1}. {enemy.type}:<br/>
-                    {enemy.distance.toFixed(0)}m @ {enemy.bearing.toFixed(0)}° {getCompassDirection(enemy.bearing)}
-                  </div>
-                ))
-              ) : (
-                <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
-                  None detected
+          {isEnabled && mapData && (
+            <div style={{ 
+              borderTop: '1px solid var(--border)', 
+              paddingTop: '12px',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '12px'
+            }}>
+              {/* Enemies Column */}
+              <div>
+                <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#ff6666', fontSize: '12px' }}>
+                  🎯 Nearest Enemies
                 </div>
-              )}
-            </div>
+                {nearestEnemies.length > 0 ? (
+                  nearestEnemies.map((enemy, idx) => (
+                    <div key={idx} style={{ fontSize: '10px', color: '#ff6666', marginBottom: '4px' }}>
+                      {idx + 1}. {enemy.type}:<br/>
+                      {enemy.distance.toFixed(0)}m @ {enemy.bearing.toFixed(0)}° {getCompassDirection(enemy.bearing)}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
+                    —
+                  </div>
+                )}
+              </div>
 
-            {/* Allies Column */}
-            <div>
-              <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#64a8ff', fontSize: '12px' }}>
-                🛡️ Nearest Allies
-              </div>
-              {nearestAllies.length > 0 ? (
-                nearestAllies.map((ally, idx) => (
-                  <div key={idx} style={{ fontSize: '10px', color: '#64a8ff', marginBottom: '4px' }}>
-                    {idx + 1}. {ally.type}:<br/>
-                    {ally.distance.toFixed(0)}m @ {ally.bearing.toFixed(0)}° {getCompassDirection(ally.bearing)}
-                  </div>
-                ))
-              ) : (
-                <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
-                  None detected
+              {/* Allies Column */}
+              <div>
+                <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#64a8ff', fontSize: '12px' }}>
+                  🛡️ Nearest Allies
                 </div>
-              )}
+                {nearestAllies.length > 0 ? (
+                  nearestAllies.map((ally, idx) => (
+                    <div key={idx} style={{ fontSize: '10px', color: '#64a8ff', marginBottom: '4px' }}>
+                      {idx + 1}. {ally.type}:<br/>
+                      {ally.distance.toFixed(0)}m @ {ally.bearing.toFixed(0)}° {getCompassDirection(ally.bearing)}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
+                    —
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
-        )}
       </div>
     </div>
   );
