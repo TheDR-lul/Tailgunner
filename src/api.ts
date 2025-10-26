@@ -29,6 +29,75 @@ export const api = {
     }
   },
 
+  // Player identity management
+  async getPlayerNames(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('get_player_names');
+    } catch (error) {
+      console.error('Failed to get player names:', error);
+      return [];
+    }
+  },
+
+  async setPlayerNames(names: string[]): Promise<void> {
+    try {
+      await invoke('set_player_names', { names });
+    } catch (error) {
+      console.error('Failed to set player names:', error);
+    }
+  },
+
+  async getClanTags(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('get_clan_tags');
+    } catch (error) {
+      console.error('Failed to get clan tags:', error);
+      return [];
+    }
+  },
+
+  async setClanTags(tags: string[]): Promise<void> {
+    try {
+      await invoke('set_clan_tags', { tags });
+    } catch (error) {
+      console.error('Failed to set clan tags:', error);
+    }
+  },
+
+  async getEnemyNames(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('get_enemy_names');
+    } catch (error) {
+      console.error('Failed to get enemy names:', error);
+      return [];
+    }
+  },
+
+  async setEnemyNames(names: string[]): Promise<void> {
+    try {
+      await invoke('set_enemy_names', { names });
+    } catch (error) {
+      console.error('Failed to set enemy names:', error);
+    }
+  },
+
+  async getEnemyClans(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('get_enemy_clans');
+    } catch (error) {
+      console.error('Failed to get enemy clans:', error);
+      return [];
+    }
+  },
+
+  async setEnemyClans(clans: string[]): Promise<void> {
+    try {
+      await invoke('set_enemy_clans', { clans });
+    } catch (error) {
+      console.error('Failed to set enemy clans:', error);
+    }
+  },
+
   // Get devices
   async getDevices(): Promise<DeviceInfo[]> {
     try {
@@ -82,6 +151,46 @@ export const api = {
         fuel_percent: 0,
       };
     }
+  },
+
+  // Datamine methods
+  async datamineAutoInit(): Promise<string> {
+    return invoke<string>('datamine_auto_init');
+  },
+
+  async datamineRebuild(): Promise<{ aircraft_count: number; ground_count: number; ships_count: number }> {
+    return invoke('datamine_rebuild');
+  },
+
+  async datamineFindGame(): Promise<string> {
+    return invoke<string>('datamine_find_game');
+  },
+
+  async datamineParse(gamePath: string): Promise<{
+    aircraft_count: number;
+    ground_count: number;
+    ships_count: number;
+  }> {
+    return invoke('datamine_parse', { gamePath });
+  },
+
+  async datamineGetStats(): Promise<[number, number, number]> {
+    return invoke('datamine_get_stats');
+  },
+
+  // File dialog
+  async selectFolder(): Promise<string | null> {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: 'Select War Thunder installation folder',
+    });
+    
+    if (selected && typeof selected === 'string') {
+      return selected;
+    }
+    return null;
   },
 };
 

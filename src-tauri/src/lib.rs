@@ -6,11 +6,12 @@ mod event_engine;
 mod profile_manager;
 mod haptic_engine;
 mod event_triggers;
-mod wt_vehicles_api;
-mod dynamic_triggers;
 mod ui_patterns;
 mod vehicle_limits;
 mod state_history;
+mod datamine;
+mod player_identity_db;
+mod device_history_db;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -56,9 +57,131 @@ async fn is_running(state: tauri::State<'_, AppState>) -> Result<bool, String> {
 }
 
 #[tauri::command]
+async fn get_player_names(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let engine = state.engine.lock().await;
+    Ok(engine.get_player_names().await)
+}
+
+#[tauri::command]
+async fn set_player_names(state: tauri::State<'_, AppState>, names: Vec<String>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.set_player_names(names.clone()).await;
+    
+    // Save to database
+    if let Err(e) = save_player_identity_to_db(&engine).await {
+        log::warn!("[Player Identity] Failed to save to DB: {}", e);
+    }
+    
+    Ok(format!("Player names set: {:?}", names))
+}
+
+#[tauri::command]
+async fn get_clan_tags(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let engine = state.engine.lock().await;
+    Ok(engine.get_clan_tags().await)
+}
+
+#[tauri::command]
+async fn set_clan_tags(state: tauri::State<'_, AppState>, tags: Vec<String>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.set_clan_tags(tags.clone()).await;
+    
+    // Save to database
+    if let Err(e) = save_player_identity_to_db(&engine).await {
+        log::warn!("[Player Identity] Failed to save to DB: {}", e);
+    }
+    
+    Ok(format!("Clan tags set: {:?}", tags))
+}
+
+#[tauri::command]
+async fn get_enemy_names(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let engine = state.engine.lock().await;
+    Ok(engine.get_enemy_names().await)
+}
+
+#[tauri::command]
+async fn set_enemy_names(state: tauri::State<'_, AppState>, names: Vec<String>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.set_enemy_names(names.clone()).await;
+    
+    // Save to database
+    if let Err(e) = save_player_identity_to_db(&engine).await {
+        log::warn!("[Player Identity] Failed to save to DB: {}", e);
+    }
+    
+    Ok(format!("Enemy names set: {:?}", names))
+}
+
+#[tauri::command]
+async fn get_enemy_clans(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let engine = state.engine.lock().await;
+    Ok(engine.get_enemy_clans().await)
+}
+
+#[tauri::command]
+async fn set_enemy_clans(state: tauri::State<'_, AppState>, clans: Vec<String>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.set_enemy_clans(clans.clone()).await;
+    
+    // Save to database
+    if let Err(e) = save_player_identity_to_db(&engine).await {
+        log::warn!("[Player Identity] Failed to save to DB: {}", e);
+    }
+    
+    Ok(format!("Enemy clans set: {:?}", clans))
+}
+
+/// Helper: Save player identity to database
+async fn save_player_identity_to_db(engine: &HapticEngine) -> anyhow::Result<()> {
+    let player_names = engine.get_player_names().await;
+    let clan_tags = engine.get_clan_tags().await;
+    let enemy_names = engine.get_enemy_names().await;
+    let enemy_clans = engine.get_enemy_clans().await;
+    
+    let mut db = player_identity_db::PlayerIdentityDB::new()?;
+    db.save(&player_names, &clan_tags, &enemy_names, &enemy_clans)?;
+    
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_devices(state: tauri::State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
     let engine = state.engine.lock().await;
     Ok(engine.get_device_manager().get_devices().await)
+}
+
+#[tauri::command]
+async fn get_device_history() -> Result<Vec<device_history_db::DeviceRecord>, String> {
+    match device_history_db::DeviceHistoryDB::new() {
+        Ok(db) => {
+            match db.get_all_devices() {
+                Ok(devices) => Ok(devices),
+                Err(e) => Err(format!("Failed to get device history: {}", e))
+            }
+        }
+        Err(e) => Err(format!("Failed to open device history DB: {}", e))
+    }
+}
+
+/// DEBUG: Direct HUD API polling
+#[tauri::command]
+async fn debug_hud_raw() -> Result<String, String> {
+    log::error!("[DEBUG] 🔍 Fetching HUD API directly...");
+    
+    let client = reqwest::Client::new();
+    let response = client
+        .get("http://127.0.0.1:8111/hudmsg?lastEvt=0&lastDmg=0")
+        .timeout(std::time::Duration::from_secs(2))
+        .send()
+        .await
+        .map_err(|e| format!("❌ HUD API request failed: {}", e))?;
+    
+    let text = response.text().await.map_err(|e| format!("❌ Failed to read response: {}", e))?;
+    
+    log::error!("[DEBUG] 📥 HUD API RAW RESPONSE:\n{}", text);
+    
+    Ok(text)
 }
 
 #[tauri::command]
@@ -204,6 +327,7 @@ struct DebugInfo {
     indicators: String,
     triggers_count: usize,
     patterns_active: usize,
+    recent_triggers: Vec<haptic_engine::TriggerEvent>,
 }
 
 #[tauri::command]
@@ -216,6 +340,9 @@ async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<DebugInfo, 
     let triggers_count = trigger_manager.get_triggers().len();
     let patterns_active = trigger_manager.get_triggers().iter().filter(|t| t.enabled).count();
     
+    // Get recent trigger events
+    let recent_triggers = engine.get_recent_trigger_events().await;
+    
     Ok(DebugInfo {
         indicators: format!(
             "Vehicle: {}, Speed: {} km/h, Alt: {} m, G: {:.1}, RPM: {}, Fuel: {}%",
@@ -224,6 +351,7 @@ async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<DebugInfo, 
         ),
         triggers_count,
         patterns_active,
+        recent_triggers,
     })
 }
 
@@ -307,24 +435,170 @@ async fn save_trigger_settings(state: tauri::State<'_, AppState>) -> Result<Stri
 }
 
 #[tauri::command]
-async fn get_vehicle_info(state: tauri::State<'_, AppState>) -> Result<wt_vehicles_api::VehicleData, String> {
+async fn get_vehicle_info(state: tauri::State<'_, AppState>) -> Result<Option<datamine::VehicleLimits>, String> {
     let engine = state.engine.lock().await;
     let status = engine.get_game_status().await
         .map_err(|e| format!("Failed to get game status: {}", e))?;
     
     if !status.connected || status.vehicle_name.is_empty() || status.vehicle_name == "N/A" {
-        return Err("No vehicle connected".to_string());
+        log::debug!("[Vehicle Info] No vehicle connected");
+        return Ok(None);
     }
     
-    log::info!("[Vehicle Info] Fetching data for vehicle: '{}'", status.vehicle_name);
+    log::info!("[Vehicle Info] 🔍 Fetching data for vehicle: '{}'", status.vehicle_name);
     
-    // Get vehicle data from API (using search endpoint)
-    let api = wt_vehicles_api::WTVehiclesAPI::new();
-    api.search_vehicle(&status.vehicle_name).await
-        .map_err(|e| {
-            log::error!("[Vehicle Info] Failed for '{}': {}", status.vehicle_name, e);
-            format!("Failed to fetch vehicle data: {}", e)
-        })
+    // Get vehicle limits from datamine database
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| format!("Database error: {}", e))?;
+    
+    // Use vehicle_name AS IS (fuzzy search will handle variations)
+    let identifier = status.vehicle_name.clone();
+    
+    log::info!("[Vehicle Info] 🔎 Searching for: '{}'", identifier);
+    
+    let mut vehicle_data = match db.get_limits(&identifier) {
+        Some(data) => data,
+        None => {
+            log::error!("[Vehicle Info] ❌ NO DATA FOUND for vehicle: '{}'", identifier);
+            log::error!("[Vehicle Info] Check datamine database or run: datamine_parse");
+            return Ok(None);
+        }
+    };
+    
+    log::info!("[Vehicle Info] ✅ Found vehicle data!");
+    
+    // 🌐 LAZY WIKI LOADING - fetch missing data on-demand
+    match vehicle_data {
+        // Ground vehicles - fetch speed and gears
+        datamine::VehicleLimits::Ground(ref mut ground) => {
+            let needs_wiki = ground.max_speed_kmh.is_none() || ground.forward_gears.is_none();
+            
+            if needs_wiki {
+                log::info!("[Vehicle Info] 🌐 Fetching missing ground data from Wiki for '{}'...", identifier);
+                
+                match datamine::wiki_scraper::scrape_ground_vehicle(&ground.identifier).await {
+                    Ok(wiki_data) => {
+                        let mut updated = false;
+                        
+                        // Update missing fields
+                        if ground.max_speed_kmh.is_none() && wiki_data.max_speed_kmh.is_some() {
+                            ground.max_speed_kmh = wiki_data.max_speed_kmh;
+                            updated = true;
+                        }
+                        if ground.max_reverse_speed_kmh.is_none() && wiki_data.max_reverse_speed_kmh.is_some() {
+                            ground.max_reverse_speed_kmh = wiki_data.max_reverse_speed_kmh;
+                            updated = true;
+                        }
+                        if ground.forward_gears.is_none() && wiki_data.forward_gears.is_some() {
+                            ground.forward_gears = wiki_data.forward_gears;
+                            updated = true;
+                        }
+                        if ground.reverse_gears.is_none() && wiki_data.reverse_gears.is_some() {
+                            ground.reverse_gears = wiki_data.reverse_gears;
+                            updated = true;
+                        }
+                        
+                        if updated {
+                            ground.data_source = "datamine+wiki".to_string();
+                            
+                            // Save to database for next time
+                            if let Err(e) = db.update_ground_wiki_data(
+                                &ground.identifier,
+                                ground.max_speed_kmh,
+                                ground.max_reverse_speed_kmh,
+                                ground.forward_gears,
+                                ground.reverse_gears,
+                            ) {
+                                log::warn!("[Vehicle Info] ⚠️ Failed to save Wiki data: {}", e);
+                            } else {
+                                log::info!("[Vehicle Info] ✅ Wiki data cached for future use");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("[Vehicle Info] ⚠️ Wiki scraping failed: {}", e);
+                    }
+                }
+            }
+        },
+        
+        // Aircraft - fetch G-load limits and speed limits
+        datamine::VehicleLimits::Aircraft(ref mut aircraft) => {
+            let needs_wiki = aircraft.max_positive_g.is_none() 
+                || aircraft.max_negative_g.is_none()
+                || aircraft.flaps_speeds_kmh.is_empty()
+                || aircraft.gear_max_speed_kmh.is_none() || aircraft.gear_max_speed_kmh == Some(0.0);
+            
+            if needs_wiki {
+                log::info!("[Vehicle Info] 🌐 Fetching missing aircraft G-load from Wiki for '{}'...", identifier);
+                
+                match datamine::wiki_scraper::scrape_aircraft_vehicle(&aircraft.identifier).await {
+                    Ok(wiki_data) => {
+                        let mut updated = false;
+                        
+                        // Update missing G-load fields
+                        if aircraft.max_positive_g.is_none() && wiki_data.max_positive_g.is_some() {
+                            aircraft.max_positive_g = wiki_data.max_positive_g;
+                            updated = true;
+                            log::info!("[Vehicle Info] ✅ Wiki G-load: +{}G / {}G",
+                                wiki_data.max_positive_g.unwrap(),
+                                wiki_data.max_negative_g.unwrap_or(0.0)
+                            );
+                        }
+                        if aircraft.max_negative_g.is_none() && wiki_data.max_negative_g.is_some() {
+                            aircraft.max_negative_g = wiki_data.max_negative_g;
+                            updated = true;
+                        }
+                        
+                        // Update missing speed limits
+                        if aircraft.flaps_speeds_kmh.is_empty() && !wiki_data.flaps_speeds_kmh.is_empty() {
+                            aircraft.flaps_speeds_kmh = wiki_data.flaps_speeds_kmh.clone();
+                            updated = true;
+                            log::info!("[Vehicle Info] ✅ Wiki Flap Speeds: {:?} km/h",
+                                wiki_data.flaps_speeds_kmh
+                            );
+                        }
+                        if (aircraft.gear_max_speed_kmh.is_none() || aircraft.gear_max_speed_kmh == Some(0.0))
+                            && wiki_data.gear_max_speed_kmh.is_some() {
+                            aircraft.gear_max_speed_kmh = wiki_data.gear_max_speed_kmh;
+                            updated = true;
+                            log::info!("[Vehicle Info] ✅ Wiki Gear Speed: {} km/h",
+                                wiki_data.gear_max_speed_kmh.unwrap()
+                            );
+                        }
+                        
+                        if updated {
+                            aircraft.data_source = "datamine+wiki".to_string();
+                            
+                            // Save updated data to database
+                            match datamine::database::VehicleDatabase::new() {
+                                Ok(mut db) => {
+                                    if let Err(e) = db.update_aircraft_wiki_data(&aircraft) {
+                                        log::warn!("[Vehicle Info] ⚠️ Failed to save Wiki data: {}", e);
+                                    } else {
+                                        log::info!("[Vehicle Info] ✅ Saved Wiki data to database");
+                                    }
+                                },
+                                Err(e) => {
+                                    log::warn!("[Vehicle Info] ⚠️ Failed to open database: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("[Vehicle Info] ⚠️ Wiki scraping failed: {}", e);
+                    }
+                }
+            }
+        },
+        
+        // Ships - no Wiki scraping yet
+        datamine::VehicleLimits::Ship(_) => {
+            // No Wiki scraping for ships yet
+        }
+    }
+    
+    Ok(Some(vehicle_data))
 }
 
 #[tauri::command]
@@ -377,11 +651,147 @@ async fn toggle_pattern(
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+// Datamine commands
+#[tauri::command]
+async fn datamine_find_game() -> Result<String, String> {
+    datamine::Datamine::auto_detect()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn datamine_parse(game_path: String) -> Result<datamine::ParseStats, String> {
+    log::info!("[Datamine] Starting parse from: {}", game_path);
+    log::info!("[Datamine] Wiki data will be fetched on-demand when vehicles are selected");
+    
+    let path = std::path::PathBuf::from(game_path);
+    
+    let mut dm = datamine::Datamine::new(path)
+        .map_err(|e| e.to_string())?;
+    
+    // Parse (now async, without Wiki)
+    let result = dm.parse_all().await
+        .map_err(|e| e.to_string())?;
+    
+    log::info!("[Datamine] Parse complete: {} aircraft, {} ground, {} ships",
+        result.aircraft_count, result.ground_count, result.ships_count);
+    
+    Ok(result)
+}
+
+#[tauri::command]
+async fn datamine_get_limits(identifier: String) -> Result<Option<datamine::VehicleLimits>, String> {
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    Ok(db.get_limits(&identifier))
+}
+
+#[tauri::command]
+async fn datamine_get_stats() -> Result<(usize, usize, usize), String> {
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    db.get_stats().map_err(|e| e.to_string())
+}
+
+/// Auto-initialize datamine: find game, check database, build if needed
+#[tauri::command]
+async fn datamine_auto_init() -> Result<String, String> {
+    log::info!("[Datamine] Starting auto-initialization");
+    
+    // Check if database exists and has data
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    let (aircraft, ground, ships) = db.get_stats()
+        .map_err(|e| e.to_string())?;
+    
+    if aircraft > 0 || ground > 0 || ships > 0 {
+        log::info!("[Datamine] Database exists: {} aircraft, {} ground, {} ships", aircraft, ground, ships);
+        return Ok(format!("Database loaded: {} aircraft, {} ground, {} ships", aircraft, ground, ships));
+    }
+    
+    // Database is empty, try to build it
+    log::info!("[Datamine] Database empty, attempting auto-build");
+    
+    // Find War Thunder installation
+    let game_path = datamine::Datamine::auto_detect()
+        .map_err(|_| "War Thunder installation not found. Please use manual parse.".to_string())?;
+    
+    log::info!("[Datamine] Found game at: {:?}", game_path);
+    
+    // Build database
+    let stats = datamine_parse(game_path.to_string_lossy().to_string()).await?;
+    
+    Ok(format!("Database built: {} aircraft, {} ground, {} ships", 
+        stats.aircraft_count, stats.ground_count, stats.ships_count))
+}
+
+/// Force rebuild database (delete + reparse)
+#[tauri::command]
+async fn datamine_rebuild() -> Result<datamine::ParseStats, String> {
+    log::info!("[Datamine] FORCE REBUILD: deleting old database...");
+    
+    // Delete database file
+    let db_path = dirs::data_local_dir()
+        .ok_or_else(|| "Failed to get local data directory".to_string())?
+        .join("Tailgunner")
+        .join("vehicle_limits.db");
+    
+    if db_path.exists() {
+        std::fs::remove_file(&db_path)
+            .map_err(|e| format!("Failed to delete database: {}", e))?;
+        log::info!("[Datamine] ✅ Old database deleted");
+    }
+    
+    // Find game
+    let game_path = datamine::Datamine::auto_detect()
+        .map_err(|_| "War Thunder installation not found".to_string())?;
+    
+    log::info!("[Datamine] Found game at: {:?}", game_path);
+    
+    // Rebuild (Wiki data will be fetched on-demand)
+    datamine_parse(game_path.to_string_lossy().to_string()).await
+}
+
 pub fn run() {
     // Initialize logger
+    // Set default log level: DEBUG for our code, WARN for libraries
+    if std::env::var("RUST_LOG").is_err() {
+        #[cfg(debug_assertions)]
+        std::env::set_var("RUST_LOG", "butt_thunder_lib=debug,warn");
+        
+        #[cfg(not(debug_assertions))]
+        std::env::set_var("RUST_LOG", "butt_thunder_lib=info,warn");
+    }
     env_logger::init();
 
-    let engine = Arc::new(Mutex::new(HapticEngine::new()));
+    let engine = HapticEngine::new();
+    
+    // Load player identity from database
+    match player_identity_db::PlayerIdentityDB::new() {
+        Ok(db) => {
+            match db.load() {
+                Ok((player_names, clan_tags, enemy_names, enemy_clans)) => {
+                    log::info!("[Startup] 💾 Loaded player identity from database");
+                    // Set data in engine (need to do this synchronously before Arc)
+                    let telemetry = engine.get_telemetry();
+                    tokio::runtime::Runtime::new().unwrap().block_on(async {
+                        let mut telem = telemetry.write().await;
+                        telem.set_player_names(player_names);
+                        telem.set_clan_tags(clan_tags);
+                        telem.set_enemy_names(enemy_names);
+                        telem.set_enemy_clans(enemy_clans);
+                    });
+                }
+                Err(e) => log::warn!("[Startup] ⚠️ Failed to load player identity: {}", e),
+            }
+        }
+        Err(e) => log::warn!("[Startup] ⚠️ Failed to open player identity DB: {}", e),
+    }
+    
+    let engine = Arc::new(Mutex::new(engine));
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -393,7 +803,16 @@ pub fn run() {
             start_engine,
             stop_engine,
             is_running,
+            get_player_names,
+            set_player_names,
+            get_clan_tags,
+            set_clan_tags,
+            get_enemy_names,
+            set_enemy_names,
+            get_enemy_clans,
+            set_enemy_clans,
             get_devices,
+            get_device_history,
             scan_devices,
             get_profiles,
             test_vibration,
@@ -413,6 +832,13 @@ pub fn run() {
             export_pattern,
             export_all_patterns,
             import_pattern,
+            debug_hud_raw,
+            datamine_find_game,
+            datamine_parse,
+            datamine_get_limits,
+            datamine_get_stats,
+            datamine_auto_init,
+            datamine_rebuild,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

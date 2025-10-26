@@ -5,7 +5,6 @@ use crate::{
     device_manager::DeviceManager,
     event_engine::EventEngine,
     event_triggers::TriggerManager,
-    dynamic_triggers::DynamicTriggerManager,
     vehicle_limits::VehicleLimitsManager,
     pattern_engine::{VibrationPattern, GameEvent},
     profile_manager::ProfileManager,
@@ -16,6 +15,7 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use std::sync::Arc;
+use std::collections::VecDeque;
 use tokio::time::{interval, Duration};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +27,14 @@ pub struct GameStatusInfo {
     pub g_load: f32,
     pub engine_rpm: i32,
     pub fuel_percent: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriggerEvent {
+    pub trigger_name: String,
+    pub event_type: String,
+    pub entity: String,
+    pub timestamp: String,
 }
 
 impl GameStatusInfo {
@@ -49,12 +57,12 @@ pub struct HapticEngine {
     event_engine: Arc<RwLock<EventEngine>>,
     profile_manager: Arc<RwLock<ProfileManager>>,
     pub trigger_manager: Arc<RwLock<TriggerManager>>,  // pub for access from lib.rs
-    dynamic_trigger_manager: Arc<DynamicTriggerManager>,
     vehicle_limits_manager: Arc<VehicleLimitsManager>,
     rate_limiter: Arc<RateLimiter>,
     running: Arc<RwLock<bool>>,
     current_intensity: Arc<RwLock<f32>>,
     last_vehicle_name: Arc<RwLock<String>>,
+    recent_trigger_events: Arc<RwLock<VecDeque<TriggerEvent>>>,
 }
 
 impl HapticEngine {
@@ -70,18 +78,24 @@ impl HapticEngine {
             log::warn!("[Triggers] Failed to load settings: {}", e);
         }
         
+        // Initialize vehicle limits manager
+        let vehicle_limits_manager = Arc::new(
+            VehicleLimitsManager::new()
+                .expect("Failed to initialize VehicleLimitsManager (database error)")
+        );
+        
         Self {
             telemetry: Arc::new(RwLock::new(WTTelemetryReader::new())),
             device_manager: Arc::new(DeviceManager::new()),
             event_engine: Arc::new(RwLock::new(EventEngine::new())),
             profile_manager: Arc::new(RwLock::new(ProfileManager::new())),
             trigger_manager: Arc::new(RwLock::new(trigger_manager)),
-            dynamic_trigger_manager: Arc::new(DynamicTriggerManager::new()),
-            vehicle_limits_manager: Arc::new(VehicleLimitsManager::new()),
+            vehicle_limits_manager,
             rate_limiter: Arc::new(RateLimiter::new()),
             running: Arc::new(RwLock::new(false)),
             current_intensity: Arc::new(RwLock::new(0.0)),
             last_vehicle_name: Arc::new(RwLock::new(String::new())),
+            recent_trigger_events: Arc::new(RwLock::new(VecDeque::with_capacity(10))),
         }
     }
 
@@ -107,12 +121,12 @@ impl HapticEngine {
         let event_engine = Arc::clone(&self.event_engine);
         let profile_manager = Arc::clone(&self.profile_manager);
         let trigger_manager = Arc::clone(&self.trigger_manager);
-        let dynamic_trigger_manager = Arc::clone(&self.dynamic_trigger_manager);
         let rate_limiter = Arc::clone(&self.rate_limiter);
         let running = Arc::clone(&self.running);
         let current_intensity = Arc::clone(&self.current_intensity);
         let vehicle_limits_manager = Arc::clone(&self.vehicle_limits_manager);
         let last_vehicle_name = Arc::clone(&self.last_vehicle_name);
+        let recent_trigger_events = Arc::clone(&self.recent_trigger_events);
 
         tokio::spawn(async move {
             let mut tick_interval = interval(WTTelemetryReader::get_poll_interval());
@@ -134,16 +148,13 @@ impl HapticEngine {
                                 connection_lost_counter = 0;
                             }
                             
-                            log::debug!("[WT] Vehicle: {:?}, Speed: {:.0} km/h, Alt: {:.0}m, Fuel: {:.0}/{:.0} kg", 
-                                state.type_, 
-                                state.indicators.speed,  // Already in km/h from API
-                                state.indicators.altitude,
-                                state.indicators.fuel,
-                                state.indicators.fuel_max
-                            );
+                            // Reduced logging spam - only log on significant changes
+                            // log::debug!("[WT] Vehicle: {:?}, Speed: {:.0} km/h, Alt: {:.0}m, Fuel: {:.0}/{:.0} kg", 
+                            //     state.type_, state.indicators.speed, state.indicators.altitude,
+                            //     state.indicators.fuel, state.indicators.fuel_max);
                             state
                         },
-                        Err(e) => {
+                        Err(_) => {
                             // Game not running or connection lost
                             connection_lost_counter += 1;
                             
@@ -186,25 +197,30 @@ impl HapticEngine {
                             log::warn!("[Vehicle Limits] ⚠️ Failed to update vehicle: {}", e);
                         }
                         
-                        // Generate dynamic triggers based on limits
+                        // Update built-in dynamic triggers with vehicle-specific limits
                         let limit_triggers = vehicle_limits_manager.generate_limit_triggers().await;
                         if !limit_triggers.is_empty() {
-                            log::info!("[Dynamic Triggers] 🔧 Generated {} dynamic triggers for {}", 
+                            log::info!("[Dynamic Triggers] 🔧 Updating {} built-in triggers for {}", 
                                 limit_triggers.len(), game_state.vehicle_name);
                             
                             let mut tm = trigger_manager.write().await;
                             
-                            // Remove old dynamic triggers
-                            tm.get_triggers_mut().retain(|t| !t.id.starts_with("dynamic_"));
-                            
-                            // Add new dynamic triggers
+                            // Update existing built-in triggers with vehicle-specific values
                             for trigger in &limit_triggers {
-                                log::info!("[Dynamic Triggers] ➕ Adding trigger: {} (enabled: {})", 
-                                    trigger.name, trigger.enabled);
-                                tm.add_trigger(trigger.clone());
+                                log::info!("[Dynamic Triggers] 🔄 Updating built-in trigger: {} → {}", 
+                                    trigger.id, trigger.name);
+                                
+                                if let Err(e) = tm.update_trigger_condition(
+                                    &trigger.id,
+                                    trigger.name.clone(),
+                                    trigger.description.clone(),
+                                    trigger.condition.clone()
+                                ) {
+                                    log::warn!("[Dynamic Triggers] ⚠️ Failed to update {}: {}", trigger.id, e);
+                                }
                             }
                         } else {
-                            log::warn!("[Dynamic Triggers] ⚠️ No dynamic triggers generated for {}", 
+                            log::warn!("[Dynamic Triggers] ⚠️ No vehicle limits found for {}, using defaults", 
                                 game_state.vehicle_name);
                         }
                         
@@ -219,13 +235,14 @@ impl HapticEngine {
                     ee.detect_events(&game_state)
                 };
                 
-                // Check custom triggers (overspeed, over-G, etc.)
+                // Check indicator-based triggers (overspeed, over-G, etc.)
+                // Event-based triggers are automatically skipped in check_triggers() and handled separately below
                 let trigger_events = {
                     let mut tm = trigger_manager.write().await;
                     let events = tm.check_triggers(&game_state);
                     
                     if !events.is_empty() {
-                        log::info!("[Triggers] 🎯 {} triggers fired", events.len());
+                        log::info!("[Triggers] 🎯 {} indicator triggers fired", events.len());
                         for (event, pattern) in &events {
                             log::info!("[Triggers]   - {:?} (pattern: {})", 
                                 event, pattern.is_some());
@@ -235,33 +252,114 @@ impl HapticEngine {
                     events
                 };
                 
-                // Process HUD events (kills, crashes, overheats)
-                let hud_events: Vec<GameEvent> = game_state.hud_events.iter().map(|hud_evt| {
+                // Process HUD events and filter by event-based triggers
+                let telemetry_lock = telemetry.read().await;
+                let player_names = telemetry_lock.get_player_names().to_vec();
+                let clan_tags = telemetry_lock.get_clan_tags().to_vec();
+                let enemy_names = telemetry_lock.get_enemy_names().to_vec();
+                let enemy_clans = telemetry_lock.get_enemy_clans().to_vec();
+                drop(telemetry_lock);
+                
+                let trigger_manager_lock = trigger_manager.read().await;
+                let all_triggers = trigger_manager_lock.get_triggers().to_vec();
+                drop(trigger_manager_lock);
+                
+                let mut hud_events_with_patterns: Vec<(GameEvent, Option<VibrationPattern>)> = Vec::new();
+                
+                for hud_evt in &game_state.hud_events {
                     use crate::wt_telemetry::HudEvent;
-                    match hud_evt {
+                    
+                    // Extract entity name and game event
+                    let (entity_name, game_event) = match hud_evt {
                         HudEvent::Kill(enemy) => {
                             log::info!("[HUD] 🎯 Kill: {}", enemy);
-                            GameEvent::TargetDestroyed
+                            (enemy.as_str(), GameEvent::TargetDestroyed)
                         }
                         HudEvent::Crashed => {
                             log::warn!("[HUD] 💥 Crashed!");
-                            GameEvent::Crashed
+                            ("", GameEvent::Crashed)
                         }
                         HudEvent::EngineOverheated => {
                             log::warn!("[HUD] 🔥 Engine overheated!");
-                            GameEvent::EngineOverheat
+                            ("", GameEvent::EngineOverheat)
                         }
                         HudEvent::OilOverheated => {
                             log::warn!("[HUD] 🛢️ Oil overheated!");
-                            GameEvent::OilOverheated
+                            ("", GameEvent::OilOverheated)
                         }
+                        HudEvent::SetAfire(victim) => {
+                            log::info!("[HUD] 🔥 Set enemy on fire: {}", victim);
+                            (victim.as_str(), GameEvent::EnemySetAfire)
+                        }
+                        HudEvent::TakeDamage(attacker) => {
+                            log::warn!("[HUD] 💥 Taking damage from: {}", attacker);
+                            (attacker.as_str(), GameEvent::TakingDamage)
+                        }
+                        HudEvent::SeverelyDamaged(attacker) => {
+                            log::warn!("[HUD] 💔 Severely damaged by: {}", attacker);
+                            (attacker.as_str(), GameEvent::SeverelyDamaged)
+                        }
+                        HudEvent::ShotDown(attacker) => {
+                            log::warn!("[HUD] ✈️💥 Shot down by: {}", attacker);
+                            (attacker.as_str(), GameEvent::ShotDown)
+                        }
+                        HudEvent::Achievement(name) => {
+                            log::info!("[HUD] 🏆 Achievement: {}", name);
+                            (name.as_str(), GameEvent::Achievement)
+                        }
+                        HudEvent::ChatMessage(text) => {
+                            log::debug!("[HUD] 💬 Chat message: {}", text);
+                            (text.as_str(), GameEvent::ChatMessage)
+                        }
+                    };
+                    
+                    // Find matching event-based triggers
+                    for trigger in &all_triggers {
+                        if !trigger.enabled || !trigger.is_event_based {
+                            continue;
+                        }
+                        
+                        if trigger.event != game_event {
+                            continue;
+                        }
+                        
+                        // Apply filter
+                        if !crate::event_triggers::TriggerManager::should_fire_event_trigger(
+                            trigger,
+                            entity_name,
+                            &player_names,
+                            &clan_tags,
+                            &enemy_names,
+                            &enemy_clans,
+                        ) {
+                            log::debug!("[HUD] ❌ Trigger '{}' filtered out for entity '{}'", trigger.name, entity_name);
+                            continue;
+                        }
+                        
+                        log::info!("[HUD] ✅ Trigger '{}' matched for entity '{}'", trigger.name, entity_name);
+                        
+                        // Record trigger event for debug console
+                        {
+                            let mut events = recent_trigger_events.write().await;
+                            if events.len() >= 10 {
+                                events.pop_front();
+                            }
+                            events.push_back(TriggerEvent {
+                                trigger_name: trigger.name.clone(),
+                                event_type: format!("{:?}", game_event),
+                                entity: entity_name.to_string(),
+                                timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                            });
+                        }
+                        
+                        hud_events_with_patterns.push((game_event.clone(), trigger.pattern.clone()));
                     }
-                }).collect();
+                }
                 
                 // Combine events: basic, triggers (including dynamic), and HUD events
                 let mut all_events: Vec<(GameEvent, Option<VibrationPattern>)> = trigger_events;
                 all_events.extend(basic_events.into_iter().map(|e| (e, None)));
-                all_events.extend(hud_events.into_iter().map(|e| (e, None)));
+                all_events.extend(hud_events_with_patterns);
                 
                 // Process each event
                 if !all_events.is_empty() {
@@ -280,12 +378,14 @@ impl HapticEngine {
                     };
                     
                     if let Some(pattern) = pattern {
-                        log::info!("[Pattern] Executing pattern for event {:?}: Attack={:.0}ms, Hold={:.0}ms", 
-                            event, pattern.attack.duration_ms, pattern.hold.duration_ms);
+                        log::info!("[Pattern] Executing pattern for event {:?}: Attack={:.0}ms, Hold={:.0}ms, Decay={:.0}ms, Repeat={}, Pause={}ms", 
+                            event, pattern.attack.duration_ms, pattern.hold.duration_ms, pattern.decay.duration_ms,
+                            pattern.burst.repeat_count, pattern.burst.pause_between_ms);
                         Self::execute_pattern_async(
                             Arc::clone(&device_manager),
                             Arc::clone(&rate_limiter),
                             Arc::clone(&current_intensity),
+                            Arc::clone(&running),
                             pattern,
                         );
                     } else {
@@ -324,13 +424,22 @@ impl HapticEngine {
         log::warn!("🛑 EMERGENCY STOP - Halting all vibrations!");
         *self.running.write().await = false;
         
-        // Immediately stop all devices
-        self.device_manager.stop_all().await?;
+        // Immediately stop all devices (send 0.0 multiple times)
+        for _ in 0..5 {
+            let _ = self.device_manager.stop_all().await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        }
         
         // Reset current intensity
         *self.current_intensity.write().await = 0.0;
         
-        log::info!("✅ All vibrations stopped");
+        // Clear trigger cooldowns to prevent stuck state
+        {
+            let mut tm = self.trigger_manager.write().await;
+            tm.clear_cooldowns();
+        }
+        
+        log::info!("✅ All vibrations stopped, cooldowns cleared");
         Ok(())
     }
 
@@ -339,13 +448,31 @@ impl HapticEngine {
         device_manager: Arc<DeviceManager>,
         rate_limiter: Arc<RateLimiter>,
         current_intensity: Arc<RwLock<f32>>,
+        running: Arc<RwLock<bool>>,
         pattern: VibrationPattern,
     ) {
         tokio::spawn(async move {
             let points = pattern.generate_points(20); // 20 Hz sampling
             
-            for (delay, intensity) in points {
-                tokio::time::sleep(delay).await;
+            let mut last_time = Duration::from_millis(0);
+            
+            for (absolute_time, intensity) in points {
+                // Check if engine is still running
+                if !*running.read().await {
+                    log::info!("[Pattern] ⏹️ Pattern interrupted by Stop");
+                    break;
+                }
+                
+                // Sleep for the DIFFERENCE between current and last time point
+                let sleep_duration = absolute_time.saturating_sub(last_time);
+                tokio::time::sleep(sleep_duration).await;
+                last_time = absolute_time;
+                
+                // Check again after sleep
+                if !*running.read().await {
+                    log::info!("[Pattern] ⏹️ Pattern interrupted by Stop (after sleep)");
+                    break;
+                }
                 
                 *current_intensity.write().await = intensity;
                 
@@ -357,7 +484,7 @@ impl HapticEngine {
                 }
             }
             
-            // Smooth fade out at the end
+            // Smooth fade out at the end (or force 0.0 if stopped)
             *current_intensity.write().await = 0.0;
             if rate_limiter.try_send() {
                 let _ = device_manager.send_vibration(0.0).await;
@@ -395,10 +522,67 @@ impl HapticEngine {
     pub async fn is_running(&self) -> bool {
         *self.running.read().await
     }
+    
+    /// Get recent trigger events for debug console
+    pub async fn get_recent_trigger_events(&self) -> Vec<TriggerEvent> {
+        let events = self.recent_trigger_events.read().await;
+        events.iter().cloned().collect()
+    }
+    
+    /// Get current player names (for filtering HUD events)
+    pub async fn get_player_names(&self) -> Vec<String> {
+        self.telemetry.read().await.get_player_names()
+    }
+    
+    /// Set player names (for filtering HUD events)
+    pub async fn set_player_names(&self, names: Vec<String>) {
+        self.telemetry.write().await.set_player_names(names);
+    }
+    
+    /// Get current clan tags (for filtering HUD events)
+    pub async fn get_clan_tags(&self) -> Vec<String> {
+        self.telemetry.read().await.get_clan_tags()
+    }
+    
+    /// Set clan tags (for filtering HUD events)
+    pub async fn set_clan_tags(&self, tags: Vec<String>) {
+        self.telemetry.write().await.set_clan_tags(tags);
+    }
+    
+    /// Get current enemy names (for tracking kills)
+    pub async fn get_enemy_names(&self) -> Vec<String> {
+        self.telemetry.read().await.get_enemy_names()
+    }
+    
+    /// Set enemy names (for tracking kills)
+    pub async fn set_enemy_names(&self, names: Vec<String>) {
+        self.telemetry.write().await.set_enemy_names(names);
+    }
+    
+    /// Get current enemy clans (for tracking kills)
+    pub async fn get_enemy_clans(&self) -> Vec<String> {
+        self.telemetry.read().await.get_enemy_clans()
+    }
+    
+    /// Set enemy clans (for tracking kills)
+    pub async fn set_enemy_clans(&self, clans: Vec<String>) {
+        self.telemetry.write().await.set_enemy_clans(clans);
+    }
 
     /// Get managers (for UI)
     pub fn get_profile_manager(&self) -> Arc<RwLock<ProfileManager>> {
         Arc::clone(&self.profile_manager)
+    }
+    
+    /// Get telemetry reader (for loading player identity from DB)
+    pub fn get_telemetry(&self) -> Arc<RwLock<crate::wt_telemetry::WTTelemetryReader>> {
+        Arc::clone(&self.telemetry)
+    }
+    
+    /// Get vehicle limits manager (for % of max value calculations in patterns)
+    #[allow(dead_code)]
+    pub fn get_vehicle_limits_manager(&self) -> Arc<VehicleLimitsManager> {
+        Arc::clone(&self.vehicle_limits_manager)
     }
 
     pub fn get_device_manager(&self) -> Arc<DeviceManager> {

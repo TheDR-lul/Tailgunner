@@ -16,6 +16,9 @@ dist-ssr
 trigger_settings.json
 *.json.bak
 
+# Reports and changelogs (local only)
+reports/
+
 # Rust build artifacts
 target/
 Cargo.lock

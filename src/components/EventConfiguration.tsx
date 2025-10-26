@@ -108,9 +108,19 @@ export function EventConfiguration() {
     }
   };
 
-  // Get triggers for a specific event
+  // Get triggers for a specific event (ONLY system triggers, NO user patterns)
   const getTriggersForEvent = (eventName: string): EventTrigger[] => {
-    return triggers.filter(trigger => trigger.event === eventName);
+    return triggers.filter(trigger => {
+      // Match event name
+      if (trigger.event !== eventName) return false;
+      
+      // ❌ EXCLUDE user patterns from Pattern Manager
+      const isUserPattern = (trigger.is_builtin === false && !trigger.id.startsWith('dynamic_'));
+      if (isUserPattern) return false;
+      
+      // ✅ INCLUDE built-in and dynamic triggers
+      return true;
+    });
   };
 
   const vehicleIcons: Record<string, string> = {
@@ -152,15 +162,44 @@ export function EventConfiguration() {
       </div>
 
       <div className="card-content">
-        {/* All Triggers Section */}
+        {/* All Triggers Section - ONLY Built-in + Vehicle-specific Dynamic (NO user patterns!) */}
         <div style={{ marginBottom: '32px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            <Zap size={16} style={{ display: 'inline', marginRight: '6px' }} />
-            All Triggers ({triggers.length})
-          </h3>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' }}>
-            {triggers.map((trigger) => {
+          {(() => {
+            // Filter: show ONLY built-in triggers that are NOT assigned to any profile
+            // If a trigger's event is in a profile, it should appear ONLY there (no duplicates!)
+            const systemTriggers = triggers.filter(t => {
+              // ❌ EXCLUDE user-created patterns from Pattern Manager
+              // User patterns have is_builtin=false and are managed in Pattern Manager tab
+              const isUserPattern = (t.is_builtin === false && !t.id.startsWith('dynamic_'));
+              if (isUserPattern) {
+                return false; // Hide from "All Triggers"
+              }
+              
+              // ✅ At this point: built-in triggers OR dynamic vehicle-specific triggers
+              
+              // Check if this trigger's event is already handled by ANY active profile
+              const isInProfile = profiles.some(profile => 
+                profile.event_mappings && Object.keys(profile.event_mappings).includes(t.event)
+              );
+              
+              // Show ONLY if NOT in any profile (avoid duplicates)
+              return !isInProfile;
+            });
+            
+            // Don't show "All Triggers" section if empty (all triggers are in profiles)
+            if (systemTriggers.length === 0) {
+              return null;
+            }
+            
+            return (
+              <>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <Zap size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                  All Triggers ({systemTriggers.length})
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' }}>
+                  {systemTriggers.map((trigger) => {
               const isExpanded = expandedTrigger === trigger.id;
               return (
                 <div
@@ -177,15 +216,10 @@ export function EventConfiguration() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {trigger.is_builtin ? (
-                          <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(99, 102, 241, 0.2)', borderRadius: '4px', color: 'var(--primary)' }}>
-                            Built-in
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(16, 185, 129, 0.2)', borderRadius: '4px', color: '#10b981' }}>
-                            Dynamic
-                          </span>
-                        )}
+                        {/* All system triggers (built-in + dynamic) shown as "Built-in" */}
+                        <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(99, 102, 241, 0.2)', borderRadius: '4px', color: 'var(--primary)' }}>
+                          Built-in
+                        </span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {trigger.name}
                         </span>
@@ -302,8 +336,11 @@ export function EventConfiguration() {
                   )}
                 </div>
               );
-            })}
-          </div>
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
         
         {/* Profiles Section */}
@@ -317,9 +354,11 @@ export function EventConfiguration() {
             {profiles.map((profile) => {
               const isExpanded = expandedProfile === profile.id;
               // Only show events that have at least one trigger
-              const patterns = Object.entries(profile.event_mappings).filter(([eventName]) => 
-                getTriggersForEvent(eventName).length > 0
-              );
+              const patterns = profile.event_mappings 
+                ? Object.entries(profile.event_mappings).filter(([eventName]) => 
+                    getTriggersForEvent(eventName).length > 0
+                  )
+                : [];
               
               // Skip profiles with no events that have triggers
               if (patterns.length === 0) return null;
@@ -335,13 +374,13 @@ export function EventConfiguration() {
                     onClick={() => setExpandedProfile(isExpanded ? null : profile.id)}
                   >
                     <div className="profile-name">
-                      <span style={{ fontSize: '18px' }}>{vehicleIcons[profile.vehicle_type]}</span>
+                      <span style={{ fontSize: '18px' }}>{profile.vehicle_type ? vehicleIcons[profile.vehicle_type] : '🎮'}</span>
                       <span>{t(`profiles.${profile.id}`)}</span>
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span className="profile-badge">
-                        {getModeLabel(profile.game_mode)}
+                        {getModeLabel(profile.game_mode || 'any')}
                       </span>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         {patterns.length} {t('profiles.patterns_count')}

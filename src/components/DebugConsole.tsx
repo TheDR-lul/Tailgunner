@@ -18,6 +18,7 @@ export function DebugConsole() {
   );
   const logsEndRef = useRef<HTMLDivElement>(null);
   const logTimeoutRef = useRef<number | null>(null);
+  const lastLoggedTriggers = useRef<Set<string>>(new Set());
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const newLog: LogEntry = {
@@ -89,15 +90,36 @@ export function DebugConsole() {
     const fetchDebugInfo = async () => {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
-        const info = await invoke('get_debug_info');
-        // Rust logs can be viewed in terminal
-        // console.log('[Rust Debug]', info);
+        const info: any = await invoke('get_debug_info');
+        
+        // Log recent trigger events
+        if (info.recent_triggers && info.recent_triggers.length > 0) {
+          const currentBatch = new Set<string>();
+          
+          info.recent_triggers.forEach((trigger: any) => {
+            const triggerId = `${trigger.trigger_name}-${trigger.timestamp}-${trigger.entity}`;
+            currentBatch.add(triggerId);
+            
+            // Only log if not already logged
+            if (!lastLoggedTriggers.current.has(triggerId)) {
+              const logMessage = `🎯 ${trigger.trigger_name}: ${trigger.event_type}${trigger.entity ? ` (${trigger.entity})` : ''}`;
+              addLog('success', logMessage);
+              lastLoggedTriggers.current.add(triggerId);
+            }
+          });
+          
+          // Clean up old entries (keep only last 20)
+          if (lastLoggedTriggers.current.size > 20) {
+            const entries = Array.from(lastLoggedTriggers.current);
+            lastLoggedTriggers.current = new Set(entries.slice(-20));
+          }
+        }
       } catch (error) {
         // Ignore errors if engine is not running
       }
     };
 
-    const interval = setInterval(fetchDebugInfo, 2000);
+    const interval = setInterval(fetchDebugInfo, 1000); // Check every second
     return () => clearInterval(interval);
   }, []);
 

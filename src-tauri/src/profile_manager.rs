@@ -49,10 +49,9 @@ impl ProfileManager {
         // Common events (controlled by built-in triggers)
         tank_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         tank_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
-        tank_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
-        tank_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
-        tank_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
-        tank_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_simple_hit());
+        // NOTE: Tanks don't use fuel in War Thunder, so LowFuel/CriticalFuel are omitted
+        tank_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_critical_hit());
+        tank_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_critical_hit());
         tank_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
         
         // Tank-specific events
@@ -70,7 +69,7 @@ impl ProfileManager {
             vehicle_type: VehicleType::Tank,
             game_mode: GameMode::Any,
             event_mappings: tank_mappings,
-            enabled: true,
+            enabled: false,  // Disabled by default - user must enable explicitly
         });
 
         // Aircraft Profile (Universal)
@@ -79,15 +78,21 @@ impl ProfileManager {
         // Common events (controlled by built-in triggers)
         aircraft_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
+        
+        // Fuel warnings (aircraft-specific)
         aircraft_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
+        
+        // Ammo and engine
         aircraft_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
-        aircraft_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
         
-        // Aircraft-specific flight dynamics
+        // Aircraft-specific flight dynamics (different patterns for variety)
         aircraft_mappings.insert(GameEvent::Stall, VibrationPattern::preset_fire());
         aircraft_mappings.insert(GameEvent::Spin, VibrationPattern::preset_fire());
+        
+        // Overspeed & OverG - stronger patterns for critical warnings
         aircraft_mappings.insert(GameEvent::Overspeed, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::OverG, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::HighAOA, VibrationPattern::preset_simple_hit());
@@ -107,7 +112,7 @@ impl ProfileManager {
             vehicle_type: VehicleType::Aircraft,
             game_mode: GameMode::Any,
             event_mappings: aircraft_mappings,
-            enabled: true,
+            enabled: false,  // Disabled by default - user must enable explicitly
         });
 
         // Light Background Profile (Minimal, all vehicles)
@@ -193,11 +198,13 @@ impl ProfileManager {
     }
 
     /// Add custom profile
+    #[allow(dead_code)]
     pub fn add_profile(&mut self, profile: Profile) {
         self.profiles.push(profile);
     }
 
     /// Remove profile
+    #[allow(dead_code)]
     pub fn remove_profile(&mut self, id: &str) {
         self.profiles.retain(|p| p.id != id);
         if self.active_profile.as_deref() == Some(id) {
@@ -206,6 +213,7 @@ impl ProfileManager {
     }
 
     /// Toggle profile on/off
+    #[allow(dead_code)]
     pub fn toggle_profile(&mut self, id: &str, enabled: bool) {
         if let Some(profile) = self.profiles.iter_mut().find(|p| p.id == id) {
             profile.enabled = enabled;

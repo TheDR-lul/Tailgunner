@@ -12,6 +12,11 @@ Tailgunner is a revolutionary haptic feedback application that bridges War Thund
 ### 🎮 **Full War Thunder Integration**
 - ✅ **100% EAC-Safe** - Reads data only from `127.0.0.1:8111` (official API)
 - ✅ **Real-time telemetry** - 10 updates per second
+- ✅ **HUD Events** - Kill feed, damage events, aircraft crashes
+  - Track your kills and deaths in real-time
+  - Filter by player names and clan tags
+  - Trigger haptic feedback on specific player events
+  - Enemy tracking and targeted feedback
 - ✅ **50+ Game Parameters** including:
   - **Flight**: IAS, TAS, Altitude, Mach, AoA, G-Load
   - **Controls**: Aileron, Elevator, Rudder, Flaps, Gear, Airbrake
@@ -51,6 +56,17 @@ Automatic profile switching based on vehicle type:
 - **Per-Trigger Settings** - Adjust cooldown, duration, and intensity individually
 - **Built-in Triggers** - Pre-configured for fuel warnings, engine damage, ammo alerts
 - **Profile Filtering** - Only shows events with active triggers for clarity
+- **Continuous Vibration Mode** - Sustained feedback while condition is active
+- **Vehicle-Specific Limits** - Auto-generated triggers based on actual aircraft data
+  - G-load warnings (80% of max positive/negative G)
+  - Flutter speed alerts (before wing rip)
+  - Critical overspeed warnings (95% of Vne)
+
+**Player Identity System:**
+- **Track Specific Players** - Set your nickname to filter kill events
+- **Clan Tag Support** - Monitor clan member activities
+- **Enemy Lists** - Create targeted feedback for specific opponents
+- **Smart Kill Filtering** - "I killed someone" vs "Enemy damaged me"
 
 ### 🔧 **Advanced Device Support**
 - **Buttplug.io Integration** - Universal device support via Intiface Central
@@ -80,6 +96,11 @@ Automatic profile switching based on vehicle type:
 - **Filtered Views** - Cleaner interface
   - Only shows triggers with configured events
   - Hides empty profiles for clarity
+- **Debug Console** - Real-time event monitoring
+  - Live trigger activation logs
+  - Game state telemetry display
+  - HUD event debugging
+  - Error tracking and diagnostics
 
 ---
 
@@ -159,15 +180,30 @@ npm run tauri build
 #### **A.S.S. (Adaptive Sensory System)**
 The engine that powers Tailgunner:
 - **Telemetry Reader** - Polls WT API at 100ms intervals
+  - `/indicators` endpoint - Real-time telemetry (50+ parameters)
+  - `/hudmsg` endpoint - Kill feed and damage events
+  - Smart HUD initialization (processes recent 15s of events)
+  - Duplicate message prevention with time-based caching
 - **Event Engine** - Detects game events (hits, damage, state changes)
 - **Trigger Manager** - Evaluates custom conditions with persistent settings
   - Custom curve point storage and serialization
   - Per-trigger cooldown and pattern management
   - Real-time condition evaluation with state history
+  - Continuous trigger support (sustained vibration)
+  - Event-based vs state-based trigger separation
 - **Profile Manager** - Switches haptic profiles based on vehicle
 - **Pattern Engine** - Converts curves to ADSR envelopes
   - Custom curve-to-pattern conversion
   - ADSR (Attack, Decay, Sustain, Release) generation
+  - Burst mode support (repeat patterns)
+- **Vehicle Limits Manager** - Datamine integration
+  - Parses War Thunder game files (VROMFS unpacking)
+  - Extracts aircraft performance limits (G-load, Vne, flutter)
+  - Auto-generates vehicle-specific triggers
+  - EAC-safe (unpacks to TEMP, doesn't modify game)
+- **Player Identity DB** - SQLite-based identity tracking
+  - Persistent storage of player names, clan tags, enemy lists
+  - Kill event filtering based on player identity
 - **Rate Limiter** - QoS to prevent device spam
 - **Device Manager** - Communicates with Buttplug.io
 
@@ -329,7 +365,7 @@ This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you a
 
 ## 🚀 Roadmap
 
-### **v0.7.0** *(Current)*
+### **v0.8.1** *(Current - Released 2025-01-26)*
 - ✅ 50+ game parameters
 - ✅ Multi-condition nodes
 - ✅ Linear & Rotate devices
@@ -339,20 +375,43 @@ This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you a
 - ✅ Persistent trigger configuration
 - ✅ Profile filtering (shows only events with triggers)
 - ✅ Editable number inputs with keyboard support
+- ✅ **HUD Events System** - Kill feed, damage tracking
+- ✅ **Player Identity** - Track specific players/clans/enemies
+- ✅ **Vehicle Datamine Integration** - Auto-generated limits from game files
+- ✅ **Continuous Vibration Mode** - Sustained feedback for conditions
+- ✅ **Debug Console** - Real-time event monitoring
+- ✅ **Smart Kill Filtering** - Context-aware event descriptions
+- ✅ **Vehicle-Specific Triggers** - G-load, flutter, overspeed warnings
+- ✅ **HUD Initialization** - Processes recent 15s of events on startup
 
-### **v0.8.0** *(Planned)*
+### **v0.9.0** *(Planned)*
+- 🔄 Enhanced datamine features
+  - Tank performance limits (turret traverse, hull break)
+  - Naval vessel data integration
+  - Weapon ballistics parameters
+- 🔄 Advanced pattern features
+  - Pattern templates library
+  - Community pattern sharing
+  - Trigger import/export (JSON)
+- 🔄 UI improvements
+  - Trigger event history viewer
+  - Pattern performance analyzer
+  - Custom event categories
+
+### **v1.0.0** *(Future)*
 - 🔄 On-screen HUD overlay
   - Real-time game state visualization
   - Active trigger indicators
   - Device status display
   - Customizable position and opacity
-- 🔄 Community pattern library
-- 🔄 Enhanced curve editor with presets
-- 🔄 Trigger import/export functionality
-- 🔄 WT wiki parcer
-
-### **v1.0.0** *(Future)*
-- TODO
+- 🔄 Advanced analytics
+  - Session statistics
+  - Trigger activation heatmaps
+  - Device usage metrics
+- 🔄 Multi-game support
+  - DCS World integration
+  - IL-2 Sturmovik support
+  - Generic telemetry adapter
 
 ---
 

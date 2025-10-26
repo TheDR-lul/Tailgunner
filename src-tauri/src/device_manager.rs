@@ -22,6 +22,7 @@ pub enum DeviceType {
     Lovense,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct LovenseDevice {
     id: String,
@@ -142,6 +143,15 @@ impl DeviceManager {
             let client_devices = client.devices();
             log::info!("📱 Devices found: {}", client_devices.len());
             
+            // Try to open Device History DB for saving
+            let mut db_opt = match crate::device_history_db::DeviceHistoryDB::new() {
+                Ok(db) => Some(db),
+                Err(e) => {
+                    log::warn!("[Device Manager] Failed to open Device History DB: {}", e);
+                    None
+                }
+            };
+            
             for device in client_devices {
                 log::info!("  → {} (index: {}, type: {})", 
                     device.name(), 
@@ -149,12 +159,22 @@ impl DeviceManager {
                     if device.vibrate_attributes().is_empty() { "no vibrate" } else { "vibrate OK" }
                 );
                 
+                let device_id = device.index().to_string();
+                let device_name = device.name().to_string();
+                
                 devices.push(DeviceInfo {
                     id: device.index(),
-                    name: device.name().to_string(),
+                    name: device_name.clone(),
                     device_type: DeviceType::Buttplug,
                     connected: true,
                 });
+                
+                // Save to Device History
+                if let Some(ref mut db) = db_opt {
+                    if let Err(e) = db.upsert_device(&device_id, &device_name, "Buttplug") {
+                        log::warn!("[Device Manager] Failed to save device to history: {}", e);
+                    }
+                }
             }
         }
 
@@ -176,11 +196,12 @@ impl DeviceManager {
             buttplug_count = devices.len();
             
             if buttplug_count > 0 {
-                log::debug!("🎮 Sending vibration {} to {} Buttplug devices", intensity, buttplug_count);
+                // Reduced logging spam - only log errors
+                // log::debug!("🎮 Sending vibration {} to {} Buttplug devices", intensity, buttplug_count);
                 
                 for device in devices {
                     match device.vibrate(&buttplug::client::ScalarValueCommand::ScalarValue(intensity.into())).await {
-                        Ok(_) => log::debug!("  ✅ {} vibrated", device.name()),
+                        Ok(_) => {}, // log::debug!("  ✅ {} vibrated", device.name()),
                         Err(e) => log::error!("  ❌ {} error: {}", device.name(), e),
                     }
                 }
@@ -209,6 +230,7 @@ impl DeviceManager {
     }
 
     /// Check connection status
+    #[allow(dead_code)]
     pub async fn is_connected(&self) -> bool {
         self.buttplug_client.read().await.is_some()
     }
@@ -276,7 +298,7 @@ impl DeviceManager {
         
         log::debug!("🎮 Sending Lovense vibration: {} (intensity: {})", lovense_intensity, intensity);
         
-        for (id, device) in lovense_devices.iter() {
+        for (_id, device) in lovense_devices.iter() {
             let url = format!("http://{}:{}/Vibrate?v={}", device.ip_address, device.port, lovense_intensity);
             
             match self.http_client.post(&url).send().await {
@@ -306,12 +328,14 @@ impl DeviceManager {
     }
     
     /// Enable/disable Lovense integration
+    #[allow(dead_code)]
     pub fn set_lovense_enabled(&mut self, enabled: bool) {
         self.lovense_enabled = enabled;
         log::info!("🔧 Lovense integration: {}", if enabled { "ENABLED" } else { "DISABLED" });
     }
     
     /// Get Lovense connection status
+    #[allow(dead_code)]
     pub async fn is_lovense_connected(&self) -> bool {
         !self.lovense_devices.read().await.is_empty()
     }

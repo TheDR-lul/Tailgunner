@@ -182,7 +182,13 @@
     "OilOverheated": "Масло перегрето",
     "Crashed": "Столкновение",
     "AmmunitionExploded": "Взрыв боекомплекта",
-    "TargetDestroyed": "Цель уничтожена"
+    "TargetDestroyed": "Цель уничтожена",
+    "EnemySetAfire": "Враг подожжён",
+    "TakingDamage": "Получение урона",
+    "SeverelyDamaged": "Критический урон",
+    "ShotDown": "Сбит",
+    "Achievement": "Достижение получено",
+    "ChatMessage": "Сообщение в чате"
   },
   "debug": {
     "title": "Консоль отладки",

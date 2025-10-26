@@ -13,6 +13,8 @@ import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { GameStatus } from "./components/GameStatus";
 import { EventConfiguration } from "./components/EventConfiguration";
 import { VehicleInfoCard } from "./components/VehicleInfoCard";
+import { PlayerIdentityModal } from "./components/PlayerIdentityModal";
+import { User, Coffee } from "lucide-react";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
 
@@ -20,9 +22,36 @@ function App() {
   const { t } = useTranslation();
   const [isRunning, setIsRunning] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
   const [editingPattern, setEditingPattern] = useState<Pattern | undefined>();
+  const [supportHighlight, setSupportHighlight] = useState(false);
   
   const { addPattern, updatePattern } = usePatterns();
+
+  // Auto-initialize datamine on startup
+  useEffect(() => {
+    const initDatamine = async () => {
+      try {
+        console.log("[Datamine] Auto-initializing...");
+        const result = await api.datamineAutoInit();
+        console.log("[Datamine]", result);
+      } catch (error) {
+        console.warn("[Datamine] Auto-init failed:", error);
+      }
+    };
+    
+    initDatamine();
+  }, []);
+
+  // Periodic support button highlight (every 2 minutes)
+  useEffect(() => {
+    const highlightInterval = setInterval(() => {
+      setSupportHighlight(true);
+      setTimeout(() => setSupportHighlight(false), 3000); // Highlight for 3 seconds
+    }, 120000); // Every 2 minutes
+
+    return () => clearInterval(highlightInterval);
+  }, []);
 
   // Check system status (NOT auto-connect!)
   useEffect(() => {
@@ -52,6 +81,17 @@ function App() {
     }
   };
 
+  const handleSupportClick = async () => {
+    try {
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+      await openUrl('https://buymeacoffee.com/wingsofprey');
+    } catch (error) {
+      console.error('Failed to open link:', error);
+      // Fallback to window.open
+      window.open('https://buymeacoffee.com/wingsofprey', '_blank');
+    }
+  };
+
   return (
     <div className="app-container">
       {/* Modern header */}
@@ -66,6 +106,20 @@ function App() {
           </div>
           
           <div className="header-actions">
+            <button
+              onClick={handleSupportClick}
+              className={`support-btn ${supportHighlight ? 'highlight' : ''}`}
+              title="Support Developer"
+            >
+              <Coffee size={18} />
+            </button>
+            <button
+              onClick={() => setIsPlayerModalOpen(true)}
+              className="player-identity-btn"
+              title="Player Identity"
+            >
+              <User size={18} />
+            </button>
             <LanguageSwitcher />
             <div className={`status-chip ${isRunning ? 'running' : 'stopped'}`}>
               <span className="status-indicator"></span>
@@ -108,6 +162,12 @@ function App() {
         }}
         onSave={handleSavePattern}
         initialData={editingPattern}
+      />
+
+      {/* Player identity modal */}
+      <PlayerIdentityModal 
+        isOpen={isPlayerModalOpen}
+        onClose={() => setIsPlayerModalOpen(false)}
       />
     </div>
   );

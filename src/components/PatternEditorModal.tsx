@@ -17,13 +17,13 @@ import { X, Save, Download, Upload } from 'lucide-react';
 
 import { InputNode } from './nodes/InputNode';
 import { ConditionNode } from './nodes/ConditionNode';
+import { MultiConditionNode } from './nodes/MultiConditionNode';
 import { VibrationNode } from './nodes/VibrationNode';
 import { OutputNode } from './nodes/OutputNode';
 import { LogicNode } from './nodes/LogicNode';
 import { EventNode } from './nodes/EventNode';
 import { LinearNode } from './nodes/LinearNode';
 import { RotateNode } from './nodes/RotateNode';
-import { MultiConditionNode } from './nodes/MultiConditionNode';
 
 const nodeTypes = {
   input: InputNode,
@@ -40,17 +40,19 @@ const nodeTypes = {
 interface PatternEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (name: string, nodes: Node[], edges: Edge[]) => void;
+  onSave: (name: string, nodes: Node[], edges: Edge[], cooldownMs?: number) => void;
   initialData?: {
     name: string;
     nodes: Node[];
     edges: Edge[];
+    cooldownMs?: number;
   };
 }
 
 export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: PatternEditorModalProps) {
   const { t } = useTranslation();
   const [patternName, setPatternName] = useState(initialData?.name || '');
+  const [cooldownMs, setCooldownMs] = useState(initialData?.cooldownMs || 1000);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
 
@@ -59,12 +61,14 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
   useEffect(() => {
     if (initialData) {
       setPatternName(initialData.name || '');
+      setCooldownMs(initialData.cooldownMs || 1000);
       setNodes(initialData.nodes || []);
       setEdges(initialData.edges || []);
-      console.log('[Pattern Editor] ✏️ Loaded pattern:', initialData.name, 'Nodes:', initialData.nodes?.length, 'Edges:', initialData.edges?.length);
+      console.log('[Pattern Editor] ✏️ Loaded pattern:', initialData.name, 'Cooldown:', initialData.cooldownMs, 'Nodes:', initialData.nodes?.length, 'Edges:', initialData.edges?.length);
     } else if (isOpen) {
       // Clear state when creating a new pattern
       setPatternName('');
+      setCooldownMs(1000);
       setNodes([]);
       setEdges([]);
       console.log('[Pattern Editor] ✨ Creating new pattern');
@@ -91,13 +95,15 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
       case 'input':
         return { label: t('nodes.input.default_label'), indicator: 'speed', value: 0 };
       case 'condition':
-        return { operator: '>', threshold: 100 };
+        return { operator: '>', value: 100 };
       case 'multiCondition':
         return { logic: 'AND', conditions: [{ id: '1', operator: '>', value: 100 }] };
       case 'logic':
         return { operation: 'AND' };
       case 'event':
-        return { event: 'Hit' };
+        return { event: 'Hit', filter_type: 'any' };
+      case 'output':
+        return { deviceMode: 'all' };
       case 'vibration':
         return {
           duration: 1.0,
@@ -124,7 +130,7 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
       alert(t('pattern_editor.name_required'));
       return;
     }
-    onSave(patternName, nodes, edges);
+    onSave(patternName, nodes, edges, cooldownMs);
     onClose();
   };
 
@@ -207,15 +213,41 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div>
+          <div style={{ flex: 1 }}>
             <h2>{initialData ? t('pattern_editor.edit_title') : t('pattern_editor.create_title')}</h2>
-            <input
-              type="text"
-              value={patternName}
-              onChange={(e) => setPatternName(e.target.value)}
-              placeholder={t('pattern_editor.name_placeholder')}
-              className="pattern-name-input"
-            />
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '8px' }}>
+              <input
+                type="text"
+                value={patternName}
+                onChange={(e) => setPatternName(e.target.value)}
+                placeholder={t('pattern_editor.name_placeholder')}
+                className="pattern-name-input"
+                style={{ flex: 1 }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>
+                  ⏱️ Cooldown:
+                </label>
+                <input
+                  type="number"
+                  value={cooldownMs}
+                  onChange={(e) => setCooldownMs(Math.max(0, parseInt(e.target.value) || 0))}
+                  min="0"
+                  step="100"
+                  style={{
+                    width: '90px',
+                    padding: '6px 8px',
+                    background: '#1e293b',
+                    border: '1px solid #334155',
+                    borderRadius: '6px',
+                    color: '#e2e8f0',
+                    fontSize: '13px',
+                    textAlign: 'right'
+                  }}
+                />
+                <span style={{ fontSize: '12px', color: '#64748b' }}>ms</span>
+              </div>
+            </div>
           </div>
           <button className="btn-icon" onClick={onClose}>
             <X size={24} />

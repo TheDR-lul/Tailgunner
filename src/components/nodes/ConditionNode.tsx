@@ -1,29 +1,38 @@
 import { useState, useEffect } from 'react';
 import { Handle, Position, NodeResizer } from 'reactflow';
 import { useTranslation } from 'react-i18next';
-import { GitBranch } from 'lucide-react';
+import { Scale } from 'lucide-react';
 
 interface ConditionNodeData {
-  logic: 'AND' | 'OR' | 'XOR' | 'NOT';
-  description?: string;
+  operator: '>' | '<' | '=' | '>=' | '<=';
+  value: number;
+  usePercentage?: boolean; // Use % of max value from vehicle limits
+  continuous?: boolean; // Vibrate continuously while condition is true
 }
 
 export function ConditionNode({ data, id, selected }: { data: ConditionNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
-  const [logic, setLogic] = useState(data.logic || 'AND');
+  const [operator, setOperator] = useState(data.operator || '>');
+  const [value, setValue] = useState(data.value || 100);
+  const [usePercentage, setUsePercentage] = useState(data.usePercentage || false);
+  const [continuous, setContinuous] = useState(data.continuous || false);
   
   useEffect(() => {
-    data.logic = logic;
-  }, [logic, data]);
+    data.operator = operator;
+    data.value = value;
+    data.usePercentage = usePercentage;
+    data.continuous = continuous;
+  }, [operator, value, usePercentage, continuous, data]);
   
-  const LOGIC_OPS = [
-    { value: 'AND', label: 'AND (All true)', symbol: '∧', color: '#4ade80', desc: 'All conditions must be true' },
-    { value: 'OR', label: 'OR (Any true)', symbol: '∨', color: '#fbbf24', desc: 'At least one condition true' },
-    { value: 'XOR', label: 'XOR (Only one)', symbol: '⊕', color: '#a855f7', desc: 'Exactly one condition true' },
-    { value: 'NOT', label: 'NOT (Inverse)', symbol: '¬', color: '#f87171', desc: 'Invert the result' },
+  const OPERATORS = [
+    { value: '>', symbol: '>', label: 'Greater than', color: '#4ade80' },
+    { value: '<', symbol: '<', label: 'Less than', color: '#f87171' },
+    { value: '>=', symbol: '≥', label: 'Greater or equal', color: '#22c55e' },
+    { value: '<=', symbol: '≤', label: 'Less or equal', color: '#fb923c' },
+    { value: '=', symbol: '=', label: 'Equal', color: '#a855f7' },
   ];
   
-  const selectedLogic = LOGIC_OPS.find(op => op.value === logic);
+  const selectedOp = OPERATORS.find(op => op.value === operator);
   
   return (
     <div 
@@ -31,131 +40,159 @@ export function ConditionNode({ data, id, selected }: { data: ConditionNodeData;
       onClick={(e) => e.stopPropagation()}
       style={{
         background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
-        border: `2px solid ${selectedLogic?.color || 'rgba(93, 138, 168, 0.4)'}`,
-        minWidth: '180px'
+        border: `2px solid ${selectedOp?.color || 'rgba(93, 138, 168, 0.4)'}`,
+        minWidth: '160px'
       }}
     >
       <NodeResizer 
         isVisible={selected} 
-        minWidth={180} 
-        minHeight={120}
-        color={selectedLogic?.color || 'rgba(93, 138, 168, 0.8)'}
+        minWidth={160} 
+        minHeight={100}
+        color="rgba(255, 153, 51, 0.8)"
       />
-      
-      {/* Multiple Inputs */}
-      <Handle 
-        type="target" 
-        position={Position.Left} 
-        id="input-a"
-        style={{ 
-          top: '30%',
-          background: '#ff9933', 
-          width: 12, 
-          height: 12, 
-          border: 'none',
-          boxShadow: '0 0 8px rgba(255, 153, 51, 0.6)'
-        }}
-      />
-      <span style={{
-        position: 'absolute',
-        left: '16px',
-        top: 'calc(30% - 8px)',
-        fontSize: '9px',
-        color: '#ff9933',
-        fontWeight: 'bold',
-        pointerEvents: 'none'
-      }}>A</span>
-      
-      <Handle 
-        type="target" 
-        position={Position.Left} 
-        id="input-b"
-        style={{ 
-          top: '70%',
-          background: '#ff9933', 
-          width: 12, 
-          height: 12, 
-          border: 'none',
-          boxShadow: '0 0 8px rgba(255, 153, 51, 0.6)'
-        }}
-      />
-      <span style={{
-        position: 'absolute',
-        left: '16px',
-        top: 'calc(70% - 8px)',
-        fontSize: '9px',
-        color: '#ff9933',
-        fontWeight: 'bold',
-        pointerEvents: 'none'
-      }}>B</span>
-      
-      <div className="node-header" style={{ background: `${selectedLogic?.color}20` }}>
-        <GitBranch size={16} style={{ color: selectedLogic?.color }} />
-        <span style={{ color: selectedLogic?.color }}>LOGIC</span>
+      <div className="node-header" style={{ background: `${selectedOp?.color}22` }}>
+        <Scale size={16} color={selectedOp?.color} />
+        <span style={{ color: selectedOp?.color }}>Condition</span>
       </div>
-      
       <div className="node-body">
-        <select 
-          value={logic} 
-          onChange={(e) => setLogic(e.target.value as any)}
-          className="node-select"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            background: 'rgba(0, 0, 0, 0.3)',
-            border: `1px solid ${selectedLogic?.color}`,
-            color: selectedLogic?.color,
-            fontSize: '13px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            padding: '8px'
+        <Handle 
+          type="target" 
+          position={Position.Left} 
+          id="input"
+          style={{ 
+            background: '#3b82f6', 
+            width: 10, 
+            height: 10, 
+            border: '2px solid #3b82f6',
+            boxShadow: '0 0 6px #3b82f688'
           }}
-        >
-          {LOGIC_OPS.map(op => (
-            <option key={op.value} value={op.value}>
-              {op.symbol} {op.value}
-            </option>
-          ))}
-        </select>
+        />
         
-        <div style={{ 
-          fontSize: '9px', 
-          color: '#64748b', 
-          textAlign: 'center',
-          padding: '4px',
-          marginTop: '4px'
-        }}>
-          {selectedLogic?.desc}
+        <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <select 
+            value={operator}
+            onChange={(e) => setOperator(e.target.value as any)}
+            className="node-select"
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              border: `1px solid ${selectedOp?.color}`,
+              color: selectedOp?.color,
+              fontSize: '12px',
+              fontWeight: 'bold'
+            }}
+          >
+            {OPERATORS.map(op => (
+              <option key={op.value} value={op.value}>
+                {op.symbol} {op.label}
+              </option>
+            ))}
+          </select>
+          
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => setValue(parseFloat(e.target.value) || 0)}
+            className="node-input-field"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              border: `1px solid ${selectedOp?.color}`,
+              color: '#fff',
+              padding: '6px 10px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          />
+          
+          <div style={{
+            padding: '5px',
+            background: `${selectedOp?.color}22`,
+            borderRadius: '4px',
+            fontSize: '9px',
+            color: selectedOp?.color,
+            textAlign: 'center',
+            fontWeight: 600
+          }}>
+            Value {selectedOp?.symbol} {value}{usePercentage ? '%' : ''}
+          </div>
+          
+          {/* Percentage mode toggle */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '9px',
+            color: '#94a3b8',
+            marginTop: '6px',
+            cursor: 'pointer',
+            padding: '4px',
+            background: usePercentage ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
+            borderRadius: '4px'
+          }}>
+            <input
+              type="checkbox"
+              checked={usePercentage}
+              onChange={(e) => setUsePercentage(e.target.checked)}
+              style={{ accentColor: '#22c55e' }}
+            />
+            📊 % of max value
+          </label>
+          
+          {/* Continuous mode toggle */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '9px',
+            color: '#94a3b8',
+            marginTop: '4px',
+            cursor: 'pointer',
+            padding: '4px',
+            background: continuous ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+            borderRadius: '4px'
+          }}>
+            <input
+              type="checkbox"
+              checked={continuous}
+              onChange={(e) => setContinuous(e.target.checked)}
+              style={{ accentColor: '#8b5cf6' }}
+            />
+            🔄 Continuous
+          </label>
+          
+          {continuous && (
+            <div style={{
+              fontSize: '8px',
+              color: '#8b5cf6',
+              marginTop: '4px',
+              padding: '4px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              borderRadius: '3px',
+              textAlign: 'center',
+              lineHeight: '1.3'
+            }}>
+              ⚡ Vibrates while condition is true
+            </div>
+          )}
         </div>
         
-        <div style={{
-          fontSize: '10px',
-          color: selectedLogic?.color,
-          textAlign: 'center',
-          padding: '6px',
-          marginTop: '4px',
-          background: `${selectedLogic?.color}10`,
-          borderRadius: '4px',
-          fontWeight: 'bold'
-        }}>
-          {logic === 'AND' && 'A ∧ B'}
-          {logic === 'OR' && 'A ∨ B'}
-          {logic === 'XOR' && 'A ⊕ B'}
-          {logic === 'NOT' && '¬A'}
-        </div>
+        <Handle 
+          type="source" 
+          position={Position.Right} 
+          id="output"
+          style={{ 
+            background: selectedOp?.color, 
+            width: 12, 
+            height: 12, 
+            border: `2px solid ${selectedOp?.color}`,
+            boxShadow: `0 0 8px ${selectedOp?.color}88`
+          }}
+        />
       </div>
-      
-      <Handle 
-        type="source" 
-        position={Position.Right} 
-        id="output" 
-        style={{ 
-          background: selectedLogic?.color, 
-          width: 12, 
-          height: 12, 
-          border: 'none',
-          boxShadow: `0 0 8px ${selectedLogic?.color}99`
-        }}
-      />
     </div>
   );
 }
+
