@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
-import { MapInfoBox } from './MapInfoBox';
 import './MiniMap.css';
 
 interface MapObject {
@@ -39,7 +38,6 @@ interface MapData {
   player_heading: number | null;
   map_name: string | null;
   player_grid: string | null;
-  correct_grid_step: [number, number] | null;
 }
 
 interface EnemyDistance {
@@ -132,9 +130,36 @@ export function MiniMap() {
       return;
     }
 
-    // Draw map image as background
+    // Draw map image as background (cropped to visible grid area)
     if (mapImage) {
-      ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
+      // Calculate crop region based on grid_zero and grid_size
+      const mapWidth = mapData.info.map_max[0] - mapData.info.map_min[0];
+      const mapHeight = mapData.info.map_max[1] - mapData.info.map_min[1];
+      
+      // Normalize grid_zero to 0..1 range
+      // Note: War Thunder Y coordinates go bottom-to-top, image Y goes top-to-bottom
+      const cropLeft = (mapData.info.grid_zero[0] - mapData.info.map_min[0]) / mapWidth;
+      const cropWidth = mapData.info.grid_size[0] / mapWidth;
+      const cropHeight = mapData.info.grid_size[1] / mapHeight;
+      
+      // grid_zero[1] is the TOP of visible area in WT coords (Y goes up)
+      // Convert to image coords where Y goes down
+      const wtTop = mapData.info.grid_zero[1];
+      const wtBottom = wtTop - mapData.info.grid_size[1];
+      const cropTop = (mapHeight - wtTop) / mapHeight;  // Invert Y
+      
+      // Draw cropped portion of the image
+      ctx.drawImage(
+        mapImage,
+        cropLeft * mapImage.width,  // Source X
+        cropTop * mapImage.height,   // Source Y
+        cropWidth * mapImage.width,  // Source Width
+        cropHeight * mapImage.height, // Source Height
+        0,                            // Dest X
+        0,                            // Dest Y
+        canvas.width,                 // Dest Width
+        canvas.height                 // Dest Height
+      );
       
       // Draw semi-transparent overlay for better object visibility
       ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
@@ -173,8 +198,10 @@ export function MiniMap() {
     if (!player.x || !player.y) return;
 
     const enemies: EnemyDistance[] = [];
-    const mapSizeX = info.map_max[0] - info.map_min[0];
-    const mapSizeY = info.map_max[1] - info.map_min[1];
+    
+    // API coords are relative to visible area, convert to meters using grid_size
+    const visibleSizeX = info.grid_size[0]; // meters
+    const visibleSizeY = info.grid_size[1]; // meters
 
     for (const obj of objects) {
       // Check if object is enemy (red color) and has position
@@ -193,17 +220,17 @@ export function MiniMap() {
       if (!isEnemy) continue;
       if (obj.type !== 'ground_model' && obj.type !== 'aircraft' && obj.type !== 'Ship') continue;
 
-      // Calculate distance in normalized coordinates
+      // Calculate distance using normalized visible area coords
       const dx = obj.x - player.x;
       const dy = obj.y - player.y;
       
-      // Convert to real-world distance (meters)
-      const distX = dx * mapSizeX;
-      const distY = dy * mapSizeY;
+      // Convert to real-world meters
+      const distX = dx * visibleSizeX;
+      const distY = dy * visibleSizeY;
       const distance = Math.sqrt(distX * distX + distY * distY);
       
       // Calculate bearing/azimuth to enemy (0° = North, clockwise)
-      const angleFromX = Math.atan2(dy, dx) * (180 / Math.PI);
+      const angleFromX = Math.atan2(distY, distX) * (180 / Math.PI);
       const bearing = (90 - angleFromX + 360) % 360;
 
       enemies.push({
@@ -220,16 +247,13 @@ export function MiniMap() {
   };
 
   const drawGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, info: MapInfo) => {
-    if (!mapData) return;
+    // Use visible grid size (matches in-game view)
+    const mapSizeX = info.grid_size[0];
+    const mapSizeY = info.grid_size[1];
     
-    // Calculate real map size
-    const mapSizeX = info.map_max[0] - info.map_min[0];
-    const mapSizeY = info.map_max[1] - info.map_min[1];
-    
-    // Use correct grid_steps from database (if available), fallback to API
-    // Database has real values (e.g. Attica: 225m, not 200m from API!)
-    const gridStepX = mapData.correct_grid_step?.[0] ?? info.grid_steps[0];
-    const gridStepY = mapData.correct_grid_step?.[1] ?? info.grid_steps[1];
+    // Use grid_steps from API
+    const gridStepX = info.grid_steps[0];
+    const gridStepY = info.grid_steps[1];
     const gridCountX = Math.ceil(mapSizeX / gridStepX);
     const gridCountY = Math.ceil(mapSizeY / gridStepY);
     
@@ -282,6 +306,7 @@ export function MiniMap() {
     obj: MapObject,
     info: MapInfo
   ) => {
+    // API coords are ALREADY relative to visible area (can be negative or >1 for off-screen objects)
     if (obj.x === undefined || obj.y === undefined) {
       // Line object (airfield)
       if (obj.sx !== undefined && obj.sy !== undefined && obj.ex !== undefined && obj.ey !== undefined) {
@@ -300,6 +325,7 @@ export function MiniMap() {
       return;
     }
 
+    // API coords are directly usable (relative to visible area)
     const x = obj.x * canvas.width;
     const y = obj.y * canvas.height;
 
@@ -346,6 +372,7 @@ export function MiniMap() {
   ) => {
     if (obj.x === undefined || obj.y === undefined) return;
 
+    // API coords are directly usable (relative to visible area)
     const x = obj.x * canvas.width;
     const y = obj.y * canvas.height;
 
@@ -381,13 +408,6 @@ export function MiniMap() {
       <div className="minimap-header">
         <h3>{t('map.title')}</h3>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {mapData && mapData.info.valid && (
-            <MapInfoBox 
-              mapName={mapData.map_name}
-              apiGridStep={mapData.info.grid_steps as [number, number]}
-              correctGridStep={mapData.correct_grid_step}
-            />
-          )}
           <button 
             className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
             onClick={() => setIsEnabled(!isEnabled)}

@@ -15,8 +15,6 @@ mod device_history_db;
 mod debug_dump;
 mod hud_messages;
 mod map_module;
-mod map_detection;
-mod map_database;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -838,19 +836,6 @@ async fn get_map_data() -> Result<map_module::MapData, String> {
     Ok(map_module::MapData::new(objects, info))
 }
 
-/// Get detailed map information from database
-#[tauri::command]
-async fn get_map_database_info(map_name: String) -> Result<Value, String> {
-    let db = map_database::MapDatabase::new();
-    
-    if let Some(map_info) = db.get_map(&map_name) {
-        serde_json::to_value(map_info)
-            .map_err(|e| format!("Failed to serialize map info: {}", e))
-    } else {
-        Err(format!("Map '{}' not found in database", map_name))
-    }
-}
-
 /// Get game chat messages
 #[tauri::command]
 async fn get_game_chat(last_id: Option<u32>) -> Result<Value, String> {
@@ -1109,7 +1094,6 @@ pub fn run() {
             get_map_objects,
             get_map_info,
             get_map_data,
-            get_map_database_info,
             get_map_image,
             get_game_chat,
             get_hud_messages,

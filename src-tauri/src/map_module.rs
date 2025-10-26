@@ -1,8 +1,6 @@
 /// Map data module for War Thunder API
 /// Provides map objects, boundaries, and player positions
 use serde::{Deserialize, Serialize};
-use crate::map_detection;
-use crate::map_database::MapDatabase;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapObject {
@@ -99,29 +97,6 @@ pub struct MapInfo {
 }
 
 impl MapInfo {
-    /// Convert world coordinates to normalized map coordinates (0..1)
-    pub fn world_to_map(&self, x: f32, y: f32) -> (f32, f32) {
-        let map_x = (x - self.map_min[0]) / (self.map_max[0] - self.map_min[0]);
-        let map_y = (y - self.map_min[1]) / (self.map_max[1] - self.map_min[1]);
-        (map_x, map_y)
-    }
-    
-    /// Get grid cell for world coordinates
-    pub fn get_grid_cell(&self, x: f32, y: f32) -> (i32, i32) {
-        let cell_x = ((x - self.grid_zero[0]) / self.grid_steps[0]).floor() as i32;
-        let cell_y = ((y - self.grid_zero[1]) / self.grid_steps[1]).floor() as i32;
-        (cell_x, cell_y)
-    }
-    
-    /// Convert grid cell to letter-number format (e.g., "A5")
-    pub fn grid_cell_to_string(&self, cell_x: i32, cell_y: i32) -> String {
-        if cell_y >= 0 && cell_y < 26 {
-            let letter = (b'A' + cell_y as u8) as char;
-            format!("{}{}", letter, cell_x + 1)
-        } else {
-            format!("?{}", cell_x + 1)
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,7 +107,6 @@ pub struct MapData {
     pub player_heading: Option<f32>,
     pub map_name: Option<String>,  // Detected map name
     pub player_grid: Option<String>,  // Grid reference (e.g. "P-10")
-    pub correct_grid_step: Option<[f32; 2]>,  // Correct grid step from database (overrides API)
 }
 
 impl MapData {
@@ -142,23 +116,8 @@ impl MapData {
         let player_position = player.map(|p| (p.x, p.y));
         let player_heading = player.map(|p| p.get_heading());
         
-        // Detect map name by coordinates
-        let identity = map_detection::detect_map_by_coordinates(
-            &[info.map_min[0], info.map_min[1]],
-            &[info.map_max[0], info.map_max[1]],
-            Some(&[info.grid_zero[0], info.grid_zero[1]])
-        );
-        
-        let map_name = identity.as_ref().map(|i| i.localized_name.clone());
-        
-        // Get correct grid step from database
-        let correct_grid_step = if let Some(ref identity) = identity {
-            let db = MapDatabase::new();
-            db.get_grid_step(&identity.name, &identity.game_mode)
-                .map(|step| [step, step])
-        } else {
-            None
-        };
+        // TODO: Map name detection (requires datamining or database)
+        let map_name = None;
         
         let mut data = Self {
             objects,
@@ -167,7 +126,6 @@ impl MapData {
             player_heading,
             map_name,
             player_grid: None,
-            correct_grid_step,
         };
         
         // Calculate grid reference
@@ -181,25 +139,20 @@ impl MapData {
     pub fn get_player_grid_reference(&self) -> Option<String> {
         let (x, y) = self.player_position?;
         
-        // Convert normalized coords to absolute meters
-        let map_width = self.info.map_max[0] - self.info.map_min[0];
-        let map_height = self.info.map_max[1] - self.info.map_min[1];
+        // API coords are ALREADY relative to visible area (0..1)
+        // Convert to grid cells using grid_steps
+        let grid_step_x = self.info.grid_steps[0];
+        let grid_step_y = self.info.grid_steps[1];
+        let grid_size_x = self.info.grid_size[0];
+        let grid_size_y = self.info.grid_size[1];
         
-        let abs_x = x * map_width + self.info.map_min[0];
-        let abs_y = y * map_height + self.info.map_min[1];
+        // Calculate position in meters from top-left of visible area
+        let pos_x = x * grid_size_x;
+        let pos_y = y * grid_size_y;
         
-        // Use correct grid_steps from database, fallback to API
-        // Database has real values from game files (e.g. Attica: 225m, not 200m!)
-        let (grid_step_x, grid_step_y) = if let Some(correct) = self.correct_grid_step {
-            (correct[0], correct[1])
-        } else {
-            // Fallback to API (may be incorrect!)
-            (self.info.grid_steps[0], self.info.grid_steps[1])
-        };
-        
-        // Calculate grid position
-        let grid_x = (abs_x / grid_step_x).floor() as i32;
-        let grid_y = (abs_y / grid_step_y).floor() as i32;
+        // Calculate grid cell
+        let grid_x = (pos_x / grid_step_x).floor() as i32;
+        let grid_y = (pos_y / grid_step_y).floor() as i32;
         
         // Convert to letter (A=0, B=1, ..., Z=25) for Y axis
         let letter = if grid_y >= 0 && grid_y < 26 {
@@ -235,18 +188,6 @@ impl MapData {
             .collect()
     }
     
-    /// Get player grid position
-    pub fn get_player_grid(&self) -> Option<String> {
-        if let Some((x, y)) = self.player_position {
-            // Convert normalized to world coordinates
-            let world_x = x * (self.info.map_max[0] - self.info.map_min[0]) + self.info.map_min[0];
-            let world_y = y * (self.info.map_max[1] - self.info.map_min[1]) + self.info.map_min[1];
-            let (cell_x, cell_y) = self.info.get_grid_cell(world_x, world_y);
-            Some(self.info.grid_cell_to_string(cell_x, cell_y))
-        } else {
-            None
-        }
-    }
     
     /// Count nearby enemies (within radius in normalized coordinates)
     pub fn count_nearby_enemies(&self, radius: f32) -> usize {
