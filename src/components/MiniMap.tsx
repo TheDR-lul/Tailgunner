@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useTranslation } from 'react-i18next';
 import './MiniMap.css';
 
 interface MapObject {
@@ -37,13 +38,21 @@ interface MapData {
   player_heading: number | null;
 }
 
+interface EnemyDistance {
+  distance: number;
+  type: string;
+  position: [number, number];
+}
+
 export function MiniMap() {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isEnabled, setIsEnabled] = useState(false);
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
   const [currentMapGen, setCurrentMapGen] = useState<number>(-1);
+  const [nearestEnemies, setNearestEnemies] = useState<EnemyDistance[]>([]);
 
   useEffect(() => {
     if (!isEnabled) return;
@@ -118,6 +127,12 @@ export function MiniMap() {
     // Draw grid
     drawGrid(ctx, canvas, mapData.info);
 
+    // Calculate enemy distances
+    const playerObj = mapData.objects.find(obj => obj.icon === 'Player');
+    if (playerObj && playerObj.x !== undefined && playerObj.y !== undefined) {
+      calculateEnemyDistances(playerObj, mapData.objects, mapData.info);
+    }
+
     // Draw objects
     for (const obj of mapData.objects) {
       if (obj.icon === 'Player') {
@@ -128,11 +143,59 @@ export function MiniMap() {
     }
 
     // Draw player
-    const playerObj = mapData.objects.find(obj => obj.icon === 'Player');
     if (playerObj) {
       drawPlayer(ctx, canvas, playerObj, mapData.info);
     }
   }, [mapData, mapImage]);
+
+  const calculateEnemyDistances = (
+    player: MapObject,
+    objects: MapObject[],
+    info: MapInfo
+  ) => {
+    if (!player.x || !player.y) return;
+
+    const enemies: EnemyDistance[] = [];
+    const mapSizeX = info.map_max[0] - info.map_min[0];
+    const mapSizeY = info.map_max[1] - info.map_min[1];
+
+    for (const obj of objects) {
+      // Check if object is enemy (red color) and has position
+      if (obj.x === undefined || obj.y === undefined) continue;
+      
+      // Skip player
+      if (obj.icon === 'Player') continue;
+      
+      // Enemy color is #fa0C00 (red), NOT player color #faC81E (yellow)
+      const isEnemy = (obj.color_rgb && 
+                       obj.color_rgb[0] > 240 && 
+                       obj.color_rgb[1] < 20 && 
+                       obj.color_rgb[2] < 20) ||
+                      obj.color.toLowerCase() === '#fa0c00';
+      
+      if (!isEnemy) continue;
+      if (obj.type !== 'ground_model' && obj.type !== 'aircraft' && obj.type !== 'Ship') continue;
+
+      // Calculate distance in normalized coordinates
+      const dx = obj.x - player.x;
+      const dy = obj.y - player.y;
+      
+      // Convert to real-world distance (meters)
+      const distX = dx * mapSizeX;
+      const distY = dy * mapSizeY;
+      const distance = Math.sqrt(distX * distX + distY * distY);
+
+      enemies.push({
+        distance,
+        type: obj.icon || obj.type,
+        position: [obj.x, obj.y],
+      });
+    }
+
+    // Sort by distance and keep top 5
+    enemies.sort((a, b) => a.distance - b.distance);
+    setNearestEnemies(enemies.slice(0, 5));
+  };
 
   const drawGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, info: MapInfo) => {
     // Make grid more visible when map image is present
@@ -187,9 +250,10 @@ export function MiniMap() {
     // Draw icon based on type
     ctx.fillStyle = obj.color;
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 0.5;
 
-    const size = 8;
+    // Smaller marker sizes
+    const size = obj.type === 'capture_zone' ? 6 : 3;
 
     if (obj.icon === 'Ship') {
       // Triangle for ships
@@ -203,9 +267,14 @@ export function MiniMap() {
     } else if (obj.type === 'capture_zone') {
       // Circle for capture zones
       ctx.beginPath();
-      ctx.arc(x, y, size * 2, 0, Math.PI * 2);
+      ctx.arc(x, y, size, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+    } else if (obj.type === 'respawn_base_tank' || obj.type === 'respawn_base_fighter' || obj.type === 'respawn_base_bomber') {
+      // Tiny dots for spawn points
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       // Square for other objects
       ctx.fillRect(x - size / 2, y - size / 2, size, size);
@@ -237,9 +306,9 @@ export function MiniMap() {
 
     ctx.fillStyle = '#faC81E';
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
 
-    const arrowSize = 12;
+    const arrowSize = 8;
     ctx.beginPath();
     ctx.moveTo(arrowSize, 0);
     ctx.lineTo(-arrowSize / 2, -arrowSize / 2);
@@ -254,12 +323,13 @@ export function MiniMap() {
   return (
     <div className="minimap-container">
       <div className="minimap-header">
-        <h3>Map</h3>
+        <h3>{t('map.title')}</h3>
         <button 
           className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
           onClick={() => setIsEnabled(!isEnabled)}
+          title={t('map.rb_warning')}
         >
-          {isEnabled ? 'Enabled' : 'Disabled'}
+          {isEnabled ? t('map.enabled') : t('map.disabled')}
         </button>
       </div>
       <div className="minimap-canvas-wrapper">
@@ -270,23 +340,38 @@ export function MiniMap() {
           className="minimap-canvas"
         />
         {error && !isEnabled && (
-          <div className="minimap-info">Enable to view map</div>
+          <div className="minimap-info">{t('map.disabled')}</div>
         )}
         {error && isEnabled && (
           <div className="minimap-error">
-            {error.includes('connect') ? 'War Thunder not running' : 'Map unavailable'}
+            {error.includes('connect') ? 'War Thunder not running' : t('map.no_data')}
           </div>
         )}
         {mapData && isEnabled && (
           <div className="minimap-stats">
-            <div>Objects: {mapData.objects.length}</div>
+            <div>{t('map.objects')} {mapData.objects.length}</div>
             {mapData.player_position && (
               <div>
-                Position: ({mapData.player_position[0].toFixed(2)}, {mapData.player_position[1].toFixed(2)})
+                {t('map.position')} ({mapData.player_position[0].toFixed(2)}, {mapData.player_position[1].toFixed(2)})
               </div>
             )}
             {mapData.player_heading !== null && (
-              <div>Heading: {mapData.player_heading.toFixed(0)}°</div>
+              <div>{t('map.heading')} {mapData.player_heading.toFixed(0)}°</div>
+            )}
+            {nearestEnemies.length > 0 && (
+              <div className="minimap-enemies">
+                <div style={{ fontWeight: 'bold', marginTop: '8px' }}>{t('map.nearest_enemies')}</div>
+                {nearestEnemies.map((enemy, idx) => (
+                  <div key={idx} style={{ fontSize: '11px', color: '#ff6666' }}>
+                    {idx + 1}. {enemy.type}: {enemy.distance.toFixed(0)}m
+                  </div>
+                ))}
+              </div>
+            )}
+            {isEnabled && nearestEnemies.length === 0 && mapData && mapData.info.valid && (
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '8px', fontStyle: 'italic' }}>
+                {t('map.no_enemies')}
+              </div>
             )}
           </div>
         )}

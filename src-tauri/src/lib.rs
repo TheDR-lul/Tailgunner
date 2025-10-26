@@ -23,6 +23,7 @@ use device_manager::DeviceInfo;
 use tokio::sync::Mutex;
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
+use serde_json::Value;
 
 // Global application state
 pub struct AppState {
@@ -835,6 +836,87 @@ async fn get_map_data() -> Result<map_module::MapData, String> {
     Ok(map_module::MapData::new(objects, info))
 }
 
+/// Get game chat messages
+#[tauri::command]
+async fn get_game_chat(last_id: Option<u32>) -> Result<Value, String> {
+    // Always use ?lastId parameter (API returns empty object without it)
+    let url = format!("http://127.0.0.1:8111/gamechat?lastId={}", last_id.unwrap_or(0));
+    
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch game chat: {}", e))?;
+    
+    let chat: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse game chat: {}", e))?;
+    
+    Ok(chat)
+}
+
+/// Get HUD messages (achievements, kills, etc)
+#[tauri::command]
+async fn get_hud_messages(last_evt_id: Option<u32>, last_dmg_id: Option<u32>) -> Result<Value, String> {
+    let url = if last_evt_id.is_some() || last_dmg_id.is_some() {
+        format!(
+            "http://127.0.0.1:8111/hudmsg?lastEvt={}&lastDmg={}",
+            last_evt_id.unwrap_or(0),
+            last_dmg_id.unwrap_or(0)
+        )
+    } else {
+        "http://127.0.0.1:8111/hudmsg?lastEvt=0&lastDmg=0".to_string()
+    };
+    
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch HUD messages: {}", e))?;
+    
+    let hud: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse HUD messages: {}", e))?;
+    
+    Ok(hud)
+}
+
+/// Get mission info
+#[tauri::command]
+async fn get_mission_info() -> Result<Value, String> {
+    let url = "http://127.0.0.1:8111/mission.json";
+    
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch mission info: {}", e))?;
+    
+    let mission: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse mission info: {}", e))?;
+    
+    Ok(mission)
+}
+
 /// Get map image as base64
 #[tauri::command]
 async fn get_map_image(map_generation: u32) -> Result<String, String> {
@@ -1013,6 +1095,9 @@ pub fn run() {
             get_map_info,
             get_map_data,
             get_map_image,
+            get_game_chat,
+            get_hud_messages,
+            get_mission_info,
             get_vehicle_mode,
         ])
         .run(tauri::generate_context!())

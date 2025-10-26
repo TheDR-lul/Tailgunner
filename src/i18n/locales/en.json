@@ -223,5 +223,38 @@
     "hud_only_warning": "Ships use HUD events only (no speed/RPM data from API)",
     "full_telemetry_desc": "All telemetry data available from game API",
     "available": "Available data"
+  },
+  "map": {
+    "title": "Map",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "no_data": "No map data",
+    "no_enemies": "No enemies (RB mode or out of range)",
+    "nearest_enemies": "Nearest Enemies:",
+    "objects": "Objects:",
+    "position": "Position:",
+    "heading": "Heading:",
+    "rb_warning": "In RB mode, enemy positions are not provided by War Thunder API (anti-cheat protection)",
+    "waiting": "Waiting for map data..."
+  },
+  "chat": {
+    "title": "Game Feed",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "waiting": "Waiting for messages...",
+    "empty": "No messages yet",
+    "description": "Chat messages, kills, achievements"
+  },
+  "mission": {
+    "title": "Mission",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "waiting": "Waiting for mission data...",
+    "primary": "Primary Objectives",
+    "secondary": "Secondary Objectives",
+    "no_objectives": "No objectives available",
+    "status_in_progress": "In Progress",
+    "status_completed": "Completed",
+    "status_failed": "Failed"
   }
 }

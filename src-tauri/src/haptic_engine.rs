@@ -289,19 +289,19 @@ impl HapticEngine {
                         }
                         HudEvent::SetAfire(victim) => {
                             log::info!("[HUD] 🔥 Set enemy on fire: {}", victim);
-                            (victim.as_str(), GameEvent::EnemySetAfire)
+                            (victim.as_str(), GameEvent::TargetSetOnFire)
                         }
                         HudEvent::TakeDamage(attacker) => {
                             log::warn!("[HUD] 💥 Taking damage from: {}", attacker);
-                            (attacker.as_str(), GameEvent::TakingDamage)
+                            (attacker.as_str(), GameEvent::Hit)
                         }
                         HudEvent::SeverelyDamaged(attacker) => {
                             log::warn!("[HUD] 💔 Severely damaged by: {}", attacker);
-                            (attacker.as_str(), GameEvent::SeverelyDamaged)
+                            (attacker.as_str(), GameEvent::TargetSeverelyDamaged)
                         }
                         HudEvent::ShotDown(attacker) => {
                             log::warn!("[HUD] ✈️💥 Shot down by: {}", attacker);
-                            (attacker.as_str(), GameEvent::ShotDown)
+                            (attacker.as_str(), GameEvent::AircraftDestroyed)
                         }
                         HudEvent::Achievement(name) => {
                             log::info!("[HUD] 🏆 Achievement: {}", name);

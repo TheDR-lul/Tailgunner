@@ -16,6 +16,8 @@ import { VehicleInfoCard } from "./components/VehicleInfoCard";
 import { PlayerIdentityModal } from "./components/PlayerIdentityModal";
 import { MiniMap } from "./components/MiniMap";
 import { VehicleModeCard } from "./components/VehicleModeCard";
+import { GameChat } from "./components/GameChat";
+import { MissionInfo } from "./components/MissionInfo";
 import { User, Coffee } from "lucide-react";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
@@ -149,7 +151,13 @@ function App() {
               <section className="main-area">
                 <PatternManager onEditPattern={handleEditPattern} />
                 <EventConfiguration />
-                <MiniMap />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <MiniMap />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <MissionInfo />
+                    <GameChat />
+                  </div>
+                </div>
               </section>
             </div>
           </main>

@@ -43,147 +43,51 @@ pub struct BurstConfig {
     pub pause_between_ms: u64,
 }
 
-/// Game Event (extended set from all WT API endpoints)
+/// Game Event - Only events that can be detected from War Thunder API
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum GameEvent {
-    // === HITS AND DAMAGE ===
-    Hit,
-    CriticalHit,
-    PenetrationHit,
-    Ricochet,
-    HitCamera,
+    // === COMBAT (HUD Events) ===
+    Hit,                      // Player hit by enemy (HUD)
+    CriticalHit,              // Critical hit (HUD "critically damaged")
+    TargetHit,                // Player hit enemy
+    TargetDestroyed,          // Player destroyed enemy
+    TargetSetOnFire,          // Player set enemy on fire (HUD)
+    TargetSeverelyDamaged,    // Player severely damaged enemy (HUD)
+    AircraftDestroyed,        // Player shot down aircraft (HUD)
+    ShipDestroyed,            // Player destroyed ship (HUD)
+    TankDestroyed,            // Player destroyed tank (HUD)
+    VehicleDestroyed,         // Player destroyed vehicle (HUD)
     
-    // === VEHICLE DAMAGE ===
-    // Engine
-    EngineDestroyed,
-    EngineDamaged,
-    EngineOverheat,
-    EngineFire,
-    OilLeak,
-    WaterLeak,
+    // === ENGINE & MOVEMENT (indicators.rpm) ===
+    EngineRunning,            // indicators.rpm > 100
+    EngineOverheat,           // HUD event
+    OilOverheated,            // HUD event
+    Shooting,                 // RPM spike pattern detection
     
-    // Crew
-    CrewKnocked,
-    PilotKnockedOut,
-    GunnerKnockedOut,
-    DriverKnockedOut,
+    // === CREW (indicators.crew_current) ===
+    CrewKnocked,              // indicators.crew_current decreased
     
-    // Tank
-    TrackBroken,
-    TurretJammed,
-    GunBreach,
-    TransmissionDamaged,
-    AmmunitionExploded,
-    FuelTankHit,
-    
-    // Aircraft
-    WingDamaged,
-    TailDamaged,
-    ElevatorDamaged,
-    RudderDamaged,
-    AileronDamaged,
-    GearDamaged,
-    FlapsDamaged,
-    
-    // === AIRCRAFT STATES ===
-    Stall,
-    Spin,
-    FlatSpin,
-    Overspeed,
-    OverG,
-    CompressorStall,
-    EngineCompressorDamage,
-    
-    // Control
-    GearUp,
-    GearDown,
-    GearStuck,
-    FlapsExtended,
-    FlapsRetracted,
-    AirbrakeDeployed,
-    ParachuteDeployed,
-    
-    // === COMBAT ACTIONS ===
-    Shooting,
-    CannonFiring,
-    MachineGunFiring,
-    RocketLaunched,
-    BombDropped,
-    TorpedoDropped,
-    
-    // === CONTINUOUS STATES ===
-    EngineRunning,
-    
-    // Player hits
-    TargetHit,
-    TargetDestroyed,
-    TargetCritical,
-    TargetSetOnFire,
-    TargetSeverelyDamaged,
-    AircraftDestroyed,
-    TankDestroyed,
-    ShipDestroyed,
-    VehicleDestroyed,
-    
-    // === FUEL AND AMMO ===
-    LowFuel,              // <10%
-    CriticalFuel,         // <5%
-    OutOfFuel,
-    LowAmmo,              // <20%
-    OutOfAmmo,
-    
-    // === AERODYNAMICS ===
-    HighAOA,              // High angle of attack >15°
-    CriticalAOA,          // Critical angle >20°
-    HighSlip,
-    Mach1,
-    
-    // === CONTROL SYSTEMS ===
-    AutopilotEngaged,
-    AutopilotDisengaged,
-    TrimAdjusted,
-    
-    // === ENVIRONMENT ===
-    LowAltitude,          // <100m
-    CriticalAltitude,     // <50m
-    HighAltitude,         // >5000m
-    Touchdown,
-    Landed,
-    Takeoff,
-    Crashed,
-    OilOverheated,
-    
-    // === CREW AND SYSTEMS ===
-    FireExtinguished,
-    RepairCompleted,
-    CrewReplenished,
-    
-    // === MISSION ===
-    MissionStarted,
+    // === MISSION (/mission.json) ===
     MissionObjectiveCompleted,
     MissionFailed,
     MissionSuccess,
-    Respawn,
     
-    // === MULTIPLAYER ===
-    TeamKill,
-    Assist,
-    BaseCapture,
-    FirstStrike,
-    ShipRescuer,
-    PlayerDisconnected,
+    // === MULTIPLAYER (HUD + /gamechat) ===
+    Achievement,              // HUD "has achieved"
+    ChatMessage,              // /gamechat + HUD chat
+    FirstStrike,              // HUD "first strike"
+    ShipRescuer,              // HUD "rescuer"
+    Assist,                   // HUD "assist"
+    BaseCapture,              // /map_obj capture zone tracking
+    TeamKill,                 // HUD "team kill"
+    PlayerDisconnected,       // /gamechat disconnect message
     
-    // === HUD EVENTS ===
-    EnemySetAfire,        // Player set enemy on fire
-    TakingDamage,         // Player taking damage from enemy
-    SeverelyDamaged,      // Player severely damaged
-    ShotDown,             // Player shot down
-    Achievement,          // Achievement unlocked
-    ChatMessage,          // Any chat message (pattern matching on text)
+    // === SYSTEM (HUD) ===
+    Crashed,                  // HUD "has crashed"
     
     // === CUSTOM TRIGGERS ===
-    CustomTrigger(String),
-    UserTriggered,  // Universal event for UI patterns
+    CustomTrigger(String),    // User-defined event from HUD messages
+    UserTriggered,            // Universal event for UI testing
 }
 
 impl VibrationPattern {

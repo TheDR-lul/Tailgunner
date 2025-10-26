@@ -46,7 +46,7 @@ impl HudMessages {
         }
         
         if msg_lower.contains("critically damaged") {
-            return Some(GameEvent::TargetCritical);
+            return Some(GameEvent::CriticalHit);
         }
         
         if msg_lower.contains("severely damaged") {
@@ -71,6 +71,18 @@ impl HudMessages {
             return Some(GameEvent::ShipRescuer);
         }
         
+        if msg_lower.contains("assist") {
+            return Some(GameEvent::Assist);
+        }
+        
+        if msg_lower.contains("base capturer") || msg_lower.contains("base defender") {
+            return Some(GameEvent::BaseCapture);
+        }
+        
+        if msg_lower.contains("team kill") || msg_lower.contains("teamkill") {
+            return Some(GameEvent::TeamKill);
+        }
+        
         if msg_lower.contains("has achieved") {
             return Some(GameEvent::Achievement);
         }
@@ -78,6 +90,15 @@ impl HudMessages {
         // === PLAYER STATUS ===
         if msg_lower.contains("disconnected from the game") {
             return Some(GameEvent::PlayerDisconnected);
+        }
+        
+        // === ENGINE ===
+        if msg_lower.contains("engine overheated") || msg_lower.contains("water overheated") {
+            return Some(GameEvent::EngineOverheat);
+        }
+        
+        if msg_lower.contains("oil overheated") {
+            return Some(GameEvent::OilOverheated);
         }
         
         None
