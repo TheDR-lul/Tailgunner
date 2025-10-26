@@ -213,5 +213,54 @@ export const api = {
     }
     return null;
   },
+
+  // === API Emulator ===
+  async emulatorGetState(): Promise<any> {
+    return invoke('emulator_get_state');
+  },
+
+  async emulatorSetEnabled(enabled: boolean): Promise<void> {
+    return invoke('emulator_set_enabled', { enabled });
+  },
+
+  async emulatorSetVehicleType(vehicleType: string): Promise<void> {
+    return invoke('emulator_set_vehicle_type', { vehicleType });
+  },
+
+  async emulatorSetSpeed(speed: number): Promise<void> {
+    return invoke('emulator_set_speed', { speed });
+  },
+
+  async emulatorSetAltitude(altitude: number): Promise<void> {
+    return invoke('emulator_set_altitude', { altitude });
+  },
+
+  async emulatorSetHeading(heading: number): Promise<void> {
+    return invoke('emulator_set_heading', { heading });
+  },
+
+  async emulatorSetPosition(x: number, y: number): Promise<void> {
+    return invoke('emulator_set_position', { x, y });
+  },
+
+  async emulatorSetAmmo(ammo: number): Promise<void> {
+    return invoke('emulator_set_ammo', { ammo });
+  },
+
+  async emulatorSetHp(hp: number): Promise<void> {
+    return invoke('emulator_set_hp', { hp });
+  },
+
+  async emulatorSetInBattle(inBattle: boolean): Promise<void> {
+    return invoke('emulator_set_in_battle', { inBattle });
+  },
+
+  async emulatorTriggerEvent(eventType: string): Promise<void> {
+    return invoke('emulator_trigger_event', { eventType });
+  },
+
+  async emulatorSendChat(message: string, mode: string): Promise<void> {
+    return invoke('emulator_send_chat', { message, mode });
+  },
 };
 

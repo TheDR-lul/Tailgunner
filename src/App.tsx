@@ -18,6 +18,7 @@ import { MiniMap } from "./components/MiniMap";
 import { VehicleModeCard } from "./components/VehicleModeCard";
 import { GameChat } from "./components/GameChat";
 import { MissionInfo } from "./components/MissionInfo";
+import { APIEmulator } from "./components/APIEmulator";
 import { User, Coffee } from "lucide-react";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
@@ -29,6 +30,7 @@ function App() {
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
   const [editingPattern, setEditingPattern] = useState<Pattern | undefined>();
   const [supportHighlight, setSupportHighlight] = useState(false);
+  const [testModeEnabled, setTestModeEnabled] = useState(false);
   
   const { addPattern, updatePattern } = usePatterns();
 
@@ -70,6 +72,29 @@ function App() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Check emulator status
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const state = await api.emulatorGetState();
+        setTestModeEnabled(state.enabled);
+      } catch (error) {
+        // Silently ignore
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleTestMode = async () => {
+    try {
+      await api.emulatorSetEnabled(!testModeEnabled);
+      setTestModeEnabled(!testModeEnabled);
+    } catch (error) {
+      console.error('[App] Failed to toggle test mode:', error);
+    }
+  };
 
   const handleEditPattern = (pattern?: Pattern) => {
     // Explicitly set to undefined when creating new pattern, or to the pattern when editing
@@ -124,6 +149,13 @@ function App() {
             >
               <User size={18} />
             </button>
+            <button
+              onClick={toggleTestMode}
+              className={`test-mode-btn ${testModeEnabled ? 'active' : ''}`}
+              title={testModeEnabled ? 'Test Mode: ON' : 'Test Mode: OFF'}
+            >
+              🧪
+            </button>
             <LanguageSwitcher />
             <div className={`status-chip ${isRunning ? 'running' : 'stopped'}`}>
               <span className="status-indicator"></span>
@@ -158,6 +190,8 @@ function App() {
                     <GameChat />
                   </div>
                 </div>
+                {/* API Emulator at the bottom */}
+                <APIEmulator />
               </section>
             </div>
           </main>

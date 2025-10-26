@@ -15,6 +15,8 @@ mod device_history_db;
 mod debug_dump;
 mod hud_messages;
 mod map_module;
+mod api_emulator;
+mod api_server;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -28,6 +30,8 @@ use serde_json::Value;
 // Global application state
 pub struct AppState {
     engine: Arc<Mutex<HapticEngine>>,
+    emulator: Arc<api_emulator::APIEmulator>,
+    server_running: Arc<Mutex<bool>>,
 }
 
 // Tauri commands
@@ -1015,6 +1019,135 @@ async fn get_vehicle_mode(state: tauri::State<'_, AppState>) -> Result<VehicleMo
     }
 }
 
+// === API Emulator Commands ===
+
+#[tauri::command]
+async fn emulator_get_state(state: tauri::State<'_, AppState>) -> Result<api_emulator::EmulatorState, String> {
+    Ok(state.emulator.get_state())
+}
+
+#[tauri::command]
+async fn emulator_set_enabled(state: tauri::State<'_, AppState>, enabled: bool) -> Result<(), String> {
+    state.emulator.set_enabled(enabled);
+    
+    let mut server_running = state.server_running.lock().await;
+    
+    if enabled && !*server_running {
+        // Start API server
+        let emulator_clone = state.emulator.clone();
+        tokio::spawn(async move {
+            api_server::start_server(emulator_clone).await;
+        });
+        *server_running = true;
+        log::info!("[Emulator] 🧪 API server started on http://localhost:8112");
+        
+        // Switch telemetry to emulator mode
+        let engine = state.engine.lock().await;
+        let telemetry = engine.get_telemetry();
+        let mut telem = telemetry.write().await;
+        telem.set_emulator_mode(true);
+        
+    } else if !enabled && *server_running {
+        *server_running = false;
+        log::info!("[Emulator] 🎮 API server stopped");
+        
+        // Switch telemetry back to real mode
+        let engine = state.engine.lock().await;
+        let telemetry = engine.get_telemetry();
+        let mut telem = telemetry.write().await;
+        telem.set_emulator_mode(false);
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_vehicle_type(state: tauri::State<'_, AppState>, vehicle_type: String) -> Result<(), String> {
+    let vtype = match vehicle_type.as_str() {
+        "Tank" => api_emulator::VehicleType::Tank,
+        "Aircraft" => api_emulator::VehicleType::Aircraft,
+        "Ship" => api_emulator::VehicleType::Ship,
+        _ => return Err("Invalid vehicle type".to_string()),
+    };
+    state.emulator.set_vehicle_type(vtype);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_speed(state: tauri::State<'_, AppState>, speed: f32) -> Result<(), String> {
+    state.emulator.set_speed(speed);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_altitude(state: tauri::State<'_, AppState>, altitude: f32) -> Result<(), String> {
+    state.emulator.set_altitude(altitude);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_heading(state: tauri::State<'_, AppState>, heading: f32) -> Result<(), String> {
+    state.emulator.set_heading(heading);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_position(state: tauri::State<'_, AppState>, x: f32, y: f32) -> Result<(), String> {
+    state.emulator.set_position(x, y);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_ammo(state: tauri::State<'_, AppState>, ammo: i32) -> Result<(), String> {
+    state.emulator.set_ammo(ammo);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_hp(state: tauri::State<'_, AppState>, hp: f32) -> Result<(), String> {
+    state.emulator.set_hp(hp);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_in_battle(state: tauri::State<'_, AppState>, in_battle: bool) -> Result<(), String> {
+    state.emulator.set_in_battle(in_battle);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_trigger_event(state: tauri::State<'_, AppState>, event_type: String) -> Result<(), String> {
+    use std::collections::HashMap;
+    log::info!("[Emulator] Triggered event: {}", event_type);
+    state.emulator.trigger_event(event_type, HashMap::new());
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_send_chat(message: String, mode: String) -> Result<(), String> {
+    // Send to emulator API server on port 8112
+    let client = reqwest::Client::new();
+    let response = client
+        .post("http://127.0.0.1:8112/gamechat/send")
+        .json(&serde_json::json!({
+            "message": message,
+            "mode": mode
+        }))
+        .send()
+        .await;
+    
+    match response {
+        Ok(_) => {
+            log::info!("[Emulator] Chat sent: {}", message);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("[Emulator] Failed to send chat: {}", e);
+            Err(format!("Failed to send chat: {}", e))
+        }
+    }
+}
+
 pub fn run() {
     // Initialize logger
     // Set default log level: DEBUG for our code, WARN for libraries
@@ -1052,12 +1185,14 @@ pub fn run() {
     }
     
     let engine = Arc::new(Mutex::new(engine));
+    let emulator = Arc::new(api_emulator::APIEmulator::new());
+    let server_running = Arc::new(Mutex::new(false));
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .manage(AppState { engine })
+        .manage(AppState { engine, emulator, server_running })
         .invoke_handler(tauri::generate_handler![
             init_devices,
             start_engine,
@@ -1109,6 +1244,18 @@ pub fn run() {
             get_hud_messages,
             get_mission_info,
             get_vehicle_mode,
+            emulator_get_state,
+            emulator_set_enabled,
+            emulator_set_vehicle_type,
+            emulator_set_speed,
+            emulator_set_altitude,
+            emulator_set_heading,
+            emulator_set_position,
+            emulator_set_ammo,
+            emulator_set_hp,
+            emulator_set_in_battle,
+            emulator_trigger_event,
+            emulator_send_chat,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

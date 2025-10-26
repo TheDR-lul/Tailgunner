@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn test_parse_critically_damaged() {
         let msg = "=TVS4N= The_Fent_Fairy (␗F-16A) critically damaged [UNSKL] FriskQaQ (F-15E)";
-        assert_eq!(HudMessages::parse_event(msg), Some(GameEvent::TargetCritical));
+        assert_eq!(HudMessages::parse_event(msg), Some(GameEvent::TargetSeverelyDamaged));
     }
 }
 

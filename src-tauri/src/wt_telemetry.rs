@@ -6,7 +6,8 @@ use anyhow::{Result, Context};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-const WT_TELEMETRY_URL: &str = "http://127.0.0.1:8111";
+const WT_TELEMETRY_URL_REAL: &str = "http://127.0.0.1:8111";
+const WT_TELEMETRY_URL_EMULATOR: &str = "http://127.0.0.1:8112";
 const POLL_INTERVAL_MS: u64 = 100; // 10 times per second
 
 #[allow(dead_code)]
@@ -134,6 +135,7 @@ pub struct Indicators {
 
 pub struct WTTelemetryReader {
     client: reqwest::Client,
+    base_url: String,        // Base URL for API (8111 for real, 8112 for emulator)
     last_state: Option<GameState>,
     last_fetch_time: Option<std::time::Instant>,
     cache_duration_ms: u64,
@@ -158,6 +160,7 @@ impl WTTelemetryReader {
         
         Self {
             client,
+            base_url: WT_TELEMETRY_URL_REAL.to_string(),
             last_state: None,
             last_fetch_time: None,
             cache_duration_ms: 50, // Cache for 50ms (20 Hz max poll rate)
@@ -172,6 +175,26 @@ impl WTTelemetryReader {
             processed_messages: std::collections::HashSet::new(),
             last_message: None,
         }
+    }
+    
+    /// Switch to emulator mode (port 8112)
+    pub fn set_emulator_mode(&mut self, enabled: bool) {
+        if enabled {
+            self.base_url = WT_TELEMETRY_URL_EMULATOR.to_string();
+            log::info!("[Telemetry] 🧪 Switched to EMULATOR mode (port 8112)");
+        } else {
+            self.base_url = WT_TELEMETRY_URL_REAL.to_string();
+            log::info!("[Telemetry] 🎮 Switched to REAL mode (port 8111)");
+        }
+        
+        // Reset state when switching
+        self.last_state = None;
+        self.hud_initialized = false;
+    }
+    
+    /// Get current mode
+    pub fn is_emulator_mode(&self) -> bool {
+        self.base_url == WT_TELEMETRY_URL_EMULATOR
     }
     
     /// Get current player names
@@ -256,7 +279,7 @@ impl WTTelemetryReader {
     /// Check War Thunder availability
     #[allow(dead_code)]
     pub async fn is_game_running(&self) -> bool {
-        let url = format!("{}/state", WT_TELEMETRY_URL);
+        let url = format!("{}/state", &self.base_url);
         self.client
             .get(&url)
             .send()
@@ -279,7 +302,7 @@ impl WTTelemetryReader {
             }
         }
         // 1. Request /indicators for vehicle type
-        let indicators_url = format!("{}/indicators", WT_TELEMETRY_URL);
+        let indicators_url = format!("{}/indicators", &self.base_url);
         let indicators_response = self.client
             .get(&indicators_url)
             .send()
@@ -292,7 +315,7 @@ impl WTTelemetryReader {
             .context("Failed to parse WT /indicators")?;
 
         // 2. Request /state for flight indicators
-        let state_url = format!("{}/state", WT_TELEMETRY_URL);
+        let state_url = format!("{}/state", &self.base_url);
         let state_response = self.client
             .get(&state_url)
             .send()
@@ -327,7 +350,7 @@ impl WTTelemetryReader {
     /// Get indicators
     #[allow(dead_code)]
     pub async fn get_indicators(&self) -> Result<Indicators> {
-        let url = format!("{}/indicators", WT_TELEMETRY_URL);
+        let url = format!("{}/indicators", &self.base_url);
         
         let response = self.client
             .get(&url)
@@ -346,7 +369,7 @@ impl WTTelemetryReader {
     /// Get HUD messages (events and damage) and parse for player events
     pub async fn get_hud_events(&mut self) -> Result<Vec<HudEvent>> {
         let url = format!("{}/hudmsg?lastEvt={}&lastDmg={}", 
-            WT_TELEMETRY_URL, self.last_hud_evt_id, self.last_hud_dmg_id);
+            &self.base_url, self.last_hud_evt_id, self.last_hud_dmg_id);
         
         let response = self.client
             .get(&url)
