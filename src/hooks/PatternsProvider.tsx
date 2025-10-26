@@ -44,7 +44,7 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
           (window as any).debugLog('info', `Loaded ${patternsWithDates.length} patterns from localStorage`);
         }
         
-        // Синхронизируем все паттерны с Rust движком
+        // Sync all patterns with Rust engine
         (async () => {
           for (const pattern of patternsWithDates) {
             console.log(`[Patterns] Syncing '${pattern.name}' (enabled: ${pattern.enabled}, nodes: ${pattern.nodes?.length || 0})`);
@@ -82,7 +82,7 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
       createdAt: new Date(),
     };
     
-    // Сохраняем в localStorage
+    // Save to localStorage
     setPatterns(prev => {
       const updated = [...prev, newPattern];
       savePatterns(updated);
@@ -94,7 +94,7 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     
-    // Синхронизируем с Rust движком
+    // Sync with Rust engine
     try {
       await invoke('add_pattern', { pattern: newPattern });
       
@@ -175,13 +175,13 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
   }, [savePatterns]);
 
   const togglePattern = useCallback(async (id: string) => {
-    // Получаем текущее состояние и переключаем
+    // Get current state and toggle
     const pattern = patterns.find(p => p.id === id);
     if (!pattern) return;
     
     const newEnabled = !pattern.enabled;
     
-    // Обновляем в localStorage
+    // Update in localStorage
     setPatterns(prev => {
       const updated = prev.map(p => 
         p.id === id ? { ...p, enabled: newEnabled } : p
@@ -190,7 +190,7 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     
-    // Синхронизируем с Rust движком
+    // Sync with Rust engine
     try {
       await invoke('toggle_pattern', { id, enabled: newEnabled });
       

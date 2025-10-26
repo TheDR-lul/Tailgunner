@@ -726,6 +726,7 @@ impl TriggerManager {
         &self.triggers
     }
     
+    #[allow(dead_code)]
     pub fn get_triggers_mut(&mut self) -> &mut Vec<EventTrigger> {
         &mut self.triggers
     }
@@ -744,6 +745,7 @@ impl TriggerManager {
     }
     
     /// Disable trigger by ID and clear its cooldown
+    #[allow(dead_code)]
     pub fn disable_trigger(&mut self, trigger_id: &str) -> bool {
         if let Some(trigger) = self.triggers.iter_mut().find(|t| t.id == trigger_id) {
             trigger.enabled = false;
@@ -757,6 +759,7 @@ impl TriggerManager {
     }
     
     /// Enable trigger by ID
+    #[allow(dead_code)]
     pub fn enable_trigger(&mut self, trigger_id: &str) -> bool {
         if let Some(trigger) = self.triggers.iter_mut().find(|t| t.id == trigger_id) {
             trigger.enabled = true;

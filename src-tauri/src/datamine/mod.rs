@@ -81,11 +81,11 @@ impl Datamine {
     }
     
     /// Prepare game files for parsing (unpack if needed)
-    /// ✅ EAC-SAFE: распаковывает в TEMP, не трогает файлы игры!
+    /// ✅ EAC-SAFE: Unpacks to TEMP, doesn't touch game files!
     fn prepare_game_files(&self) -> Result<PathBuf> {
         log::info!("[Datamine] Preparing game files...");
         
-        // 1. Check if already unpacked IN GAME FOLDER (юзер запустил игру с -unpack)
+        // 1. Check if already unpacked IN GAME FOLDER (user launched game with -unpack)
         let game_unpacked_dir = self.game_path.join("aces.vromfs.bin_u");
         if game_unpacked_dir.exists() && game_unpacked_dir.join("gamedata").exists() {
             log::info!("[Datamine] ✅ Using pre-unpacked files from game: {:?}", game_unpacked_dir);
@@ -99,7 +99,7 @@ impl Datamine {
             return Ok(self.game_path.clone());
         }
         
-        // 3. Check TEMP directory (кешированная распаковка)
+        // 3. Check TEMP directory (cached unpacked files)
         let temp_base = std::env::temp_dir().join("tailgunner_datamine");
         let temp_aces = temp_base.join("aces.vromfs.bin_u");
         

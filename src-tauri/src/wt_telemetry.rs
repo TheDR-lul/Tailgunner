@@ -393,7 +393,7 @@ impl WTTelemetryReader {
                 
                 // First pass: process recent events
                 for msg_value in damage_array {
-                    let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    let _id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                     let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
                     let time = msg_value.get("time").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                     

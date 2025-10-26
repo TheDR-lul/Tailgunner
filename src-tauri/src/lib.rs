@@ -164,7 +164,7 @@ async fn get_device_history() -> Result<Vec<device_history_db::DeviceRecord>, St
     }
 }
 
-/// DEBUG: Опрос HUD API напрямую
+/// DEBUG: Direct HUD API polling
 #[tauri::command]
 async fn debug_hud_raw() -> Result<String, String> {
     log::error!("[DEBUG] 🔍 Fetching HUD API directly...");
@@ -757,7 +757,7 @@ async fn datamine_rebuild() -> Result<datamine::ParseStats, String> {
 
 pub fn run() {
     // Initialize logger
-    // Set default log level: DEBUG для нашего кода, WARN для библиотек
+    // Set default log level: DEBUG for our code, WARN for libraries
     if std::env::var("RUST_LOG").is_err() {
         #[cfg(debug_assertions)]
         std::env::set_var("RUST_LOG", "butt_thunder_lib=debug,warn");

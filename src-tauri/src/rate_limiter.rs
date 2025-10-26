@@ -20,7 +20,7 @@ impl RateLimiter {
         }
     }
 
-    /// Проверка, можно ли отправить команду
+    /// Check if command can be sent
     pub fn should_send(&self) -> bool {
         let now = Instant::now();
         let last = *self.last_send.lock()
@@ -29,13 +29,13 @@ impl RateLimiter {
         now.duration_since(last) >= self.min_interval
     }
 
-    /// Отметка об отправке команды
+    /// Mark that command was sent
     pub fn mark_sent(&self) {
         *self.last_send.lock()
             .expect("RateLimiter mutex poisoned") = Instant::now();
     }
 
-    /// Попытка отправки (возвращает true если можно)
+    /// Attempt to send (returns true if allowed)
     pub fn try_send(&self) -> bool {
         if self.should_send() {
             self.mark_sent();
@@ -45,7 +45,7 @@ impl RateLimiter {
         }
     }
 
-    /// Время до следующей возможной отправки
+    /// Time until next send is possible
     #[allow(dead_code)]
     pub fn time_until_next(&self) -> Duration {
         let now = Instant::now();
@@ -76,13 +76,13 @@ mod tests {
     fn test_rate_limiting() {
         let limiter = RateLimiter::new();
         
-        // Первая отправка должна пройти
+        // First send should succeed
         assert!(limiter.try_send());
         
-        // Немедленная повторная отправка должна быть заблокирована
+        // Immediate retry should be blocked
         assert!(!limiter.try_send());
         
-        // Ждем и пробуем снова
+        // Wait and try again
         thread::sleep(Duration::from_millis(MIN_INTERVAL_MS + 10));
         assert!(limiter.try_send());
     }

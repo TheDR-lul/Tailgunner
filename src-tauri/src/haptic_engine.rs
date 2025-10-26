@@ -63,7 +63,6 @@ pub struct HapticEngine {
     current_intensity: Arc<RwLock<f32>>,
     last_vehicle_name: Arc<RwLock<String>>,
     recent_trigger_events: Arc<RwLock<VecDeque<TriggerEvent>>>,
-    active_continuous_triggers: Arc<RwLock<std::collections::HashMap<String, bool>>>, // trigger_id -> is_active
 }
 
 impl HapticEngine {
@@ -97,7 +96,6 @@ impl HapticEngine {
             current_intensity: Arc::new(RwLock::new(0.0)),
             last_vehicle_name: Arc::new(RwLock::new(String::new())),
             recent_trigger_events: Arc::new(RwLock::new(VecDeque::with_capacity(10))),
-            active_continuous_triggers: Arc::new(RwLock::new(std::collections::HashMap::new())),
         }
     }
 
@@ -582,8 +580,9 @@ impl HapticEngine {
     }
     
     /// Get vehicle limits manager (for % of max value calculations in patterns)
-    pub fn get_vehicle_limits_manager(&self) -> Arc<RwLock<VehicleLimitsManager>> {
-        Arc::new(RwLock::new(VehicleLimitsManager::new().expect("Failed to get vehicle limits manager")))
+    #[allow(dead_code)]
+    pub fn get_vehicle_limits_manager(&self) -> Arc<VehicleLimitsManager> {
+        Arc::clone(&self.vehicle_limits_manager)
     }
 
     pub fn get_device_manager(&self) -> Arc<DeviceManager> {

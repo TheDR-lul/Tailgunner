@@ -95,6 +95,7 @@ impl DeviceHistoryDB {
     }
     
     /// Get device by ID
+    #[allow(dead_code)]
     pub fn get_device(&self, id: &str) -> Result<Option<DeviceRecord>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, device_type, last_seen FROM device_history WHERE id = ?1"
@@ -115,6 +116,7 @@ impl DeviceHistoryDB {
     }
     
     /// Delete device from history
+    #[allow(dead_code)]
     pub fn delete_device(&mut self, id: &str) -> Result<()> {
         self.conn.execute(
             "DELETE FROM device_history WHERE id = ?1",

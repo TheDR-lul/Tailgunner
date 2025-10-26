@@ -1,7 +1,7 @@
 /// Full node-based pattern parser with support for all node types
 use serde::{Deserialize, Serialize};
 use crate::event_triggers::{TriggerCondition, EventTrigger};
-use crate::pattern_engine::{GameEvent, VibrationPattern, EnvelopeStage, Curve, BurstConfig};
+use crate::pattern_engine::{GameEvent, VibrationPattern, BurstConfig};
 use std::collections::{HashMap, HashSet};
 
 /// Pattern created in UI editor
