@@ -74,7 +74,11 @@ pub enum GameEvent {
     
     // === MULTIPLAYER (HUD + /gamechat) ===
     Achievement,              // HUD "has achieved"
-    ChatMessage,              // /gamechat + HUD chat
+    ChatMessage,              // /gamechat - any chat message
+    TeamChatMessage,          // /gamechat - [Team] messages
+    AllChatMessage,           // /gamechat - [All] messages  
+    SquadChatMessage,         // /gamechat - [Squad] messages
+    EnemyChatMessage,         // /gamechat - enemy messages
     FirstStrike,              // HUD "first strike"
     ShipRescuer,              // HUD "rescuer"
     Assist,                   // HUD "assist"

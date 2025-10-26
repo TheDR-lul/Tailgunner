@@ -36,12 +36,15 @@ interface MapData {
   info: MapInfo;
   player_position: [number, number] | null;
   player_heading: number | null;
+  map_name: string | null;
+  player_grid: string | null;
 }
 
 interface EnemyDistance {
   distance: number;
   type: string;
   position: [number, number];
+  bearing: number;  // Bearing/azimuth to enemy in degrees
 }
 
 export function MiniMap() {
@@ -53,6 +56,18 @@ export function MiniMap() {
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
   const [currentMapGen, setCurrentMapGen] = useState<number>(-1);
   const [nearestEnemies, setNearestEnemies] = useState<EnemyDistance[]>([]);
+
+  const getCompassDirection = (heading: number): string => {
+    if (heading >= 337.5 || heading < 22.5) return 'N';
+    if (heading >= 22.5 && heading < 67.5) return 'NE';
+    if (heading >= 67.5 && heading < 112.5) return 'E';
+    if (heading >= 112.5 && heading < 157.5) return 'SE';
+    if (heading >= 157.5 && heading < 202.5) return 'S';
+    if (heading >= 202.5 && heading < 247.5) return 'SW';
+    if (heading >= 247.5 && heading < 292.5) return 'W';
+    if (heading >= 292.5 && heading < 337.5) return 'NW';
+    return '';
+  };
 
   useEffect(() => {
     if (!isEnabled) return;
@@ -184,11 +199,16 @@ export function MiniMap() {
       const distX = dx * mapSizeX;
       const distY = dy * mapSizeY;
       const distance = Math.sqrt(distX * distX + distY * distY);
+      
+      // Calculate bearing/azimuth to enemy (0° = North, clockwise)
+      const angleFromX = Math.atan2(dy, dx) * (180 / Math.PI);
+      const bearing = (90 - angleFromX + 360) % 360;
 
       enemies.push({
         distance,
         type: obj.icon || obj.type,
         position: [obj.x, obj.y],
+        bearing,
       });
     }
 
@@ -198,26 +218,58 @@ export function MiniMap() {
   };
 
   const drawGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, info: MapInfo) => {
+    // Calculate real map size
+    const mapSizeX = info.map_max[0] - info.map_min[0];
+    const mapSizeY = info.map_max[1] - info.map_min[1];
+    
+    // Use grid_steps from API (different for tanks/air/naval)
+    // Tanks: 200m, Air: 13100m, etc
+    const gridStepX = info.grid_steps[0];
+    const gridStepY = info.grid_steps[1];
+    const gridCountX = Math.ceil(mapSizeX / gridStepX);
+    const gridCountY = Math.ceil(mapSizeY / gridStepY);
+    
     // Make grid more visible when map image is present
-    ctx.strokeStyle = mapImage ? 'rgba(255, 255, 255, 0.3)' : '#333';
+    ctx.strokeStyle = mapImage ? 'rgba(255, 255, 255, 0.25)' : '#333';
     ctx.lineWidth = 1;
     ctx.beginPath();
 
-    // Vertical lines
-    for (let i = 0; i <= 10; i++) {
-      const x = (canvas.width / 10) * i;
+    // Draw vertical lines and top numbers
+    for (let i = 0; i <= gridCountX; i++) {
+      const x = (canvas.width / gridCountX) * i;
       ctx.moveTo(x, 0);
       ctx.lineTo(x, canvas.height);
     }
 
-    // Horizontal lines
-    for (let i = 0; i <= 10; i++) {
-      const y = (canvas.height / 10) * i;
+    // Draw horizontal lines and left letters
+    for (let i = 0; i <= gridCountY; i++) {
+      const y = (canvas.height / gridCountY) * i;
       ctx.moveTo(0, y);
       ctx.lineTo(canvas.width, y);
     }
 
     ctx.stroke();
+    
+    // Draw grid labels (like in War Thunder)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = '10px monospace';
+    
+    // Top numbers (1, 2, 3, ...)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (let i = 0; i < gridCountX && i < 20; i++) {
+      const x = (canvas.width / gridCountX) * (i + 0.5);
+      ctx.fillText((i + 1).toString(), x, 2);
+    }
+    
+    // Left letters (A, B, C, ...)
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < gridCountY && i < 26; i++) {
+      const y = (canvas.height / gridCountY) * (i + 0.5);
+      const letter = String.fromCharCode(65 + i); // A=65, B=66, ...
+      ctx.fillText(letter, 2, y);
+    }
   };
 
   const drawMapObject = (
@@ -349,21 +401,31 @@ export function MiniMap() {
         )}
         {mapData && isEnabled && (
           <div className="minimap-stats">
+            {mapData.map_name && (
+              <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', color: '#64c8ff' }}>
+                📍 {mapData.map_name}
+              </div>
+            )}
             <div>{t('map.objects')} {mapData.objects.length}</div>
+            {mapData.player_grid && (
+              <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: 'bold' }}>
+                🎯 Grid: {mapData.player_grid}
+              </div>
+            )}
             {mapData.player_position && (
-              <div>
-                {t('map.position')} ({mapData.player_position[0].toFixed(2)}, {mapData.player_position[1].toFixed(2)})
+              <div style={{ fontSize: '10px', color: '#888' }}>
+                ({mapData.player_position[0].toFixed(3)}, {mapData.player_position[1].toFixed(3)})
               </div>
             )}
             {mapData.player_heading !== null && (
-              <div>{t('map.heading')} {mapData.player_heading.toFixed(0)}°</div>
+              <div>🧭 {mapData.player_heading.toFixed(0)}° {getCompassDirection(mapData.player_heading)}</div>
             )}
             {nearestEnemies.length > 0 && (
               <div className="minimap-enemies">
                 <div style={{ fontWeight: 'bold', marginTop: '8px' }}>{t('map.nearest_enemies')}</div>
                 {nearestEnemies.map((enemy, idx) => (
                   <div key={idx} style={{ fontSize: '11px', color: '#ff6666' }}>
-                    {idx + 1}. {enemy.type}: {enemy.distance.toFixed(0)}m
+                    {idx + 1}. {enemy.type}: {enemy.distance.toFixed(0)}m @ {enemy.bearing.toFixed(0)}° {getCompassDirection(enemy.bearing)}
                   </div>
                 ))}
               </div>

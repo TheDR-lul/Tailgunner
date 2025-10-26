@@ -18,6 +18,14 @@ pub struct HudMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatDetails {
+    pub message: String,
+    pub sender: Option<String>,
+    pub mode: Option<String>,  // "Team", "All", "Squad", "Private"
+    pub is_enemy: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HudEvent {
     Kill(String),              // Killed enemy vehicle name
     Crashed,
@@ -28,7 +36,7 @@ pub enum HudEvent {
     SeverelyDamaged(String),   // Severely damaged by attacker
     ShotDown(String),          // Shot down by attacker
     Achievement(String),       // Achievement unlocked (achievement name)
-    ChatMessage(String),       // Any chat message (full text)
+    ChatMessage(ChatDetails),  // Chat message with mode/enemy info       // Any chat message (full text)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -486,7 +494,12 @@ impl WTTelemetryReader {
                        !msg.contains("NET_PLAYER_") &&
                        !msg.contains("td! kd?") {
                         log::debug!("[HUD Event] 💬 CHAT at {}s: {}", time, msg);
-                        events.push(HudEvent::ChatMessage(msg.to_string()));
+                        events.push(HudEvent::ChatMessage(ChatDetails {
+                            message: msg.to_string(),
+                            sender: None,
+                            mode: None,
+                            is_enemy: false,
+                        }));
                     }
                 }
             }

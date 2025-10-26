@@ -58,7 +58,11 @@ impl HudMessages {
         }
         
         // === DAMAGE RECEIVED ===
-        if msg_lower.contains("has been wrecked") || msg_lower.contains("has crashed") {
+        if msg_lower.contains("has crashed") {
+            return Some(GameEvent::Crashed);
+        }
+        
+        if msg_lower.contains("has been wrecked") {
             return Some(GameEvent::VehicleDestroyed);
         }
         

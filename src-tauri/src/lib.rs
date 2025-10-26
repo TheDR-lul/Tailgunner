@@ -15,6 +15,7 @@ mod device_history_db;
 mod debug_dump;
 mod hud_messages;
 mod map_module;
+mod map_detection;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;

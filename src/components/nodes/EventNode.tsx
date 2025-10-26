@@ -22,39 +22,48 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
   }, [event, filterType, filterText, data]);
   
   const EVENTS = [
-    // === COMBAT EVENTS ===
+    // === COMBAT EVENTS (HUD-based detection) ===
     { id: 'Hit', icon: Target, color: '#f59e0b', category: 'Combat' },
     { id: 'CriticalHit', icon: Flame, color: '#ef4444', category: 'Combat' },
-    { id: 'PenetrationHit', icon: Zap, color: '#dc2626', category: 'Combat' },
+    { id: 'TargetHit', icon: Target, color: '#f97316', category: 'Combat' },
     { id: 'TargetDestroyed', icon: Skull, color: '#22c55e', category: 'Combat' },
-    { id: 'EnemySetAfire', icon: Flame, color: '#fb923c', category: 'Combat' },
-    { id: 'TakingDamage', icon: Heart, color: '#ef4444', category: 'Combat' },
-    { id: 'SeverelyDamaged', icon: AlertTriangle, color: '#dc2626', category: 'Combat' },
-    { id: 'ShotDown', icon: Target, color: '#991b1b', category: 'Combat' },
+    { id: 'TargetSetOnFire', icon: Flame, color: '#fb923c', category: 'Combat' },
+    { id: 'TargetSeverelyDamaged', icon: AlertTriangle, color: '#dc2626', category: 'Combat' },
+    { id: 'AircraftDestroyed', icon: Target, color: '#991b1b', category: 'Combat' },
+    { id: 'ShipDestroyed', icon: Skull, color: '#0891b2', category: 'Combat' },
+    { id: 'TankDestroyed', icon: Skull, color: '#65a30d', category: 'Combat' },
+    { id: 'VehicleDestroyed', icon: Skull, color: '#71717a', category: 'Combat' },
     
-    // === FLIGHT WARNINGS ===
-    { id: 'Overspeed', icon: Wind, color: '#8b5cf6', category: 'Flight' },
-    { id: 'OverG', icon: AlertTriangle, color: '#ef4444', category: 'Flight' },
-    { id: 'HighAOA', icon: Wind, color: '#f59e0b', category: 'Flight' },
-    { id: 'CriticalAOA', icon: AlertTriangle, color: '#dc2626', category: 'Flight' },
-    { id: 'Mach1', icon: Zap, color: '#6366f1', category: 'Flight' },
-    { id: 'LowAltitude', icon: Wind, color: '#dc2626', category: 'Flight' },
+    // === FLIGHT (HUD events) ===
     { id: 'Crashed', icon: AlertTriangle, color: '#991b1b', category: 'Flight' },
     
-    // === RESOURCES ===
-    { id: 'LowFuel', icon: Droplet, color: '#eab308', category: 'Resources' },
-    { id: 'CriticalFuel', icon: AlertTriangle, color: '#ef4444', category: 'Resources' },
-    { id: 'LowAmmo', icon: Target, color: '#f97316', category: 'Resources' },
-    
-    // === ENGINE ===
-    { id: 'EngineDamaged', icon: Flame, color: '#f59e0b', category: 'Engine' },
-    { id: 'EngineDestroyed', icon: AlertTriangle, color: '#dc2626', category: 'Engine' },
+    // === ENGINE (HUD + indicators) ===
+    { id: 'EngineRunning', icon: Zap, color: '#22c55e', category: 'Engine' },
     { id: 'EngineOverheat', icon: Flame, color: '#ef4444', category: 'Engine' },
     { id: 'OilOverheated', icon: Droplet, color: '#f97316', category: 'Engine' },
+    { id: 'Shooting', icon: Target, color: '#fbbf24', category: 'Engine' },
     
-    // === MULTIPLAYER ===
+    // === CREW (indicators) ===
+    { id: 'CrewKnocked', icon: Heart, color: '#dc2626', category: 'Crew' },
+    
+    // === MISSION (/mission.json) ===
+    { id: 'MissionObjectiveCompleted', icon: Award, color: '#22c55e', category: 'Mission' },
+    { id: 'MissionFailed', icon: AlertTriangle, color: '#dc2626', category: 'Mission' },
+    { id: 'MissionSuccess', icon: Award, color: '#10b981', category: 'Mission' },
+    
+    // === MULTIPLAYER (HUD + /gamechat) ===
     { id: 'Achievement', icon: Award, color: '#fbbf24', category: 'Multiplayer' },
-    { id: 'ChatMessage', icon: MessageSquare, color: '#6366f1', category: 'Multiplayer' },
+  { id: 'ChatMessage', icon: MessageSquare, color: '#6366f1', category: 'Multiplayer' },
+  { id: 'TeamChatMessage', icon: MessageSquare, color: '#22c55e', category: 'Multiplayer' },
+  { id: 'AllChatMessage', icon: MessageSquare, color: '#f97316', category: 'Multiplayer' },
+  { id: 'SquadChatMessage', icon: MessageSquare, color: '#8b5cf6', category: 'Multiplayer' },
+  { id: 'EnemyChatMessage', icon: MessageSquare, color: '#ef4444', category: 'Multiplayer' },
+  { id: 'FirstStrike', icon: Zap, color: '#8b5cf6', category: 'Multiplayer' },
+    { id: 'ShipRescuer', icon: Heart, color: '#0891b2', category: 'Multiplayer' },
+    { id: 'Assist', icon: Target, color: '#eab308', category: 'Multiplayer' },
+    { id: 'BaseCapture', icon: Flame, color: '#22c55e', category: 'Multiplayer' },
+    { id: 'TeamKill', icon: AlertTriangle, color: '#dc2626', category: 'Multiplayer' },
+    { id: 'PlayerDisconnected', icon: AlertTriangle, color: '#64748b', category: 'Multiplayer' },
   ];
   
   const selectedEvent = EVENTS.find(e => e.id === event) || EVENTS[0];
@@ -62,12 +71,19 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
   
   // Determine if this event needs filtering
   const needsTextFilter = ['ChatMessage'].includes(event);
-  const needsPlayerFilter = ['TargetDestroyed', 'EnemySetAfire', 'TakingDamage', 'SeverelyDamaged', 'ShotDown', 'Achievement'].includes(event);
+  const needsPlayerFilter = [
+    'TargetDestroyed', 'TargetSetOnFire', 'TargetSeverelyDamaged', 'AircraftDestroyed',
+    'ShipDestroyed', 'TankDestroyed', 'VehicleDestroyed',
+    'Hit', 'CriticalHit', 'Achievement'
+  ].includes(event);
   const showFilter = needsTextFilter || needsPlayerFilter;
   
   // Context-dependent filter labels
-  const isKillEvent = ['TargetDestroyed', 'EnemySetAfire'].includes(event);
-  const isDamageEvent = ['TakingDamage', 'SeverelyDamaged', 'ShotDown'].includes(event);
+  const isKillEvent = [
+    'TargetDestroyed', 'TargetSetOnFire', 'TargetSeverelyDamaged', 
+    'AircraftDestroyed', 'ShipDestroyed', 'TankDestroyed', 'VehicleDestroyed'
+  ].includes(event);
+  const isDamageEvent = ['Hit', 'CriticalHit'].includes(event);
   
   // Get filter description based on event type
   const getFilterLabel = (filterValue: string) => {

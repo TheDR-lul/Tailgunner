@@ -307,9 +307,22 @@ impl HapticEngine {
                             log::info!("[HUD] 🏆 Achievement: {}", name);
                             (name.as_str(), GameEvent::Achievement)
                         }
-                        HudEvent::ChatMessage(text) => {
-                            log::debug!("[HUD] 💬 Chat message: {}", text);
-                            (text.as_str(), GameEvent::ChatMessage)
+                        HudEvent::ChatMessage(details) => {
+                            log::debug!("[HUD] 💬 Chat message: {}", details.message);
+                            // Determine event type based on chat details
+                            let event = if details.is_enemy {
+                                GameEvent::EnemyChatMessage
+                            } else if let Some(mode) = &details.mode {
+                                match mode.to_lowercase().as_str() {
+                                    "team" => GameEvent::TeamChatMessage,
+                                    "all" => GameEvent::AllChatMessage,
+                                    "squad" => GameEvent::SquadChatMessage,
+                                    _ => GameEvent::ChatMessage
+                                }
+                            } else {
+                                GameEvent::ChatMessage
+                            };
+                            (details.message.as_str(), event)
                         }
                     };
                     

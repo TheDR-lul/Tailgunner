@@ -146,7 +146,21 @@ impl EventEngine {
             HudEvent::Crashed => Some(GameEvent::Crashed),
             HudEvent::EngineOverheated => Some(GameEvent::EngineOverheat),
             HudEvent::OilOverheated => Some(GameEvent::OilOverheated),
-            HudEvent::ChatMessage(_) => Some(GameEvent::ChatMessage),
+            HudEvent::ChatMessage(details) => {
+                // Map chat message to specific type based on mode and enemy flag
+                if details.is_enemy {
+                    Some(GameEvent::EnemyChatMessage)
+                } else if let Some(mode) = &details.mode {
+                    match mode.to_lowercase().as_str() {
+                        "team" => Some(GameEvent::TeamChatMessage),
+                        "all" => Some(GameEvent::AllChatMessage),
+                        "squad" => Some(GameEvent::SquadChatMessage),
+                        _ => Some(GameEvent::ChatMessage)
+                    }
+                } else {
+                    Some(GameEvent::ChatMessage)
+                }
+            },
         }
     }
 

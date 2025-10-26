@@ -1,6 +1,7 @@
 /// Map data module for War Thunder API
 /// Provides map objects, boundaries, and player positions
 use serde::{Deserialize, Serialize};
+use crate::map_detection;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapObject {
@@ -69,13 +70,18 @@ impl MapObject {
         self.icon == "Tank" || self.obj_type.contains("tank")
     }
     
-    /// Get heading angle in degrees
+    /// Get heading angle in degrees (0° = North, clockwise)
+    /// Synchronized with War Thunder compass
     pub fn get_heading(&self) -> f32 {
         if self.dx == 0.0 && self.dy == 0.0 {
             return 0.0;
         }
-        let angle = self.dy.atan2(self.dx).to_degrees();
-        (angle + 360.0) % 360.0
+        // atan2 gives angle from X axis
+        // Convert to compass bearing (0° = North/up, 90° = East/right)
+        let angle_from_x = self.dy.atan2(self.dx).to_degrees();
+        // Convert: X-axis angle → North-based compass bearing
+        let compass_bearing = (90.0 - angle_from_x + 360.0) % 360.0;
+        compass_bearing
     }
 }
 
@@ -123,6 +129,8 @@ pub struct MapData {
     pub info: MapInfo,
     pub player_position: Option<(f32, f32)>,
     pub player_heading: Option<f32>,
+    pub map_name: Option<String>,  // Detected map name
+    pub player_grid: Option<String>,  // Grid reference (e.g. "P-10")
 }
 
 impl MapData {
@@ -132,12 +140,60 @@ impl MapData {
         let player_position = player.map(|p| (p.x, p.y));
         let player_heading = player.map(|p| p.get_heading());
         
-        Self {
+        // Detect map name by coordinates
+        let map_name = map_detection::detect_map_by_coordinates(
+            &[info.map_min[0], info.map_min[1]],
+            &[info.map_max[0], info.map_max[1]],
+            Some(&[info.grid_zero[0], info.grid_zero[1]])
+        ).map(|identity| identity.localized_name);
+        
+        let mut data = Self {
             objects,
             info,
             player_position,
             player_heading,
-        }
+            map_name,
+            player_grid: None,
+        };
+        
+        // Calculate grid reference
+        data.player_grid = data.get_player_grid_reference();
+        
+        data
+    }
+    
+    /// Get player position as grid reference (e.g. "P-10")
+    /// War Thunder grid: Letters A-Z (vertical/Y axis), Numbers 1-20 (horizontal/X axis)
+    pub fn get_player_grid_reference(&self) -> Option<String> {
+        let (x, y) = self.player_position?;
+        
+        // Convert normalized coords to absolute meters
+        let map_width = self.info.map_max[0] - self.info.map_min[0];
+        let map_height = self.info.map_max[1] - self.info.map_min[1];
+        
+        let abs_x = x * map_width + self.info.map_min[0];
+        let abs_y = y * map_height + self.info.map_min[1];
+        
+        // Use grid_steps from API (different for tanks/air/naval)
+        // Tanks: 200m, Air: 13100m, Naval: varies
+        let grid_step_x = self.info.grid_steps[0];
+        let grid_step_y = self.info.grid_steps[1];
+        
+        // Calculate grid position
+        let grid_x = (abs_x / grid_step_x).floor() as i32;
+        let grid_y = (abs_y / grid_step_y).floor() as i32;
+        
+        // Convert to letter (A=0, B=1, ..., Z=25) for Y axis
+        let letter = if grid_y >= 0 && grid_y < 26 {
+            ((b'A' + grid_y as u8) as char).to_string()
+        } else {
+            format!("?{}", grid_y)
+        };
+        
+        // X axis is 1-based numbering
+        let number = grid_x + 1;
+        
+        Some(format!("{}-{}", letter, number))
     }
     
     /// Get all friendly ships
