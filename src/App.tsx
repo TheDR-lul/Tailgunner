@@ -151,9 +151,9 @@ function App() {
               <section className="main-area">
                 <PatternManager onEditPattern={handleEditPattern} />
                 <EventConfiguration />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <MiniMap />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <MissionInfo />
                     <GameChat />
                   </div>

@@ -40,14 +40,32 @@ interface MapData {
   player_grid: string | null;
 }
 
-interface EnemyDistance {
+interface UnitDistance {
   distance: number;
   type: string;
   position: [number, number];
-  bearing: number;  // Bearing/azimuth to enemy in degrees
+  bearing: number;  // Bearing/azimuth in degrees
+  isEnemy: boolean; // true for enemies, false for allies
+}
+
+interface MapMarker {
+  id: string;
+  x: number;  // Normalized coords (0..1)
+  y: number;
+  label?: string;
+  color?: string;
+}
+
+interface MeasurementData {
+  distance: number;
+  bearing: number;
+  gridRef: string;
+  point1: { x: number; y: number };
+  point2: { x: number; y: number };
 }
 
 type MapMode = 'current' | 'full';
+type MapTool = 'none' | 'measure' | 'distance' | 'marker';
 
 export function MiniMap() {
   const { t } = useTranslation();
@@ -57,8 +75,73 @@ export function MiniMap() {
   const [isEnabled, setIsEnabled] = useState(false);
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
   const [currentMapGen, setCurrentMapGen] = useState<number>(-1);
-  const [nearestEnemies, setNearestEnemies] = useState<EnemyDistance[]>([]);
+  const [nearestEnemies, setNearestEnemies] = useState<UnitDistance[]>([]);
+  const [nearestAllies, setNearestAllies] = useState<UnitDistance[]>([]);
   const [mapMode, setMapMode] = useState<MapMode>('current');
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [followPlayer, setFollowPlayer] = useState<boolean>(false); // OFF по умолчанию
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [activeTool, setActiveTool] = useState<MapTool>('none');
+  const [markers, setMarkers] = useState<MapMarker[]>([]);
+  const [measurePoint, setMeasurePoint] = useState<{ x: number; y: number } | null>(null);
+  const [measurement, setMeasurement] = useState<MeasurementData | null>(null);
+  const [updateInterval, setUpdateInterval] = useState<number>(() => 
+    parseInt(localStorage.getItem('mapUpdateInterval') || '200')
+  );
+  const [canvasSize, setCanvasSize] = useState<number>(500);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Listen for localStorage changes from DebugConsole
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newInterval = parseInt(localStorage.getItem('mapUpdateInterval') || '200');
+      setUpdateInterval(newInterval);
+    };
+    
+    window.addEventListener('localStorageChange', handleStorageChange);
+    return () => window.removeEventListener('localStorageChange', handleStorageChange);
+  }, []);
+
+  // Update canvas size based on wrapper size (ALWAYS SQUARE)
+  useEffect(() => {
+    const wrapper = canvasWrapperRef.current;
+    if (!wrapper) return;
+
+    const updateSize = () => {
+      const rect = wrapper.getBoundingClientRect();
+      // Force square: use minimum of width/height
+      const size = Math.min(rect.width, rect.height);
+      setCanvasSize(size);
+      
+      // Force wrapper to be square
+      wrapper.style.width = `${size}px`;
+      wrapper.style.height = `${size}px`;
+    };
+
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(wrapper);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Clamp pan offset to keep map within bounds
+  const clampPanOffset = (offset: { x: number; y: number }, canvasSize: number): { x: number; y: number } => {
+    // If zoom <= 1.0, don't allow panning (map fills canvas or smaller)
+    if (zoomLevel <= 1.0) {
+      return { x: 0, y: 0 };
+    }
+    
+    const scaledSize = canvasSize * zoomLevel;
+    const maxOffset = (scaledSize - canvasSize) / 2;
+    
+    return {
+      x: Math.max(-maxOffset, Math.min(maxOffset, offset.x)),
+      y: Math.max(-maxOffset, Math.min(maxOffset, offset.y))
+    };
+  };
 
   const getCompassDirection = (heading: number): string => {
     if (heading >= 337.5 || heading < 22.5) return 'N';
@@ -71,6 +154,190 @@ export function MiniMap() {
     if (heading >= 292.5 && heading < 337.5) return 'NW';
     return '';
   };
+
+  // Handle canvas click for tools
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!mapData || activeTool === 'none') return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Get click position in canvas space (0..1)
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = (e.clientX - rect.left) / rect.width;
+    const canvasY = (e.clientY - rect.top) / rect.height;
+
+    // Convert from screen space to map space (accounting for zoom/pan)
+    // The canvas transform is: translate(center + pan), then scale(zoom)
+    // To invert: first unscale, then untranslate
+    const centerX = 0.5;
+    const centerY = 0.5;
+    
+    // Undo translation (in scaled space)
+    const scaledX = canvasX - centerX - panOffset.x / canvas.width;
+    const scaledY = canvasY - centerY - panOffset.y / canvas.height;
+    
+    // Undo scaling
+    const mapX = scaledX / zoomLevel + centerX;
+    const mapY = scaledY / zoomLevel + centerY;
+
+    // Clamp to 0..1
+    const clampedX = Math.max(0, Math.min(1, mapX));
+    const clampedY = Math.max(0, Math.min(1, mapY));
+
+    if (activeTool === 'measure') {
+      if (!measurePoint) {
+        // First click - set start point
+        setMeasurePoint({ x: clampedX, y: clampedY });
+        setMeasurement(null);
+      } else {
+        // Second click - set end point and calculate
+        calculateMeasurement(measurePoint.x, measurePoint.y, clampedX, clampedY);
+      }
+    } else if (activeTool === 'distance') {
+      // Measure from player to clicked point
+      if (mapData.player_position) {
+        calculateMeasurement(mapData.player_position[0], mapData.player_position[1], clampedX, clampedY);
+      }
+    } else if (activeTool === 'marker') {
+      addMarker(clampedX, clampedY);
+    }
+  };
+
+  const calculateMeasurement = (x1: number, y1: number, x2: number, y2: number) => {
+    if (!mapData) return;
+
+    const info = mapData.info;
+    const mapWidth = info.map_max[0] - info.map_min[0];
+    const mapHeight = info.map_max[1] - info.map_min[1];
+
+    // Convert both points to world space (meters)
+    const point1WorldX = x1 * mapWidth + info.map_min[0];
+    const point1WorldY = (1 - y1) * mapHeight + info.map_min[1];
+    const point2WorldX = x2 * mapWidth + info.map_min[0];
+    const point2WorldY = (1 - y2) * mapHeight + info.map_min[1];
+
+    // Calculate distance
+    const dx = point2WorldX - point1WorldX;
+    const dy = point2WorldY - point1WorldY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Calculate bearing from point1 to point2
+    const angleFromX = Math.atan2(dy, dx) * (180 / Math.PI);
+    const bearing = (90 - angleFromX + 360) % 360;
+
+    // Calculate grid reference for end point
+    let gridRef = '?';
+    if (mapMode === 'current') {
+      const posX = point2WorldX - info.grid_zero[0];
+      const posY = info.grid_zero[1] - point2WorldY;
+      const gridX = Math.floor(posX / info.grid_steps[0]);
+      const gridY = Math.floor(posY / info.grid_steps[1]);
+      if (gridY >= 0 && gridY < 26) {
+        const letter = String.fromCharCode(65 + gridY);
+        gridRef = `${letter}-${gridX + 1}`;
+      }
+    }
+
+    setMeasurement({ 
+      distance, 
+      bearing, 
+      gridRef,
+      point1: { x: x1, y: y1 },
+      point2: { x: x2, y: y2 }
+    });
+  };
+
+  const addMarker = (x: number, y: number) => {
+    const newMarker: MapMarker = {
+      id: Date.now().toString(),
+      x,
+      y,
+      color: '#ff9933',
+    };
+    setMarkers(prev => [...prev, newMarker]);
+  };
+
+  const clearMarkers = () => {
+    setMarkers([]);
+    setMeasurePoint(null);
+    setMeasurement(null);
+  };
+
+  // Handle zoom with mouse wheel
+  useEffect(() => {
+    const wrapper = canvasWrapperRef.current;
+    if (!wrapper) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      const newZoom = Math.max(0.8, Math.min(6.0, zoomLevel + delta));
+      setZoomLevel(newZoom);
+      
+      // Clamp pan offset to new zoom bounds
+      const canvas = canvasRef.current;
+      if (canvas) {
+        setPanOffset(prev => clampPanOffset(prev, canvas.width));
+      }
+      setFollowPlayer(false); // Disable follow when zooming
+    };
+
+    wrapper.addEventListener('wheel', handleWheel, { passive: false });
+    return () => wrapper.removeEventListener('wheel', handleWheel);
+  }, [zoomLevel, clampPanOffset]);
+
+  // Handle drag for panning
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Don't start dragging if tool is active
+      if (activeTool !== 'none') return;
+      
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+      setFollowPlayer(false); // Disable follow when dragging
+      canvas.style.cursor = 'grabbing';
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !dragStart) return;
+
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      
+      // 1:1 movement - no acceleration, clamped to bounds
+      setPanOffset(prev => {
+        const newOffset = {
+          x: prev.x + dx,
+          y: prev.y + dy
+        };
+        // Use actual canvas size (assumes square canvas, use width)
+        const canvasSize = canvas.width;
+        return clampPanOffset(newOffset, canvasSize);
+      });
+      
+      setDragStart({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setDragStart(null);
+      canvas.style.cursor = 'grab';
+    };
+
+    canvas.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragStart, zoomLevel, clampPanOffset, activeTool]);
 
   useEffect(() => {
     if (!isEnabled) return;
@@ -107,10 +374,10 @@ export function MiniMap() {
       } catch (err) {
         setError(String(err));
       }
-    }, 500); // Update every 500ms
+    }, updateInterval); // Use configurable update interval
 
     return () => clearInterval(interval);
-  }, [isEnabled, currentMapGen]);
+  }, [isEnabled, currentMapGen, updateInterval]);
 
   useEffect(() => {
     if (!mapData || !canvasRef.current) return;
@@ -131,6 +398,38 @@ export function MiniMap() {
       ctx.textBaseline = 'middle';
       ctx.fillText('No map data', canvas.width / 2, canvas.height / 2);
       return;
+    }
+
+    // Apply zoom and pan transforms
+    ctx.save();
+    
+    if (followPlayer && mapData.player_position) {
+      // Follow mode: center on player
+      // Convert player API coords to canvas coords
+      const mapWidth = mapData.info.map_max[0] - mapData.info.map_min[0];
+      const mapHeight = mapData.info.map_max[1] - mapData.info.map_min[1];
+      const worldX = mapData.player_position[0] * mapWidth + mapData.info.map_min[0];
+      const worldY = (1 - mapData.player_position[1]) * mapHeight + mapData.info.map_min[1];
+      
+      let canvasX, canvasY;
+      if (mapMode === 'full') {
+        canvasX = (worldX - mapData.info.map_min[0]) / mapWidth * canvas.width;
+        canvasY = (mapData.info.map_max[1] - worldY) / mapHeight * canvas.height;
+      } else {
+        canvasX = (worldX - mapData.info.grid_zero[0]) / mapData.info.grid_size[0] * canvas.width;
+        canvasY = (mapData.info.grid_zero[1] - worldY) / mapData.info.grid_size[1] * canvas.height;
+      }
+      
+      // Center canvas, zoom, then center on player
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-canvasX, -canvasY);
+    } else {
+      // Free mode: pan in screen space (before zoom)
+      ctx.translate(panOffset.x, panOffset.y);
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
     }
 
     // Draw map image as background
@@ -179,10 +478,10 @@ export function MiniMap() {
     // Draw grid
     drawGrid(ctx, canvas, mapData.info);
 
-    // Calculate enemy distances
+    // Calculate nearby units (enemies and allies) distances
     const playerObj = mapData.objects.find(obj => obj.icon === 'Player');
     if (playerObj && playerObj.x !== undefined && playerObj.y !== undefined) {
-      calculateEnemyDistances(playerObj, mapData.objects, mapData.info);
+      calculateNearbyUnits(playerObj, mapData.objects, mapData.info);
     }
 
     // Draw objects
@@ -196,18 +495,25 @@ export function MiniMap() {
 
     // Draw player
     if (playerObj) {
-      drawPlayer(ctx, canvas, playerObj, mapData.info);
+      drawPlayer(ctx, canvas, playerObj, mapData.info, zoomLevel);
     }
-  }, [mapData, mapImage, mapMode]);
 
-  const calculateEnemyDistances = (
+    // Draw markers and measurements (after zoom/pan transform)
+    drawMarkersAndMeasurements(ctx, canvas, playerObj, mapData.info);
+
+    // Restore transform
+    ctx.restore();
+  }, [mapData, mapImage, mapMode, zoomLevel, panOffset, followPlayer, markers, measurePoint]);
+
+  const calculateNearbyUnits = (
     player: MapObject,
     objects: MapObject[],
     info: MapInfo
   ) => {
     if (!player.x || !player.y) return;
 
-    const enemies: EnemyDistance[] = [];
+    const enemies: UnitDistance[] = [];
+    const allies: UnitDistance[] = [];
     
     // Convert player API coords to world coords (meters)
     // NOTE: API Y is inverted! y=0 is North (top), y=1 is South (bottom)
@@ -217,46 +523,65 @@ export function MiniMap() {
     const playerWorldY = (1 - player.y) * mapHeight + info.map_min[1];
 
     for (const obj of objects) {
-      // Check if object is enemy (red color) and has position
+      // Check if object has position
       if (obj.x === undefined || obj.y === undefined) continue;
       
       // Skip player
       if (obj.icon === 'Player') continue;
       
-      // Enemy color is #fa0C00 (red), NOT player color #faC81E (yellow)
+      // Filter only vehicles (ground, aircraft, ships)
+      if (obj.type !== 'ground_model' && obj.type !== 'aircraft' && obj.type !== 'Ship') continue;
+      
+      // Determine if enemy or ally
+      // Enemy color: #fa0C00 (red)
+      // Ally color: #174DFF (blue)
       const isEnemy = (obj.color_rgb && 
                        obj.color_rgb[0] > 240 && 
                        obj.color_rgb[1] < 20 && 
                        obj.color_rgb[2] < 20) ||
                       obj.color.toLowerCase() === '#fa0c00';
       
-      if (!isEnemy) continue;
-      if (obj.type !== 'ground_model' && obj.type !== 'aircraft' && obj.type !== 'Ship') continue;
+      const isAlly = (obj.color_rgb && 
+                      obj.color_rgb[0] < 50 && 
+                      obj.color_rgb[1] > 60 && 
+                      obj.color_rgb[2] > 200) ||
+                     obj.color.toLowerCase() === '#174dff';
+      
+      if (!isEnemy && !isAlly) continue;
 
-      // Convert enemy API coords to world coords (meters)
-      const enemyWorldX = obj.x * mapWidth + info.map_min[0];
-      const enemyWorldY = (1 - obj.y) * mapHeight + info.map_min[1]; // API Y inverted!
+      // Convert API coords to world coords (meters)
+      const unitWorldX = obj.x * mapWidth + info.map_min[0];
+      const unitWorldY = (1 - obj.y) * mapHeight + info.map_min[1]; // API Y inverted!
       
       // Calculate distance in real-world meters
-      const distX = enemyWorldX - playerWorldX;
-      const distY = enemyWorldY - playerWorldY;
+      const distX = unitWorldX - playerWorldX;
+      const distY = unitWorldY - playerWorldY;
       const distance = Math.sqrt(distX * distX + distY * distY);
       
-      // Calculate bearing/azimuth to enemy (0° = North, clockwise)
+      // Calculate bearing/azimuth (0° = North, clockwise)
       const angleFromX = Math.atan2(distY, distX) * (180 / Math.PI);
       const bearing = (90 - angleFromX + 360) % 360;
 
-      enemies.push({
+      const unit: UnitDistance = {
         distance,
         type: obj.icon || obj.type,
         position: [obj.x, obj.y],
         bearing,
-      });
+        isEnemy,
+      };
+      
+      if (isEnemy) {
+        enemies.push(unit);
+      } else {
+        allies.push(unit);
+      }
     }
 
     // Sort by distance and keep top 5
     enemies.sort((a, b) => a.distance - b.distance);
+    allies.sort((a, b) => a.distance - b.distance);
     setNearestEnemies(enemies.slice(0, 5));
+    setNearestAllies(allies.slice(0, 5));
   };
 
   const drawGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, info: MapInfo) => {
@@ -389,8 +714,9 @@ export function MiniMap() {
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 0.5;
 
-    // Smaller marker sizes
-    const size = obj.type === 'capture_zone' ? 6 : 3;
+    // Icon sizes - bigger in Current mode for better visibility
+    const baseSize = mapMode === 'current' ? 5 : 3;
+    const size = obj.type === 'capture_zone' ? (mapMode === 'current' ? 8 : 6) : baseSize;
 
     if (obj.icon === 'Ship') {
       // Triangle for ships
@@ -419,11 +745,126 @@ export function MiniMap() {
     }
   };
 
+  const drawMarkersAndMeasurements = (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    player: MapObject | undefined,
+    info: MapInfo
+  ) => {
+    // Helper to convert map coords (0..1) to canvas coords
+    const toCanvasCoords = (x: number, y: number) => {
+      const mapWidth = info.map_max[0] - info.map_min[0];
+      const mapHeight = info.map_max[1] - info.map_min[1];
+      const worldX = x * mapWidth + info.map_min[0];
+      const worldY = (1 - y) * mapHeight + info.map_min[1];
+      
+      let visibleX, visibleY;
+      if (mapMode === 'full') {
+        visibleX = (worldX - info.map_min[0]) / mapWidth;
+        visibleY = (info.map_max[1] - worldY) / mapHeight;
+      } else {
+        visibleX = (worldX - info.grid_zero[0]) / info.grid_size[0];
+        visibleY = (info.grid_zero[1] - worldY) / info.grid_size[1];
+      }
+      return { x: visibleX * canvas.width, y: visibleY * canvas.height };
+    };
+
+    // Draw measurement line and points
+    if (measurement) {
+      const point1Pos = toCanvasCoords(measurement.point1.x, measurement.point1.y);
+      const point2Pos = toCanvasCoords(measurement.point2.x, measurement.point2.y);
+
+      ctx.save();
+      // Draw line between points
+      ctx.strokeStyle = '#ff9933';
+      ctx.lineWidth = 2 / zoomLevel;
+      ctx.setLineDash([5 / zoomLevel, 5 / zoomLevel]);
+      ctx.beginPath();
+      ctx.moveTo(point1Pos.x, point1Pos.y);
+      ctx.lineTo(point2Pos.x, point2Pos.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw point 1 (start)
+      ctx.fillStyle = '#ff9933';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2 / zoomLevel;
+      ctx.beginPath();
+      ctx.arc(point1Pos.x, point1Pos.y, 5 / zoomLevel, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw point 2 (end) with crosshair
+      ctx.beginPath();
+      ctx.arc(point2Pos.x, point2Pos.y, 5 / zoomLevel, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw crosshair on end point
+      const crossSize = 10 / zoomLevel;
+      ctx.strokeStyle = '#ff9933';
+      ctx.lineWidth = 1.5 / zoomLevel;
+      ctx.beginPath();
+      ctx.moveTo(point2Pos.x - crossSize, point2Pos.y);
+      ctx.lineTo(point2Pos.x + crossSize, point2Pos.y);
+      ctx.moveTo(point2Pos.x, point2Pos.y - crossSize);
+      ctx.lineTo(point2Pos.x, point2Pos.y + crossSize);
+      ctx.stroke();
+
+      ctx.restore();
+    } else if (measurePoint && activeTool === 'measure') {
+      // Only start point set for 'measure' tool, draw it
+      const pointPos = toCanvasCoords(measurePoint.x, measurePoint.y);
+      
+      ctx.save();
+      ctx.fillStyle = '#ff9933';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2 / zoomLevel;
+      ctx.beginPath();
+      ctx.arc(pointPos.x, pointPos.y, 5 / zoomLevel, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw markers
+    for (const marker of markers) {
+      const pos = toCanvasCoords(marker.x, marker.y);
+      
+      ctx.save();
+      ctx.fillStyle = marker.color || '#ff9933';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2 / zoomLevel;
+      
+      // Draw marker pin
+      const size = 8 / zoomLevel;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw label if exists
+      if (marker.label) {
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3 / zoomLevel;
+        ctx.font = `${12 / zoomLevel}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.strokeText(marker.label, pos.x, pos.y - size - 2 / zoomLevel);
+        ctx.fillText(marker.label, pos.x, pos.y - size - 2 / zoomLevel);
+      }
+      
+      ctx.restore();
+    }
+  };
+
   const drawPlayer = (
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
     obj: MapObject,
-    info: MapInfo
+    info: MapInfo,
+    currentZoom: number
   ) => {
     if (obj.x === undefined || obj.y === undefined) return;
 
@@ -451,16 +892,22 @@ export function MiniMap() {
       angle = Math.atan2(obj.dy, obj.dx);
     }
 
-    // Draw player as arrow
+    // Draw player as arrow with fixed size (compensate for zoom)
     ctx.save();
     ctx.translate(x, y);
+    
+    // Compensate zoom to keep icon fixed size
+    const zoomCompensation = 1 / currentZoom;
+    ctx.scale(zoomCompensation, zoomCompensation);
+    
     ctx.rotate(angle);
 
     ctx.fillStyle = '#faC81E';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1.5;
 
-    const arrowSize = 8;
+    // Bigger arrow in Current mode for better visibility
+    const arrowSize = mapMode === 'current' ? 10 : 8;
     ctx.beginPath();
     ctx.moveTo(arrowSize, 0);
     ctx.lineTo(-arrowSize / 2, -arrowSize / 2);
@@ -474,15 +921,18 @@ export function MiniMap() {
 
   return (
     <div className="minimap-container">
-      <div className="minimap-header">
+      <div style={{ display: 'flex', gap: '16px', width: '100%' }}>
+        {/* Left side - Map Canvas */}
+        <div style={{ flex: '0 0 auto' }}>
+          <div className="minimap-header">
         <h3>{t('map.title')}</h3>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button
               className={`btn btn-${mapMode === 'current' ? 'primary' : 'secondary'}`}
               onClick={() => setMapMode('current')}
               disabled={!isEnabled}
-              title="Current vehicle view (tank/aircraft)"
+              title="Current vehicle view"
               style={{ fontSize: '11px', padding: '4px 8px' }}
             >
               Current
@@ -497,6 +947,35 @@ export function MiniMap() {
               Full
             </button>
           </div>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              className={`btn btn-${followPlayer ? 'primary' : 'secondary'}`}
+              onClick={() => {
+                setFollowPlayer(!followPlayer);
+                if (!followPlayer) {
+                  setPanOffset({ x: 0, y: 0 });
+                }
+              }}
+              disabled={!isEnabled}
+              title="Center map on player"
+              style={{ fontSize: '11px', padding: '4px 8px' }}
+            >
+              📍 Follow
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setZoomLevel(1.0);
+                setPanOffset({ x: 0, y: 0 });
+                setFollowPlayer(false);
+              }}
+              disabled={!isEnabled}
+              title="Reset view"
+              style={{ fontSize: '11px', padding: '4px 8px' }}
+            >
+              🔄 Reset
+            </button>
+          </div>
           <button 
             className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
             onClick={() => setIsEnabled(!isEnabled)}
@@ -506,12 +985,18 @@ export function MiniMap() {
           </button>
         </div>
       </div>
-      <div className="minimap-canvas-wrapper">
+      <div 
+        className="minimap-canvas-wrapper" 
+        ref={canvasWrapperRef}
+        title={`Zoom: ${(zoomLevel * 100).toFixed(0)}% (scroll to zoom)`}
+      >
         <canvas
           ref={canvasRef}
-          width={400}
-          height={400}
+          width={canvasSize}
+          height={canvasSize}
           className="minimap-canvas"
+          style={{ cursor: isDragging ? 'grabbing' : activeTool !== 'none' ? 'crosshair' : 'grab' }}
+          onClick={handleCanvasClick}
         />
         {error && !isEnabled && (
           <div className="minimap-info">{t('map.disabled')}</div>
@@ -522,48 +1007,185 @@ export function MiniMap() {
           </div>
         )}
       </div>
-      {mapData && isEnabled && (
-        <div className="minimap-stats-bottom">
-          {mapData.map_name && (
-            <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', color: '#64c8ff' }}>
-              📍 {mapData.map_name}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <div>
-              <div>{t('map.objects')} {mapData.objects.length}</div>
+        </div>
+
+        {/* Right side - Tools & Info */}
+        {isEnabled && mapData && (
+        <div style={{
+          flex: '1',
+          padding: '16px',
+          paddingLeft: '0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          maxHeight: '600px',
+          overflowY: 'auto',
+        }}>
+          {/* Player Info */}
+          <div style={{ 
+            borderBottom: '1px solid var(--border)', 
+            paddingBottom: '12px' 
+          }}>
+            <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              👤 Player Info
+            </h4>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               {mapData.player_grid && (
-                <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: 'bold' }}>
+                <div style={{ color: '#22c55e', fontWeight: 'bold' }}>
                   🎯 Grid: {mapData.player_grid}
-                </div>
-              )}
-              {mapData.player_position && (
-                <div style={{ fontSize: '10px', color: '#888' }}>
-                  ({mapData.player_position[0].toFixed(3)}, {mapData.player_position[1].toFixed(3)})
                 </div>
               )}
               {mapData.player_heading !== null && (
                 <div>🧭 {mapData.player_heading.toFixed(0)}° {getCompassDirection(mapData.player_heading)}</div>
               )}
             </div>
-            {nearestEnemies.length > 0 && (
-              <div className="minimap-enemies">
-                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{t('map.nearest_enemies')}</div>
-                {nearestEnemies.map((enemy, idx) => (
-                  <div key={idx} style={{ fontSize: '11px', color: '#ff6666' }}>
-                    {idx + 1}. {enemy.type}: {enemy.distance.toFixed(0)}m @ {enemy.bearing.toFixed(0)}° {getCompassDirection(enemy.bearing)}
+          </div>
+
+          {/* Tools */}
+          <div style={{ 
+            borderBottom: '1px solid var(--border)', 
+            paddingBottom: '12px' 
+          }}>
+            <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              🛠️ Tools
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <button
+                className={`btn btn-${activeTool === 'measure' ? 'primary' : 'secondary'}`}
+                onClick={() => {
+                  setActiveTool(activeTool === 'measure' ? 'none' : 'measure');
+                  if (activeTool === 'measure') clearMarkers();
+                }}
+                style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
+              >
+                📏 Measure (2 points)
+              </button>
+              <button
+                className={`btn btn-${activeTool === 'distance' ? 'primary' : 'secondary'}`}
+                onClick={() => {
+                  setActiveTool(activeTool === 'distance' ? 'none' : 'distance');
+                  if (activeTool === 'distance') clearMarkers();
+                }}
+                style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
+              >
+                📏 Distance from Player
+              </button>
+              <button
+                className={`btn btn-${activeTool === 'marker' ? 'primary' : 'secondary'}`}
+                onClick={() => setActiveTool(activeTool === 'marker' ? 'none' : 'marker')}
+                style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
+              >
+                📍 Place Marker
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={clearMarkers}
+                disabled={markers.length === 0 && !measurePoint && !measurement}
+                style={{ fontSize: '11px', padding: '6px 10px', justifyContent: 'flex-start' }}
+              >
+                🗑️ Clear All
+              </button>
+            </div>
+          </div>
+
+          {/* Measurement Info */}
+          {measurement && (
+            <div style={{
+              background: 'rgba(255, 153, 51, 0.1)',
+              border: '1px solid #ff9933',
+              borderRadius: '4px',
+              padding: '12px',
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#ff9933', fontSize: '12px' }}>
+                📏 Measurement
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <div>Distance: <span style={{ fontWeight: 'bold', color: '#ff9933' }}>{measurement.distance.toFixed(0)}m</span></div>
+                <div>Bearing: <span style={{ fontWeight: 'bold', color: '#ff9933' }}>{measurement.bearing.toFixed(0)}° {getCompassDirection(measurement.bearing)}</span></div>
+                {measurement.gridRef !== '?' && (
+                  <div>Grid: <span style={{ fontWeight: 'bold', color: '#ff9933' }}>{measurement.gridRef}</span></div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Active Tool Hint */}
+          {activeTool !== 'none' && !measurement && (
+            <div style={{
+              background: 'rgba(100, 200, 255, 0.1)',
+              border: '1px solid #64c8ff',
+              borderRadius: '4px',
+              padding: '8px',
+              fontSize: '10px',
+              color: '#64c8ff',
+              fontStyle: 'italic',
+            }}>
+              {activeTool === 'measure' && !measurePoint && '🖱️ Click to set start point'}
+              {activeTool === 'measure' && measurePoint && !measurement && '🖱️ Click to set end point'}
+              {activeTool === 'distance' && '🖱️ Click to measure from player'}
+              {activeTool === 'marker' && '🖱️ Click to place marker'}
+            </div>
+          )}
+
+          {/* Markers Count */}
+          {markers.length > 0 && (
+            <div style={{
+              fontSize: '11px',
+              color: 'var(--text-secondary)',
+            }}>
+              📍 {markers.length} marker{markers.length > 1 ? 's' : ''} placed
+            </div>
+          )}
+
+          {/* Enemies & Allies in columns */}
+          <div style={{ 
+            borderTop: '1px solid var(--border)', 
+            paddingTop: '12px',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '12px'
+          }}>
+            {/* Enemies Column */}
+            <div>
+              <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#ff6666', fontSize: '12px' }}>
+                🎯 Nearest Enemies
+              </div>
+              {nearestEnemies.length > 0 ? (
+                nearestEnemies.map((enemy, idx) => (
+                  <div key={idx} style={{ fontSize: '10px', color: '#ff6666', marginBottom: '4px' }}>
+                    {idx + 1}. {enemy.type}:<br/>
+                    {enemy.distance.toFixed(0)}m @ {enemy.bearing.toFixed(0)}° {getCompassDirection(enemy.bearing)}
                   </div>
-                ))}
+                ))
+              ) : (
+                <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
+                  None detected
+                </div>
+              )}
+            </div>
+
+            {/* Allies Column */}
+            <div>
+              <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#64a8ff', fontSize: '12px' }}>
+                🛡️ Nearest Allies
               </div>
-            )}
-            {nearestEnemies.length === 0 && mapData.info.valid && (
-              <div style={{ fontSize: '11px', color: '#888', fontStyle: 'italic' }}>
-                {t('map.no_enemies')}
-              </div>
-            )}
+              {nearestAllies.length > 0 ? (
+                nearestAllies.map((ally, idx) => (
+                  <div key={idx} style={{ fontSize: '10px', color: '#64a8ff', marginBottom: '4px' }}>
+                    {idx + 1}. {ally.type}:<br/>
+                    {ally.distance.toFixed(0)}m @ {ally.bearing.toFixed(0)}° {getCompassDirection(ally.bearing)}
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
+                  None detected
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

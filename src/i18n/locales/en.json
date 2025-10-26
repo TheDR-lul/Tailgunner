@@ -250,6 +250,7 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "waiting": "Waiting for mission data...",
+    "no_map_data": "No map data",
     "primary": "Primary Objectives",
     "secondary": "Secondary Objectives",
     "no_objectives": "No objectives available",

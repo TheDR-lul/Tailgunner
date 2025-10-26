@@ -8,13 +8,15 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: 350px;
+  height: 400px;
+  min-height: 300px;
+  overflow: hidden;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .game-chat-container:hover {
-  border-color: var(--accent);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 153, 51, 0.1);
 }
 
 .game-chat-container::before {

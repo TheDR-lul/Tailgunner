@@ -21,8 +21,22 @@ export function GameChat() {
   const [lastDmgId, setLastDmgId] = useState<number>(0);
   const [isEnabled, setIsEnabled] = useState(false);
   const [lastBattleId, setLastBattleId] = useState<number>(0); // Track battle changes
+  const [updateInterval, setUpdateInterval] = useState<number>(() => 
+    parseInt(localStorage.getItem('feedUpdateInterval') || '500')
+  );
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Listen for localStorage changes from DebugConsole
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newInterval = parseInt(localStorage.getItem('feedUpdateInterval') || '500');
+      setUpdateInterval(newInterval);
+    };
+    
+    window.addEventListener('localStorageChange', handleStorageChange);
+    return () => window.removeEventListener('localStorageChange', handleStorageChange);
+  }, []);
 
   useEffect(() => {
     if (!isEnabled) return;
@@ -116,10 +130,10 @@ export function GameChat() {
       } catch (err) {
         // Silently ignore errors (game not running)
       }
-    }, 1000);
+    }, updateInterval); // Use configurable update interval
 
     return () => clearInterval(interval);
-  }, [isEnabled, lastChatId, lastEvtId, lastDmgId, lastBattleId]);
+  }, [isEnabled, lastChatId, lastEvtId, lastDmgId, lastBattleId, updateInterval]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);

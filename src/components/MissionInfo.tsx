@@ -19,22 +19,48 @@ export function MissionInfo() {
   const { t } = useTranslation();
   const [mission, setMission] = useState<MissionData | null>(null);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [hasMapData, setHasMapData] = useState(false);
+  const [updateInterval, setUpdateInterval] = useState<number>(() => 
+    parseInt(localStorage.getItem('feedUpdateInterval') || '500')
+  );
+
+  // Listen for localStorage changes from DebugConsole
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newInterval = parseInt(localStorage.getItem('feedUpdateInterval') || '500');
+      setUpdateInterval(newInterval);
+    };
+    
+    window.addEventListener('localStorageChange', handleStorageChange);
+    return () => window.removeEventListener('localStorageChange', handleStorageChange);
+  }, []);
 
   useEffect(() => {
     if (!isEnabled) return;
 
     const interval = setInterval(async () => {
       try {
-        const data = await invoke<MissionData>('get_mission_info');
-        setMission(data);
+        // Check if map data is available
+        const mapData = await invoke<{info: {map_generation: number}}>('get_map_data')
+          .catch(() => null);
+        setHasMapData(mapData !== null && mapData.info.map_generation > 0);
+        
+        // Only fetch mission if map data exists
+        if (mapData && mapData.info.map_generation > 0) {
+          const data = await invoke<MissionData>('get_mission_info');
+          setMission(data);
+        } else {
+          setMission(null);
+        }
       } catch (err) {
         // Silently ignore errors (game not running)
         setMission(null);
+        setHasMapData(false);
       }
-    }, 2000);
+    }, updateInterval); // Use configurable update interval
 
     return () => clearInterval(interval);
-  }, [isEnabled]);
+  }, [isEnabled, updateInterval]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -95,7 +121,10 @@ export function MissionInfo() {
           )}
         </div>
       )}
-      {isEnabled && !mission && (
+      {isEnabled && !hasMapData && (
+        <div className="mission-info-empty">{t('mission.no_map_data', 'No map data')}</div>
+      )}
+      {isEnabled && hasMapData && !mission && (
         <div className="mission-info-empty">{t('mission.waiting')}</div>
       )}
     </div>
