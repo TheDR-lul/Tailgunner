@@ -1,0 +1,146 @@
+.vehicle-mode-card {
+  background: var(--bg-dark);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border-left: 4px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.vehicle-mode-card.hud-only {
+  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, var(--bg-dark) 100%);
+}
+
+.vehicle-mode-card.full-telemetry {
+  border-left-color: #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, var(--bg-dark) 100%);
+}
+
+.vehicle-mode-card.disconnected {
+  border-left-color: #6b7280;
+  opacity: 0.6;
+}
+
+.mode-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.vehicle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  color: var(--text-primary);
+}
+
+.mode-info {
+  flex: 1;
+}
+
+.mode-info h3 {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.hud-only .mode-badge {
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.full-telemetry .mode-badge {
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.mode-description {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mode-warning,
+.mode-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.mode-warning {
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.mode-warning span {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.mode-warning p,
+.mode-success p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.mode-success {
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.mode-success span {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.available-data {
+  font-size: 12px;
+}
+
+.available-data strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.available-data ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.available-data li {
+  padding: 4px 0;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mode-desc {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+

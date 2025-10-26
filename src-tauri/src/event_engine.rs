@@ -2,7 +2,7 @@
 /// Detect events from game state
 
 use crate::pattern_engine::GameEvent;
-use crate::wt_telemetry::GameState;
+use crate::wt_telemetry::{GameState, HudEvent, VehicleType};
 use std::collections::HashSet;
 
 pub struct EventEngine {
@@ -28,21 +28,33 @@ impl EventEngine {
             return events;
         }
 
-        // Detect new events in state array
-        let current_states: HashSet<_> = current_state.state.iter().cloned().collect();
-        
-        // Find new states (not present in previous state)
-        let new_states: Vec<_> = if let Some(prev) = &self.previous_state {
-            let prev_states: HashSet<_> = prev.state.iter().cloned().collect();
-            current_states.difference(&prev_states).cloned().collect()
-        } else {
-            current_states.iter().cloned().collect()
-        };
+        // FOR SHIPS: Use HUD events as primary source (indicators/state not available)
+        if matches!(current_state.type_, VehicleType::Ship) {
+            // Process HUD events
+            for hud_event in &current_state.hud_events {
+                if let Some(game_event) = self.map_hud_event_to_game_event(hud_event) {
+                    events.push(game_event);
+                }
+            }
+        }
 
-        // Map WT string events to our GameEvents
-        for state_str in new_states {
-            if let Some(event) = self.map_wt_state_to_event(&state_str) {
-                events.push(event);
+        // FOR TANKS/AIRCRAFT: Detect new events in state array (standard method)
+        if !matches!(current_state.type_, VehicleType::Ship) {
+            let current_states: HashSet<_> = current_state.state.iter().cloned().collect();
+            
+            // Find new states (not present in previous state)
+            let new_states: Vec<_> = if let Some(prev) = &self.previous_state {
+                let prev_states: HashSet<_> = prev.state.iter().cloned().collect();
+                current_states.difference(&prev_states).cloned().collect()
+            } else {
+                current_states.iter().cloned().collect()
+            };
+
+            // Map WT string events to our GameEvents
+            for state_str in new_states {
+                if let Some(event) = self.map_wt_state_to_event(&state_str) {
+                    events.push(event);
+                }
             }
         }
 
@@ -166,6 +178,22 @@ impl EventEngine {
                     None
                 }
             }
+        }
+    }
+
+    /// Map HUD events to game events (used for ships)
+    fn map_hud_event_to_game_event(&self, hud_event: &HudEvent) -> Option<GameEvent> {
+        match hud_event {
+            HudEvent::Kill(_) => Some(GameEvent::TargetDestroyed),
+            HudEvent::SetAfire(_) => Some(GameEvent::TargetSetOnFire),
+            HudEvent::TakeDamage(_) => Some(GameEvent::Hit),
+            HudEvent::SeverelyDamaged(_) => Some(GameEvent::SeverelyDamaged),
+            HudEvent::ShotDown(_) => Some(GameEvent::VehicleDestroyed),
+            HudEvent::Achievement(_) => Some(GameEvent::Achievement),
+            HudEvent::Crashed => Some(GameEvent::Crashed),
+            HudEvent::EngineOverheated => Some(GameEvent::EngineOverheat),
+            HudEvent::OilOverheated => Some(GameEvent::OilOverheated),
+            HudEvent::ChatMessage(_) => None, // Ignore chat messages
         }
     }
 

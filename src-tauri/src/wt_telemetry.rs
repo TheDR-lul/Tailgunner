@@ -773,8 +773,17 @@ impl WTTelemetryReader {
             *last = vehicle_name.clone();
         }
 
+        // SHIPS: indicators/state not available, but we can still get HUD events
+        // Mark as valid if we detected it's a ship, even if indicators say valid=false
+        let final_valid = if matches!(type_, VehicleType::Ship) && !valid {
+            log::info!("[WT Parser] 🚢 Ship detected but indicators invalid - using HUD-only mode");
+            !vehicle_name.is_empty() && vehicle_name != "unknown"
+        } else {
+            valid
+        };
+
         Ok(GameState {
-            valid,
+            valid: final_valid,
             type_,
             vehicle_name,
             indicators,
@@ -851,17 +860,17 @@ impl WTTelemetryReader {
         let get_i32 = |key: &str| json.get(key).and_then(|v| v.as_i64()).unwrap_or(0) as i32;
         let get_bool = |key: &str| json.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
 
-        // AIRCRAFT vs TANK detection: 
-        // - Tanks have "speed" field (no commas, no units)
-        // - Aircraft have "IAS, km/h" field (with commas and units)
-        // - Tanks have "army": "tank" or "army": "ground"
-        let is_tank = json.get("speed").is_some() || 
-                      json.get("army").and_then(|v| v.as_str())
-                          .map(|s| s == "tank" || s == "ground")
-                          .unwrap_or(false);
+        // Detect vehicle type
+        let army_str = json.get("army").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let type_str = json.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
         
-        let (speed, ias, tas) = if is_tank {
-            // TANK: direct "speed" field
+        let is_tank = json.get("speed").is_some() || 
+                      (army_str == "tank" || army_str == "ground");
+        let is_ship = army_str == "ship" || type_str.contains("ship") || type_str.contains("boat");
+        
+        
+        let (speed, ias, tas) = if is_tank || is_ship {
+            // TANK/SHIP: direct "speed" field
             let spd = get_f32("speed");
             (spd, spd, spd)
         } else {
@@ -875,8 +884,8 @@ impl WTTelemetryReader {
         let fuel = get_f32("Mfuel, kg");
         let fuel_max = get_f32("Mfuel0, kg");
         
-        // ENGINE RPM: tanks use "rpm", aircraft use "RPM 1"/"RPM 2"
-        let engine_rpm = if is_tank {
+        // ENGINE RPM: tanks/ships use "rpm", aircraft use "RPM 1"/"RPM 2"
+        let engine_rpm = if is_tank || is_ship {
             get_f32("rpm")
         } else {
             get_f32("RPM 1").max(get_f32("RPM 2"))
@@ -890,7 +899,7 @@ impl WTTelemetryReader {
         };
         
         // Only log if in battle (crew > 0 or speed > 0)
-        let in_battle = (is_tank && get_i32("crew_total") > 0) || (!is_tank && speed > 1.0);
+        let in_battle = ((is_tank || is_ship) && get_i32("crew_total") > 0) || (!is_tank && !is_ship && speed > 1.0);
         
         if in_battle {
             // Reduced logging spam
@@ -947,9 +956,9 @@ impl WTTelemetryReader {
             bombs_ready: get_i32("bombs_ready"),
             torpedoes_ready: get_i32("torpedoes_ready"),
             
-            // Ammo (different fields for tanks vs aircraft)
-            ammo_count: if is_tank {
-                get_i32("first_stage_ammo")  // Tank ammo in ready rack
+            // Ammo (different fields for tanks/ships vs aircraft)
+            ammo_count: if is_tank || is_ship {
+                get_i32("first_stage_ammo")  // Tank/ship ammo in ready rack
             } else {
                 get_i32("cannon ammo 1").max(get_i32("cannon ammo 2"))  // Aircraft cannon ammo
             },

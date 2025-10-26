@@ -118,8 +118,12 @@ pub enum GameEvent {
     TargetHit,
     TargetDestroyed,
     TargetCritical,
+    TargetSetOnFire,
+    TargetSeverelyDamaged,
     AircraftDestroyed,
     TankDestroyed,
+    ShipDestroyed,
+    VehicleDestroyed,
     
     // === FUEL AND AMMO ===
     LowFuel,              // <10%
@@ -165,6 +169,9 @@ pub enum GameEvent {
     TeamKill,
     Assist,
     BaseCapture,
+    FirstStrike,
+    ShipRescuer,
+    PlayerDisconnected,
     
     // === HUD EVENTS ===
     EnemySetAfire,        // Player set enemy on fire

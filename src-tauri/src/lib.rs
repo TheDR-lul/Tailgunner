@@ -12,6 +12,9 @@ mod state_history;
 mod datamine;
 mod player_identity_db;
 mod device_history_db;
+mod debug_dump;
+mod hud_messages;
+mod map_module;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -19,6 +22,7 @@ use profile_manager::Profile;
 use device_manager::DeviceInfo;
 use tokio::sync::Mutex;
 use std::sync::Arc;
+use serde::{Serialize, Deserialize};
 
 // Global application state
 pub struct AppState {
@@ -165,6 +169,25 @@ async fn get_device_history() -> Result<Vec<device_history_db::DeviceRecord>, St
 }
 
 /// DEBUG: Direct HUD API polling
+#[tauri::command]
+async fn dump_wt_api() -> Result<String, String> {
+    log::info!("[API Dump] Starting full API dump...");
+    let dumper = debug_dump::ApiDumper::new();
+    let data = dumper.dump_all().await;
+    
+    // Convert to pretty JSON
+    match serde_json::to_string_pretty(&data) {
+        Ok(json) => {
+            log::info!("[API Dump] Successfully dumped {} endpoints", data.len());
+            Ok(json)
+        }
+        Err(e) => {
+            log::error!("[API Dump] Failed to serialize: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
 #[tauri::command]
 async fn debug_hud_raw() -> Result<String, String> {
     log::error!("[DEBUG] 🔍 Fetching HUD API directly...");
@@ -755,6 +778,124 @@ async fn datamine_rebuild() -> Result<datamine::ParseStats, String> {
     datamine_parse(game_path.to_string_lossy().to_string()).await
 }
 
+/// Get map objects from War Thunder API
+#[tauri::command]
+async fn get_map_objects() -> Result<Vec<map_module::MapObject>, String> {
+    let url = format!("{}/map_obj.json", "http://127.0.0.1:8111");
+    
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(500))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to War Thunder API: {}", e))?;
+    
+    let objects: Vec<map_module::MapObject> = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse map objects: {}", e))?;
+    
+    Ok(objects)
+}
+
+/// Get map info from War Thunder API
+#[tauri::command]
+async fn get_map_info() -> Result<map_module::MapInfo, String> {
+    let url = format!("{}/map_info.json", "http://127.0.0.1:8111");
+    
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(500))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to War Thunder API: {}", e))?;
+    
+    let info: map_module::MapInfo = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse map info: {}", e))?;
+    
+    Ok(info)
+}
+
+/// Get combined map data
+#[tauri::command]
+async fn get_map_data() -> Result<map_module::MapData, String> {
+    let objects = get_map_objects().await?;
+    let info = get_map_info().await?;
+    
+    Ok(map_module::MapData::new(objects, info))
+}
+
+/// Vehicle mode info for UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct VehicleModeInfo {
+    vehicle_type: String,  // "Ship", "Aircraft", "Tank", "Helicopter", "Unknown"
+    mode: String,          // "HudOnly", "FullTelemetry", "Disconnected"
+    available_data: Vec<String>,
+}
+
+/// Get current vehicle mode and data availability
+#[tauri::command]
+async fn get_vehicle_mode(state: tauri::State<'_, AppState>) -> Result<VehicleModeInfo, String> {
+    let engine = state.engine.lock().await;
+    let telemetry = engine.get_telemetry();
+    let mut telem = telemetry.write().await;
+    
+    match telem.get_state().await {
+        Ok(game_state) => {
+            let vehicle_type = format!("{:?}", game_state.type_);
+            let is_ship = matches!(game_state.type_, wt_telemetry::VehicleType::Ship);
+            
+            let mode = if is_ship {
+                "HudOnly".to_string()
+            } else if game_state.valid {
+                "FullTelemetry".to_string()
+            } else {
+                "Disconnected".to_string()
+            };
+            
+            let available_data = if is_ship {
+                vec![
+                    "Combat events (kills, hits)".to_string(),
+                    "Damage events (fire, flooding)".to_string(),
+                    "Achievements".to_string(),
+                    "Map position".to_string(),
+                ]
+            } else {
+                vec![
+                    "Speed & altitude".to_string(),
+                    "Engine telemetry".to_string(),
+                    "Fuel & ammo".to_string(),
+                    "Damage state".to_string(),
+                    "All combat events".to_string(),
+                ]
+            };
+            
+            Ok(VehicleModeInfo {
+                vehicle_type,
+                mode,
+                available_data,
+            })
+        }
+        Err(_) => {
+            Ok(VehicleModeInfo {
+                vehicle_type: "Unknown".to_string(),
+                mode: "Disconnected".to_string(),
+                available_data: vec![],
+            })
+        }
+    }
+}
+
 pub fn run() {
     // Initialize logger
     // Set default log level: DEBUG for our code, WARN for libraries
@@ -832,6 +973,7 @@ pub fn run() {
             export_pattern,
             export_all_patterns,
             import_pattern,
+            dump_wt_api,
             debug_hud_raw,
             datamine_find_game,
             datamine_parse,
@@ -839,6 +981,10 @@ pub fn run() {
             datamine_get_stats,
             datamine_auto_init,
             datamine_rebuild,
+            get_map_objects,
+            get_map_info,
+            get_map_data,
+            get_vehicle_mode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

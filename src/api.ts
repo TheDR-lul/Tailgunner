@@ -178,6 +178,23 @@ export const api = {
     return invoke('datamine_get_stats');
   },
 
+  // Map API
+  async getMapObjects(): Promise<any[]> {
+    return invoke('get_map_objects');
+  },
+  
+  async getMapInfo(): Promise<any> {
+    return invoke('get_map_info');
+  },
+  
+  async getMapData(): Promise<any> {
+    return invoke('get_map_data');
+  },
+
+  async getVehicleMode(): Promise<any> {
+    return invoke('get_vehicle_mode');
+  },
+
   // File dialog
   async selectFolder(): Promise<string | null> {
     const { open } = await import('@tauri-apps/plugin-dialog');

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Terminal, Trash2, Download } from 'lucide-react';
+import { Terminal, Trash2, Download, Database } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 
 interface LogEntry {
   id: string;
@@ -58,6 +59,35 @@ export function DebugConsole() {
     a.href = url;
     a.download = `debug-log-${Date.now()}.txt`;
     a.click();
+  };
+
+  const dumpWtApi = async () => {
+    addLog('info', '🔄 Dumping War Thunder API...');
+    try {
+      const data = await invoke<string>('dump_wt_api');
+      
+      // Use Tauri save dialog
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      
+      const filePath = await save({
+        title: 'Save API Dump',
+        defaultPath: `wt-api-dump-${Date.now()}.json`,
+        filters: [{
+          name: 'JSON',
+          extensions: ['json']
+        }]
+      });
+      
+      if (filePath) {
+        await writeTextFile(filePath, data);
+        addLog('success', `✅ API dump saved: ${filePath}`);
+      } else {
+        addLog('warn', '⚠️ Save cancelled');
+      }
+    } catch (error) {
+      addLog('error', `❌ API dump failed: ${error}`);
+    }
   };
 
   useEffect(() => {
@@ -132,6 +162,13 @@ export function DebugConsole() {
           <span className="log-count">({logs.length})</span>
         </div>
         <div className="debug-actions">
+          <button 
+            className="btn-icon" 
+            onClick={(e) => { e.stopPropagation(); dumpWtApi(); }}
+            title="Dump War Thunder API"
+          >
+            <Database size={16} />
+          </button>
           <button className="btn-icon" onClick={(e) => { e.stopPropagation(); exportLogs(); }}>
             <Download size={16} />
           </button>

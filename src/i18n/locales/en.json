@@ -202,5 +202,26 @@
     "language_en": "English",
     "intiface_auto": "Auto-connect to Intiface",
     "save_config": "Auto-save configuration"
+  },
+  "validation": {
+    "no_nodes": "Pattern has no nodes",
+    "no_input_nodes": "No input nodes found",
+    "no_vibration_nodes": "No vibration nodes found",
+    "not_connected": "Nodes are not connected",
+    "disconnected_nodes": "Some nodes are disconnected"
+  },
+  "vehicle_mode": {
+    "disconnected": "Not Connected",
+    "waiting": "Waiting for War Thunder connection...",
+    "type_ship": "Ship",
+    "type_aircraft": "Aircraft",
+    "type_tank": "Tank",
+    "type_helicopter": "Helicopter",
+    "type_unknown": "Unknown Vehicle",
+    "hud_only": "HUD-Only Mode",
+    "full_telemetry": "Full Telemetry",
+    "hud_only_warning": "Ships use HUD events only (no speed/RPM data from API)",
+    "full_telemetry_desc": "All telemetry data available from game API",
+    "available": "Available data"
   }
 }

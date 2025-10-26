@@ -52,6 +52,7 @@ interface PatternEditorModalProps {
 export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: PatternEditorModalProps) {
   const { t } = useTranslation();
   const [patternName, setPatternName] = useState(initialData?.name || '');
+  const [nameError, setNameError] = useState(false);
   const [cooldownMs, setCooldownMs] = useState(initialData?.cooldownMs || 1000);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
@@ -127,9 +128,10 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
 
   const handleSave = () => {
     if (!patternName.trim()) {
-      alert(t('pattern_editor.name_required'));
+      setNameError(true);
       return;
     }
+    setNameError(false);
     onSave(patternName, nodes, edges, cooldownMs);
     onClose();
   };
@@ -200,10 +202,10 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
       console.error('[Pattern Editor] ❌ Import error:', error);
       
       if ((window as any).debugLog) {
-        (window as any).debugLog('error', `❌ Import failed: ${error}`);
+        (window as any).debugLog('error', `Import failed: ${error}`);
       }
       
-      alert(t('pattern_editor.import_error') || 'Failed to import pattern');
+      console.error('[Pattern Editor] Import failed:', error);
     }
   };
 
@@ -219,10 +221,17 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
               <input
                 type="text"
                 value={patternName}
-                onChange={(e) => setPatternName(e.target.value)}
+                onChange={(e) => {
+                  setPatternName(e.target.value);
+                  setNameError(false);
+                }}
                 placeholder={t('pattern_editor.name_placeholder')}
                 className="pattern-name-input"
-                style={{ flex: 1 }}
+                style={{ 
+                  flex: 1,
+                  borderColor: nameError ? '#ef4444' : undefined,
+                  outline: nameError ? '2px solid rgba(239, 68, 68, 0.3)' : undefined
+                }}
               />
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
                 <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>

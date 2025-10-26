@@ -202,5 +202,26 @@
     "language_en": "English",
     "intiface_auto": "Автоподключение к Intiface",
     "save_config": "Автосохранение конфигурации"
+  },
+  "validation": {
+    "no_nodes": "Паттерн не содержит нод",
+    "no_input_nodes": "Нет входных нод",
+    "no_vibration_nodes": "Нет нод вибрации",
+    "not_connected": "Ноды не соединены",
+    "disconnected_nodes": "Есть несоединённые ноды"
+  },
+  "vehicle_mode": {
+    "disconnected": "Не подключено",
+    "waiting": "Ожидание подключения к War Thunder...",
+    "type_ship": "Корабль",
+    "type_aircraft": "Самолёт",
+    "type_tank": "Танк",
+    "type_helicopter": "Вертолёт",
+    "type_unknown": "Неизвестная техника",
+    "hud_only": "Режим HUD",
+    "full_telemetry": "Полная телеметрия",
+    "hud_only_warning": "Корабли используют только HUD-события (нет данных скорости/RPM из API)",
+    "full_telemetry_desc": "Все данные телеметрии доступны из игрового API",
+    "available": "Доступные данные"
   }
 }

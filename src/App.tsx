@@ -14,6 +14,8 @@ import { GameStatus } from "./components/GameStatus";
 import { EventConfiguration } from "./components/EventConfiguration";
 import { VehicleInfoCard } from "./components/VehicleInfoCard";
 import { PlayerIdentityModal } from "./components/PlayerIdentityModal";
+import { MiniMap } from "./components/MiniMap";
+import { VehicleModeCard } from "./components/VehicleModeCard";
 import { User, Coffee } from "lucide-react";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
@@ -139,6 +141,7 @@ function App() {
             <Dashboard />
             <DeviceList />
             <GameStatus />
+            <VehicleModeCard />
             <VehicleInfoCard />
           </aside>
 
@@ -146,6 +149,7 @@ function App() {
               <section className="main-area">
                 <PatternManager onEditPattern={handleEditPattern} />
                 <EventConfiguration />
+                <MiniMap />
               </section>
             </div>
           </main>
