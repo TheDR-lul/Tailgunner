@@ -70,7 +70,7 @@ impl ProfileManager {
             vehicle_type: VehicleType::Tank,
             game_mode: GameMode::Any,
             event_mappings: tank_mappings,
-            enabled: true,
+            enabled: false,  // Disabled by default - user must enable explicitly
         });
 
         // Aircraft Profile (Universal)
@@ -107,7 +107,7 @@ impl ProfileManager {
             vehicle_type: VehicleType::Aircraft,
             game_mode: GameMode::Any,
             event_mappings: aircraft_mappings,
-            enabled: true,
+            enabled: false,  // Disabled by default - user must enable explicitly
         });
 
         // Light Background Profile (Minimal, all vehicles)

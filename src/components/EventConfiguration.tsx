@@ -152,15 +152,24 @@ export function EventConfiguration() {
       </div>
 
       <div className="card-content">
-        {/* All Triggers Section */}
+        {/* All Triggers Section - ONLY Built-in + Vehicle-specific Dynamic (NO user patterns!) */}
         <div style={{ marginBottom: '32px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            <Zap size={16} style={{ display: 'inline', marginRight: '6px' }} />
-            All Triggers ({triggers.length})
-          </h3>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' }}>
-            {triggers.map((trigger) => {
+          {(() => {
+            // Filter: show ONLY built-in and vehicle-specific dynamic triggers
+            // User-created patterns (from Pattern Manager) should NOT appear here
+            const systemTriggers = triggers.filter(t => 
+              t.is_builtin || t.id.startsWith('dynamic_')
+            );
+            
+            return (
+              <>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <Zap size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                  All Triggers ({systemTriggers.length})
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' }}>
+                  {systemTriggers.map((trigger) => {
               const isExpanded = expandedTrigger === trigger.id;
               return (
                 <div
@@ -177,15 +186,10 @@ export function EventConfiguration() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {trigger.is_builtin ? (
-                          <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(99, 102, 241, 0.2)', borderRadius: '4px', color: 'var(--primary)' }}>
-                            Built-in
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(16, 185, 129, 0.2)', borderRadius: '4px', color: '#10b981' }}>
-                            Dynamic
-                          </span>
-                        )}
+                        {/* All system triggers (built-in + dynamic) shown as "Built-in" */}
+                        <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(99, 102, 241, 0.2)', borderRadius: '4px', color: 'var(--primary)' }}>
+                          Built-in
+                        </span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {trigger.name}
                         </span>
@@ -302,8 +306,11 @@ export function EventConfiguration() {
                   )}
                 </div>
               );
-            })}
-          </div>
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
         
         {/* Profiles Section */}

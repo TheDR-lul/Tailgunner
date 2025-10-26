@@ -10,6 +10,8 @@ mod ui_patterns;
 mod vehicle_limits;
 mod state_history;
 mod datamine;
+mod player_identity_db;
+mod device_history_db;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -64,6 +66,12 @@ async fn get_player_names(state: tauri::State<'_, AppState>) -> Result<Vec<Strin
 async fn set_player_names(state: tauri::State<'_, AppState>, names: Vec<String>) -> Result<String, String> {
     let engine = state.engine.lock().await;
     engine.set_player_names(names.clone()).await;
+    
+    // Save to database
+    if let Err(e) = save_player_identity_to_db(&engine).await {
+        log::warn!("[Player Identity] Failed to save to DB: {}", e);
+    }
+    
     Ok(format!("Player names set: {:?}", names))
 }
 
@@ -77,13 +85,103 @@ async fn get_clan_tags(state: tauri::State<'_, AppState>) -> Result<Vec<String>,
 async fn set_clan_tags(state: tauri::State<'_, AppState>, tags: Vec<String>) -> Result<String, String> {
     let engine = state.engine.lock().await;
     engine.set_clan_tags(tags.clone()).await;
+    
+    // Save to database
+    if let Err(e) = save_player_identity_to_db(&engine).await {
+        log::warn!("[Player Identity] Failed to save to DB: {}", e);
+    }
+    
     Ok(format!("Clan tags set: {:?}", tags))
+}
+
+#[tauri::command]
+async fn get_enemy_names(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let engine = state.engine.lock().await;
+    Ok(engine.get_enemy_names().await)
+}
+
+#[tauri::command]
+async fn set_enemy_names(state: tauri::State<'_, AppState>, names: Vec<String>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.set_enemy_names(names.clone()).await;
+    
+    // Save to database
+    if let Err(e) = save_player_identity_to_db(&engine).await {
+        log::warn!("[Player Identity] Failed to save to DB: {}", e);
+    }
+    
+    Ok(format!("Enemy names set: {:?}", names))
+}
+
+#[tauri::command]
+async fn get_enemy_clans(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let engine = state.engine.lock().await;
+    Ok(engine.get_enemy_clans().await)
+}
+
+#[tauri::command]
+async fn set_enemy_clans(state: tauri::State<'_, AppState>, clans: Vec<String>) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.set_enemy_clans(clans.clone()).await;
+    
+    // Save to database
+    if let Err(e) = save_player_identity_to_db(&engine).await {
+        log::warn!("[Player Identity] Failed to save to DB: {}", e);
+    }
+    
+    Ok(format!("Enemy clans set: {:?}", clans))
+}
+
+/// Helper: Save player identity to database
+async fn save_player_identity_to_db(engine: &HapticEngine) -> anyhow::Result<()> {
+    let player_names = engine.get_player_names().await;
+    let clan_tags = engine.get_clan_tags().await;
+    let enemy_names = engine.get_enemy_names().await;
+    let enemy_clans = engine.get_enemy_clans().await;
+    
+    let mut db = player_identity_db::PlayerIdentityDB::new()?;
+    db.save(&player_names, &clan_tags, &enemy_names, &enemy_clans)?;
+    
+    Ok(())
 }
 
 #[tauri::command]
 async fn get_devices(state: tauri::State<'_, AppState>) -> Result<Vec<DeviceInfo>, String> {
     let engine = state.engine.lock().await;
     Ok(engine.get_device_manager().get_devices().await)
+}
+
+#[tauri::command]
+async fn get_device_history() -> Result<Vec<device_history_db::DeviceRecord>, String> {
+    match device_history_db::DeviceHistoryDB::new() {
+        Ok(db) => {
+            match db.get_all_devices() {
+                Ok(devices) => Ok(devices),
+                Err(e) => Err(format!("Failed to get device history: {}", e))
+            }
+        }
+        Err(e) => Err(format!("Failed to open device history DB: {}", e))
+    }
+}
+
+/// DEBUG: Опрос HUD API напрямую
+#[tauri::command]
+async fn debug_hud_raw() -> Result<String, String> {
+    log::error!("[DEBUG] 🔍 Fetching HUD API directly...");
+    
+    let client = reqwest::Client::new();
+    let response = client
+        .get("http://127.0.0.1:8111/hudmsg?lastEvt=0&lastDmg=0")
+        .timeout(std::time::Duration::from_secs(2))
+        .send()
+        .await
+        .map_err(|e| format!("❌ HUD API request failed: {}", e))?;
+    
+    let text = response.text().await.map_err(|e| format!("❌ Failed to read response: {}", e))?;
+    
+    log::error!("[DEBUG] 📥 HUD API RAW RESPONSE:\n{}", text);
+    
+    Ok(text)
 }
 
 #[tauri::command]
@@ -466,7 +564,20 @@ async fn get_vehicle_info(state: tauri::State<'_, AppState>) -> Result<Option<da
                         
                         if updated {
                             aircraft.data_source = "datamine+wiki".to_string();
-                            // TODO: Save to database (need to add update_aircraft_wiki_data function)
+                            
+                            // Save updated data to database
+                            match datamine::database::VehicleDatabase::new() {
+                                Ok(mut db) => {
+                                    if let Err(e) = db.update_aircraft_wiki_data(&aircraft) {
+                                        log::warn!("[Vehicle Info] ⚠️ Failed to save Wiki data: {}", e);
+                                    } else {
+                                        log::info!("[Vehicle Info] ✅ Saved Wiki data to database");
+                                    }
+                                },
+                                Err(e) => {
+                                    log::warn!("[Vehicle Info] ⚠️ Failed to open database: {}", e);
+                                }
+                            }
                         }
                     }
                     Err(e) => {
@@ -651,7 +762,31 @@ pub fn run() {
     }
     env_logger::init();
 
-    let engine = Arc::new(Mutex::new(HapticEngine::new()));
+    let mut engine = HapticEngine::new();
+    
+    // Load player identity from database
+    match player_identity_db::PlayerIdentityDB::new() {
+        Ok(db) => {
+            match db.load() {
+                Ok((player_names, clan_tags, enemy_names, enemy_clans)) => {
+                    log::info!("[Startup] 💾 Loaded player identity from database");
+                    // Set data in engine (need to do this synchronously before Arc)
+                    let telemetry = engine.get_telemetry();
+                    tokio::runtime::Runtime::new().unwrap().block_on(async {
+                        let mut telem = telemetry.write().await;
+                        telem.set_player_names(player_names);
+                        telem.set_clan_tags(clan_tags);
+                        telem.set_enemy_names(enemy_names);
+                        telem.set_enemy_clans(enemy_clans);
+                    });
+                }
+                Err(e) => log::warn!("[Startup] ⚠️ Failed to load player identity: {}", e),
+            }
+        }
+        Err(e) => log::warn!("[Startup] ⚠️ Failed to open player identity DB: {}", e),
+    }
+    
+    let engine = Arc::new(Mutex::new(engine));
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -667,7 +802,12 @@ pub fn run() {
             set_player_names,
             get_clan_tags,
             set_clan_tags,
+            get_enemy_names,
+            set_enemy_names,
+            get_enemy_clans,
+            set_enemy_clans,
             get_devices,
+            get_device_history,
             scan_devices,
             get_profiles,
             test_vibration,
@@ -687,6 +827,7 @@ pub fn run() {
             export_pattern,
             export_all_patterns,
             import_pattern,
+            debug_hud_raw,
             datamine_find_game,
             datamine_parse,
             datamine_get_limits,

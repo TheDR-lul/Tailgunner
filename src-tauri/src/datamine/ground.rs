@@ -125,6 +125,7 @@ async fn parse_ground_file(path: &PathBuf) -> Result<GroundLimits> {
 }
 
 /// Extract gear counts from VehiclePhys.mechanics.gearRatios
+#[allow(dead_code)]
 fn extract_gears(json: &serde_json::Value) -> (Option<u8>, Option<u8>) {
     let ratios = match json.get("VehiclePhys")
         .and_then(|v| v.get("mechanics"))

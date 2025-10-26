@@ -156,6 +156,54 @@ body {
   gap: 1rem;
 }
 
+/* Support Button */
+.support-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(251, 146, 60, 0.1);
+  border: 1px solid rgba(251, 146, 60, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  color: #fb923c;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.support-btn:hover {
+  background: rgba(251, 146, 60, 0.2);
+  border-color: rgba(251, 146, 60, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 0 15px rgba(251, 146, 60, 0.4);
+}
+
+.support-btn.highlight {
+  animation: supportPulse 3s ease-in-out;
+}
+
+@keyframes supportPulse {
+  0%, 100% {
+    background: rgba(251, 146, 60, 0.1);
+    border-color: rgba(251, 146, 60, 0.3);
+    box-shadow: 0 0 0 rgba(251, 146, 60, 0);
+  }
+  10%, 30%, 50% {
+    background: rgba(251, 146, 60, 0.3);
+    border-color: rgba(251, 146, 60, 0.8);
+    box-shadow: 0 0 20px rgba(251, 146, 60, 0.6);
+    transform: scale(1.05);
+  }
+  20%, 40%, 60% {
+    background: rgba(251, 146, 60, 0.15);
+    border-color: rgba(251, 146, 60, 0.4);
+    box-shadow: 0 0 10px rgba(251, 146, 60, 0.3);
+    transform: scale(1);
+  }
+}
+
 /* Player Identity Button */
 .player-identity-btn {
   display: flex;

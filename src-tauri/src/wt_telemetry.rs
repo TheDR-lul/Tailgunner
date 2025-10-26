@@ -133,7 +133,12 @@ pub struct WTTelemetryReader {
     last_hud_dmg_id: u32,
     player_names: Vec<String>,  // Player names for filtering own events
     clan_tags: Vec<String>,      // Player clan tags for filtering
+    enemy_names: Vec<String>,    // Enemy player names to track
+    enemy_clans: Vec<String>,    // Enemy clan tags to track
     hud_initialized: bool,  // Flag to skip old events on first connect
+    last_battle_time: u32,  // Last battle time (seconds) to detect old events
+    processed_messages: std::collections::HashSet<String>, // Cache to prevent duplicates
+    last_message: Option<String>, // Last processed message for immediate duplicate check
 }
 
 impl WTTelemetryReader {
@@ -152,7 +157,12 @@ impl WTTelemetryReader {
             last_hud_dmg_id: 0,
             player_names: Vec::new(),
             clan_tags: Vec::new(),
+            enemy_names: Vec::new(),
+            enemy_clans: Vec::new(),
             hud_initialized: false,
+            last_battle_time: 0,
+            processed_messages: std::collections::HashSet::new(),
+            last_message: None,
         }
     }
     
@@ -184,6 +194,55 @@ impl WTTelemetryReader {
         } else {
             log::info!("[HUD] 🏷️ Clan tags cleared");
         }
+    }
+    
+    /// Get current enemy names
+    pub fn get_enemy_names(&self) -> Vec<String> {
+        self.enemy_names.clone()
+    }
+    
+    /// Set enemy names (for tracking specific enemies)
+    pub fn set_enemy_names(&mut self, names: Vec<String>) {
+        self.enemy_names = names.clone();
+        if !names.is_empty() {
+            log::info!("[HUD] 🎯 Enemy names set: {:?}", names);
+        } else {
+            log::info!("[HUD] 🎯 Enemy names cleared");
+        }
+    }
+    
+    /// Get current enemy clans
+    pub fn get_enemy_clans(&self) -> Vec<String> {
+        self.enemy_clans.clone()
+    }
+    
+    /// Set enemy clans (for tracking specific enemy clans)
+    pub fn set_enemy_clans(&mut self, clans: Vec<String>) {
+        self.enemy_clans = clans.clone();
+        if !clans.is_empty() {
+            log::info!("[HUD] 🎯 Enemy clans set: {:?}", clans);
+        } else {
+            log::info!("[HUD] 🎯 Enemy clans cleared");
+        }
+    }
+    
+    /// Check if message contains enemy identity
+    fn is_enemy_message(&self, msg: &str) -> bool {
+        // Check if any of our enemy names match
+        for name in &self.enemy_names {
+            if msg.contains(name) {
+                return true;
+            }
+        }
+        
+        // Check if any of our enemy clans match
+        for tag in &self.enemy_clans {
+            if msg.contains(tag) {
+                return true;
+            }
+        }
+        
+        false
     }
 
     /// Check War Thunder availability
@@ -308,22 +367,79 @@ impl WTTelemetryReader {
         
         // Parse damage messages (contain kill feed, crashes, overheats)
         if let Some(damage_array) = json.get("damage").and_then(|v| v.as_array()) {
+            log::error!("[HUD DEBUG] 📥 Received {} damage messages", damage_array.len());
+            
             for msg_value in damage_array {
                 let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
+                let time = msg_value.get("time").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 
-                // Update last seen ID
-                if id > self.last_hud_dmg_id {
-                    self.last_hud_dmg_id = id;
-                }
+                log::error!("[HUD DEBUG] 📨 RAW MSG: ID={}, time={}s, msg='{}', baseline={}, initialized={}", 
+                    id, time, msg, self.last_hud_dmg_id, self.hud_initialized);
                 
-                // Skip parsing events on first connect (ignore old events)
+                // INIT PHASE: Just collect baseline IDs, don't process events
                 if !self.hud_initialized {
+                    // Update baseline with max ID seen
+                    if id > self.last_hud_dmg_id {
+                        self.last_hud_dmg_id = id;
+                    }
+                    log::error!("[HUD DEBUG] ⏭️ INIT PHASE: Skipping OLD event ID={}, baseline now={}", id, self.last_hud_dmg_id);
                     continue;
                 }
                 
+                // NORMAL PHASE: Only process NEW events (ID > baseline)
+                if id <= self.last_hud_dmg_id {
+                    log::error!("[HUD DEBUG] ⏭️ BLOCKED OLD ID: {} <= baseline {} (msg: '{}')", id, self.last_hud_dmg_id, msg);
+                    continue;
+                }
+                
+                // Update baseline for next check
+                self.last_hud_dmg_id = id;
+                
+                // Filter by battle time: skip old events from previous battles
+                if time < self.last_battle_time {
+                    log::debug!("[HUD] ⏭️ Skipping old event (time {}s < last {}s)", time, self.last_battle_time);
+                    continue;
+                }
+                
+                // Update last battle time
+                if time > self.last_battle_time {
+                    self.last_battle_time = time;
+                    // Clean old messages from cache (keep only last 10 seconds)
+                    self.processed_messages.retain(|m| {
+                        // Parse time from cached message key (format: "time:msg")
+                        if let Some(cached_time) = m.split(':').next().and_then(|t| t.parse::<u32>().ok()) {
+                            time - cached_time < 10
+                        } else {
+                            false
+                        }
+                    });
+                }
+                
+                // IMMEDIATE duplicate check: same message as last one
+                if let Some(ref last_msg) = self.last_message {
+                    if last_msg == msg {
+                        log::error!("[HUD DEBUG] ⏭️ BLOCKED IMMEDIATE duplicate: '{}'", msg);
+                        continue;
+                    }
+                }
+                
+                // Check for duplicates (same message within 10 seconds)
+                let message_key = format!("{}:{}", time, msg);
+                if self.processed_messages.contains(&message_key) {
+                    log::error!("[HUD DEBUG] ⏭️ BLOCKED CACHED duplicate: '{}' (key: {})", msg, message_key);
+                    continue;
+                }
+                
+                // Mark as processed
+                log::error!("[HUD DEBUG] ✅ PASSED filter, marking as processed: '{}'", msg);
+                self.processed_messages.insert(message_key.clone());
+                self.last_message = Some(msg.to_string());
+                log::error!("[HUD DEBUG] 📝 Cached messages count: {}, cache key: {}", self.processed_messages.len(), message_key);
+                
                 // Try to parse as specific player event
                 if let Some(event) = self.parse_hud_message(msg) {
+                    log::info!("[HUD] ✅ Parsed event at {}s: {:?} from msg '{}'", time, event, msg);
                     events.push(event);
                 } else if !msg.is_empty() {
                     // If not a specific event, treat as generic chat message
@@ -331,7 +447,7 @@ impl WTTelemetryReader {
                     if !msg.contains("has disconnected") && 
                        !msg.contains("NET_PLAYER_") &&
                        !msg.contains("td! kd?") {
-                        log::debug!("[HUD Event] 💬 CHAT: {}", msg);
+                        log::debug!("[HUD Event] 💬 CHAT at {}s: {}", time, msg);
                         events.push(HudEvent::ChatMessage(msg.to_string()));
                     }
                 }
@@ -341,7 +457,8 @@ impl WTTelemetryReader {
         // Mark HUD as initialized after first call
         if !self.hud_initialized {
             self.hud_initialized = true;
-            log::info!("[HUD] ✅ Initialized, old events ignored");
+            log::error!("[HUD DEBUG] ✅ INITIALIZED - baseline IDs set: evt={}, dmg={}", self.last_hud_evt_id, self.last_hud_dmg_id);
+            log::info!("[HUD] ✅ Initialized - will only process NEW events (ID > {})", self.last_hud_dmg_id);
         }
         
         Ok(events)
@@ -463,29 +580,65 @@ impl WTTelemetryReader {
             return None;
         }
         
-        // Destroyed (kill)
-        if msg.contains("destroyed") {
-            // Check if player identity is set
-            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-                // ONLY count kills if our player identity is the attacker
-                if let Some(before_destroyed) = msg.split("destroyed").next() {
-                    if self.is_player_message(before_destroyed) {
-                        // Extract enemy vehicle name
-                        if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
-                            let enemy = destroyed_part.trim().to_string();
-                            log::info!("[HUD Event] 🎯 KILL: {}", enemy);
-                            return Some(HudEvent::Kill(enemy));
+    // Destroyed (kill)
+    if msg.contains("destroyed") {
+        // Check if player identity is set
+        if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
+            // ONLY count kills if our player identity is the attacker
+            if let Some(before_destroyed) = msg.split("destroyed").next() {
+                if self.is_player_message(before_destroyed) {
+                    // Extract victim name (after "destroyed")
+                    if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
+                        let victim = destroyed_part.trim().to_string();
+                        
+                        // Check if victim is in our enemy tracking list
+                        let is_priority = self.is_enemy_message(&victim);
+                        
+                        if is_priority {
+                            log::info!("[HUD Event] 🎯💀 PRIORITY KILL (tracked enemy player): {}", victim);
+                        } else {
+                            log::info!("[HUD Event] 🎯 KILL (bot/random): {}", victim);
                         }
+                        
+                        // Return kill event with victim name
+                        // Frontend can filter by enemy list if needed
+                        return Some(HudEvent::Kill(victim));
                     }
                 }
-                // If player identity doesn't match, this is someone else's kill - ignore
-                return None;
-            } else {
-                // Without player identity, we can't reliably filter
-                // Skip to avoid false positives from other players' kills
-                return None;
             }
+            // If player identity doesn't match, this is someone else's kill - ignore
+            return None;
+        } else {
+            // Without player identity, we can't reliably filter
+            // Skip to avoid false positives from other players' kills
+            return None;
         }
+    }
+    
+    // "has been wrecked" (alternative kill message)
+    if msg.contains("has been wrecked") {
+        if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
+            if let Some(before_wrecked) = msg.split("has been wrecked").next() {
+                if self.is_player_message(before_wrecked) {
+                    if let Some(victim_part) = msg.split("has been wrecked").nth(1) {
+                        let victim = victim_part.trim().to_string();
+                        
+                        let is_priority = self.is_enemy_message(&victim);
+                        if is_priority {
+                            log::info!("[HUD Event] 🎯💀 PRIORITY KILL (wrecked, tracked enemy): {}", victim);
+                        } else {
+                            log::info!("[HUD Event] 🎯 KILL (wrecked): {}", victim);
+                        }
+                        
+                        return Some(HudEvent::Kill(victim));
+                    }
+                }
+            }
+            return None;
+        } else {
+            return None;
+        }
+    }
         
         None
     }

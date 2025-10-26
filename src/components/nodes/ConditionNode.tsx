@@ -4,31 +4,25 @@ import { useTranslation } from 'react-i18next';
 import { Scale } from 'lucide-react';
 
 interface ConditionNodeData {
-  param: 'speed' | 'altitude' | 'g_load' | 'fuel' | 'rpm';
   operator: '>' | '<' | '=' | '>=' | '<=';
   value: number;
-  description?: string;
+  usePercentage?: boolean; // Use % of max value from vehicle limits
+  continuous?: boolean; // Vibrate continuously while condition is true
 }
 
 export function ConditionNode({ data, id, selected }: { data: ConditionNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
-  const [param, setParam] = useState(data.param || 'speed');
   const [operator, setOperator] = useState(data.operator || '>');
   const [value, setValue] = useState(data.value || 100);
+  const [usePercentage, setUsePercentage] = useState(data.usePercentage || false);
+  const [continuous, setContinuous] = useState(data.continuous || false);
   
   useEffect(() => {
-    data.param = param;
     data.operator = operator;
     data.value = value;
-  }, [param, operator, value, data]);
-  
-  const PARAMS = [
-    { value: 'speed', label: 'Speed', unit: 'km/h', color: '#06b6d4' },
-    { value: 'altitude', label: 'Altitude', unit: 'm', color: '#10b981' },
-    { value: 'g_load', label: 'G-Load', unit: 'G', color: '#f59e0b' },
-    { value: 'fuel', label: 'Fuel', unit: '%', color: '#ef4444' },
-    { value: 'rpm', label: 'RPM', unit: '', color: '#a855f7' },
-  ];
+    data.usePercentage = usePercentage;
+    data.continuous = continuous;
+  }, [operator, value, usePercentage, continuous, data]);
   
   const OPERATORS = [
     { value: '>', symbol: '>', label: 'Greater than', color: '#4ade80' },
@@ -38,7 +32,6 @@ export function ConditionNode({ data, id, selected }: { data: ConditionNodeData;
     { value: '=', symbol: '=', label: 'Equal', color: '#a855f7' },
   ];
   
-  const selectedParam = PARAMS.find(p => p.value === param);
   const selectedOp = OPERATORS.find(op => op.value === operator);
   
   return (
@@ -47,116 +40,159 @@ export function ConditionNode({ data, id, selected }: { data: ConditionNodeData;
       onClick={(e) => e.stopPropagation()}
       style={{
         background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
-        border: `2px solid ${selectedParam?.color || 'rgba(93, 138, 168, 0.4)'}`,
-        minWidth: '200px'
+        border: `2px solid ${selectedOp?.color || 'rgba(93, 138, 168, 0.4)'}`,
+        minWidth: '160px'
       }}
     >
       <NodeResizer 
         isVisible={selected} 
-        minWidth={200} 
-        minHeight={160}
-        color={selectedParam?.color || 'rgba(93, 138, 168, 0.8)'}
+        minWidth={160} 
+        minHeight={100}
+        color="rgba(255, 153, 51, 0.8)"
       />
-      
-      {/* Input */}
-      <Handle 
-        type="target" 
-        position={Position.Left} 
-        style={{ 
-          background: '#ff9933', 
-          width: 12, 
-          height: 12, 
-          border: 'none',
-          boxShadow: '0 0 8px rgba(255, 153, 51, 0.6)'
-        }}
-      />
-      
-      <div className="node-header" style={{ background: `${selectedParam?.color}20` }}>
-        <Scale size={16} style={{ color: selectedParam?.color }} />
-        <span style={{ color: selectedParam?.color }}>CONDITION</span>
+      <div className="node-header" style={{ background: `${selectedOp?.color}22` }}>
+        <Scale size={16} color={selectedOp?.color} />
+        <span style={{ color: selectedOp?.color }}>Condition</span>
       </div>
-      
       <div className="node-body">
-        {/* Parameter selector */}
-        <div style={{ marginBottom: '8px' }}>
-          <label style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-            Parameter
-          </label>
-          <select 
-            value={param} 
-            onChange={(e) => setParam(e.target.value as any)}
-            className="node-select"
-            style={{ width: '100%', padding: '4px 8px', fontSize: '12px' }}
-          >
-            {PARAMS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label} {p.unit && `(${p.unit})`}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Handle 
+          type="target" 
+          position={Position.Left} 
+          id="input"
+          style={{ 
+            background: '#3b82f6', 
+            width: 10, 
+            height: 10, 
+            border: '2px solid #3b82f6',
+            boxShadow: '0 0 6px #3b82f688'
+          }}
+        />
         
-        {/* Operator selector */}
-        <div style={{ marginBottom: '8px' }}>
-          <label style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-            Operator
-          </label>
+        <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <select 
-            value={operator} 
+            value={operator}
             onChange={(e) => setOperator(e.target.value as any)}
             className="node-select"
-            style={{ width: '100%', padding: '4px 8px', fontSize: '12px' }}
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              border: `1px solid ${selectedOp?.color}`,
+              color: selectedOp?.color,
+              fontSize: '12px',
+              fontWeight: 'bold'
+            }}
           >
-            {OPERATORS.map((op) => (
+            {OPERATORS.map(op => (
               <option key={op.value} value={op.value}>
                 {op.symbol} {op.label}
               </option>
             ))}
           </select>
-        </div>
-        
-        {/* Value input */}
-        <div>
-          <label style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-            Value
-          </label>
-          <input 
+          
+          <input
             type="number"
             value={value}
             onChange={(e) => setValue(parseFloat(e.target.value) || 0)}
-            className="node-input"
-            style={{ width: '100%', padding: '4px 8px', fontSize: '12px' }}
-            step={param === 'g_load' ? 0.1 : 1}
+            className="node-input-field"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              border: `1px solid ${selectedOp?.color}`,
+              color: '#fff',
+              padding: '6px 10px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
           />
+          
+          <div style={{
+            padding: '5px',
+            background: `${selectedOp?.color}22`,
+            borderRadius: '4px',
+            fontSize: '9px',
+            color: selectedOp?.color,
+            textAlign: 'center',
+            fontWeight: 600
+          }}>
+            Value {selectedOp?.symbol} {value}{usePercentage ? '%' : ''}
+          </div>
+          
+          {/* Percentage mode toggle */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '9px',
+            color: '#94a3b8',
+            marginTop: '6px',
+            cursor: 'pointer',
+            padding: '4px',
+            background: usePercentage ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
+            borderRadius: '4px'
+          }}>
+            <input
+              type="checkbox"
+              checked={usePercentage}
+              onChange={(e) => setUsePercentage(e.target.checked)}
+              style={{ accentColor: '#22c55e' }}
+            />
+            📊 % of max value
+          </label>
+          
+          {/* Continuous mode toggle */}
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '9px',
+            color: '#94a3b8',
+            marginTop: '4px',
+            cursor: 'pointer',
+            padding: '4px',
+            background: continuous ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+            borderRadius: '4px'
+          }}>
+            <input
+              type="checkbox"
+              checked={continuous}
+              onChange={(e) => setContinuous(e.target.checked)}
+              style={{ accentColor: '#8b5cf6' }}
+            />
+            🔄 Continuous
+          </label>
+          
+          {continuous && (
+            <div style={{
+              fontSize: '8px',
+              color: '#8b5cf6',
+              marginTop: '4px',
+              padding: '4px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              borderRadius: '3px',
+              textAlign: 'center',
+              lineHeight: '1.3'
+            }}>
+              ⚡ Vibrates while condition is true
+            </div>
+          )}
         </div>
         
-        {/* Formula preview */}
-        <div style={{ 
-          marginTop: '10px', 
-          padding: '8px', 
-          background: 'rgba(0, 0, 0, 0.3)', 
-          borderRadius: '4px',
-          fontSize: '11px',
-          color: selectedOp?.color,
-          fontFamily: 'monospace',
-          textAlign: 'center'
-        }}>
-          {selectedParam?.label} {selectedOp?.symbol} {value}{selectedParam?.unit}
-        </div>
+        <Handle 
+          type="source" 
+          position={Position.Right} 
+          id="output"
+          style={{ 
+            background: selectedOp?.color, 
+            width: 12, 
+            height: 12, 
+            border: `2px solid ${selectedOp?.color}`,
+            boxShadow: `0 0 8px ${selectedOp?.color}88`
+          }}
+        />
       </div>
-      
-      {/* Output */}
-      <Handle 
-        type="source" 
-        position={Position.Right} 
-        style={{ 
-          background: '#00ff88', 
-          width: 12, 
-          height: 12, 
-          border: 'none',
-          boxShadow: '0 0 8px rgba(0, 255, 136, 0.6)'
-        }}
-      />
     </div>
   );
 }
+

@@ -64,6 +64,40 @@ export const api = {
     }
   },
 
+  async getEnemyNames(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('get_enemy_names');
+    } catch (error) {
+      console.error('Failed to get enemy names:', error);
+      return [];
+    }
+  },
+
+  async setEnemyNames(names: string[]): Promise<void> {
+    try {
+      await invoke('set_enemy_names', { names });
+    } catch (error) {
+      console.error('Failed to set enemy names:', error);
+    }
+  },
+
+  async getEnemyClans(): Promise<string[]> {
+    try {
+      return await invoke<string[]>('get_enemy_clans');
+    } catch (error) {
+      console.error('Failed to get enemy clans:', error);
+      return [];
+    }
+  },
+
+  async setEnemyClans(clans: string[]): Promise<void> {
+    try {
+      await invoke('set_enemy_clans', { clans });
+    } catch (error) {
+      console.error('Failed to set enemy clans:', error);
+    }
+  },
+
   // Get devices
   async getDevices(): Promise<DeviceInfo[]> {
     try {

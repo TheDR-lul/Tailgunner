@@ -227,6 +227,7 @@ fn extract_speed(text: &str) -> Option<f32> {
 
 /// Extract forward and reverse gears from strings like:
 /// "8 / 4", "Forward / Reverse: 8 / 4", "8 forward, 4 reverse"
+#[allow(dead_code)]
 fn extract_gears(text: &str) -> Option<(u8, u8)> {
     // Look for pattern "X / Y" or "X forward Y reverse"
     let text_lower = text.to_lowercase();

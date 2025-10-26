@@ -5,15 +5,21 @@ import { Zap, Target, AlertTriangle, Flame, Droplet, Wind, Skull, TrendingUp, Me
 
 interface EventNodeData {
   event: string;
+  filter_type?: string;  // 'any', 'my_players', 'my_clans', 'text_contains'
+  filter_text?: string;  // For ChatMessage text filtering
 }
 
 export function EventNode({ data, id, selected }: { data: EventNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [event, setEvent] = useState(data.event || 'Hit');
+  const [filterType, setFilterType] = useState(data.filter_type || 'any');
+  const [filterText, setFilterText] = useState(data.filter_text || '');
   
   useEffect(() => {
     data.event = event;
-  }, [event, data]);
+    data.filter_type = filterType;
+    data.filter_text = filterText;
+  }, [event, filterType, filterText, data]);
   
   const EVENTS = [
     // === COMBAT EVENTS ===
@@ -54,6 +60,11 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
   const selectedEvent = EVENTS.find(e => e.id === event) || EVENTS[0];
   const EventIcon = selectedEvent.icon;
   
+  // Determine if this event needs filtering
+  const needsTextFilter = ['ChatMessage'].includes(event);
+  const needsPlayerFilter = ['TargetDestroyed', 'EnemySetAfire', 'TakingDamage', 'SeverelyDamaged', 'ShotDown', 'Achievement'].includes(event);
+  const showFilter = needsTextFilter || needsPlayerFilter;
+  
   return (
     <div 
       className="custom-node event-node" 
@@ -61,13 +72,13 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
       style={{
         background: 'linear-gradient(135deg, #1a1f29 0%, #252b3a 100%)',
         border: '2px solid rgba(255, 153, 51, 0.3)',
-        minWidth: '180px'
+        minWidth: '200px'
       }}
     >
       <NodeResizer 
         isVisible={selected} 
-        minWidth={180} 
-        minHeight={100}
+        minWidth={200} 
+        minHeight={showFilter ? 180 : 100}
         color="rgba(255, 153, 51, 0.8)"
       />
       <div className="node-header" style={{ background: 'rgba(255, 153, 51, 0.15)' }}>
@@ -106,6 +117,89 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
             ))}
           </select>
           
+          {/* Filter Section */}
+          {showFilter && (
+            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '4px' }}>
+                🎯 Filter:
+              </div>
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="node-select"
+          style={{
+            width: '100%',
+            background: 'rgba(0, 0, 0, 0.3)',
+            border: '1px solid #6366f1',
+            color: '#6366f1',
+            fontSize: '10px'
+          }}
+        >
+          <option value="any">🌍 Any {needsTextFilter ? 'message' : 'victim'}</option>
+          {needsTextFilter && (
+            <option value="text_contains">💬 Contains text</option>
+          )}
+          {needsPlayerFilter && (
+            <>
+              <option value="my_players">👤 My players (attacker)</option>
+              <option value="my_clans">🏷️ My clans (attacker)</option>
+              <option value="enemy_players">🎯 Enemy players (victim)</option>
+              <option value="enemy_clans">☠️ Enemy clans (victim)</option>
+            </>
+          )}
+        </select>
+              
+              {/* Text input for ChatMessage */}
+              {needsTextFilter && filterType === 'text_contains' && (
+                <input
+                  type="text"
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  placeholder="e.g. gg wp"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{
+                    width: '100%',
+                    marginTop: '6px',
+                    padding: '5px 8px',
+                    background: 'rgba(0, 0, 0, 0.4)',
+                    border: '1px solid #6366f1',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    fontSize: '11px',
+                    outline: 'none'
+                  }}
+                />
+              )}
+              
+        {(filterType === 'my_players' || filterType === 'my_clans') && (
+          <div style={{ 
+            fontSize: '8px', 
+            color: '#64748b', 
+            marginTop: '4px',
+            padding: '4px',
+            background: 'rgba(99, 102, 241, 0.1)',
+            borderRadius: '3px'
+          }}>
+            💡 Uses names from Player Identity
+          </div>
+        )}
+        
+        {(filterType === 'enemy_players' || filterType === 'enemy_clans') && (
+          <div style={{ 
+            fontSize: '8px', 
+            color: '#ef4444', 
+            marginTop: '4px',
+            padding: '4px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            borderRadius: '3px'
+          }}>
+            🎯 Uses names from Enemy List
+          </div>
+        )}
+            </div>
+          )}
+          
           <div style={{
             marginTop: '8px',
             padding: '6px',
@@ -116,7 +210,12 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
             textAlign: 'center',
             fontWeight: 600
           }}>
-            Triggers on: {t(`game_events.${event}`, event)}
+            {showFilter && filterType === 'text_contains' && filterText ? 
+              `🎯 "${filterText}"` :
+              showFilter && filterType !== 'any' ? 
+                `🎯 ${filterType === 'my_players' ? 'My players' : 'My clans'}` : 
+                `Triggers on: ${t(`game_events.${event}`, event)}`
+            }
           </div>
         </div>
       </div>

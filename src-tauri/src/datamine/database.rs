@@ -3,7 +3,6 @@
 use anyhow::Result;
 use rusqlite::{Connection, params};
 use std::path::PathBuf;
-use anyhow::anyhow;
 use crate::datamine::types::*;
 
 pub struct VehicleDatabase {
@@ -109,6 +108,38 @@ impl VehicleDatabase {
     }
     
     /// Save aircraft to database
+    /// Update aircraft Wiki data (G-load, flaps, gear speeds)
+    pub fn update_aircraft_wiki_data(&mut self, aircraft: &AircraftLimits) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        
+        let flaps_json = serde_json::to_string(&aircraft.flaps_speeds_kmh)
+            .unwrap_or_else(|_| "[]".to_string());
+        
+        tx.execute(
+            "UPDATE aircraft SET 
+                flaps_speeds_kmh = ?1,
+                gear_max_speed_kmh = ?2,
+                max_positive_g = ?3,
+                max_negative_g = ?4,
+                data_source = ?5,
+                last_updated = ?6
+            WHERE identifier = ?7",
+            params![
+                flaps_json,
+                aircraft.gear_max_speed_kmh,
+                aircraft.max_positive_g,
+                aircraft.max_negative_g,
+                aircraft.data_source,
+                aircraft.last_updated,
+                aircraft.identifier,
+            ],
+        )?;
+        
+        tx.commit()?;
+        log::info!("[Database] ✅ Updated Wiki data for aircraft: {}", aircraft.identifier);
+        Ok(())
+    }
+    
     pub fn save_aircraft(&mut self, aircraft: &[AircraftLimits]) -> Result<()> {
         let tx = self.conn.transaction()?;
         

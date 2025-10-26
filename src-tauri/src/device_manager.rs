@@ -143,6 +143,15 @@ impl DeviceManager {
             let client_devices = client.devices();
             log::info!("📱 Devices found: {}", client_devices.len());
             
+            // Try to open Device History DB for saving
+            let mut db_opt = match crate::device_history_db::DeviceHistoryDB::new() {
+                Ok(db) => Some(db),
+                Err(e) => {
+                    log::warn!("[Device Manager] Failed to open Device History DB: {}", e);
+                    None
+                }
+            };
+            
             for device in client_devices {
                 log::info!("  → {} (index: {}, type: {})", 
                     device.name(), 
@@ -150,12 +159,22 @@ impl DeviceManager {
                     if device.vibrate_attributes().is_empty() { "no vibrate" } else { "vibrate OK" }
                 );
                 
+                let device_id = device.index().to_string();
+                let device_name = device.name().to_string();
+                
                 devices.push(DeviceInfo {
                     id: device.index(),
-                    name: device.name().to_string(),
+                    name: device_name.clone(),
                     device_type: DeviceType::Buttplug,
                     connected: true,
                 });
+                
+                // Save to Device History
+                if let Some(ref mut db) = db_opt {
+                    if let Err(e) = db.upsert_device(&device_id, &device_name, "Buttplug") {
+                        log::warn!("[Device Manager] Failed to save device to history: {}", e);
+                    }
+                }
             }
         }
 

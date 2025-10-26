@@ -136,6 +136,8 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             is_builtin: false,
             pattern: None,
             curve_points: None,
+            continuous: false,
+            is_event_based: false,
         });
     }
     
@@ -152,11 +154,13 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
         is_builtin: false,
         pattern: None,
         curve_points: None,
+        continuous: false,
+        is_event_based: false,
     });
     
-    // Max +G Warning (95% of max) - only if data available
+    // Max +G Warning (80% of max) - only if data available
     if let Some(max_g) = aircraft.max_positive_g {
-        let warning_g = max_g * 0.95;
+        let warning_g = max_g * 0.8;
         triggers.push(EventTrigger {
             id: "dynamic_high_g".to_string(),
             name: format!("High G Warning ({:.1}+ G)", warning_g),
@@ -168,12 +172,14 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             is_builtin: false,
             pattern: None,
             curve_points: None,
+            continuous: false,
+            is_event_based: false,
         });
     }
     
-    // Max -G Warning (95% of max) - only if data available
+    // Max -G Warning (80% of max) - only if data available
     if let Some(max_g_neg) = aircraft.max_negative_g {
-        let warning_g_neg = max_g_neg * 0.95;
+        let warning_g_neg = max_g_neg * 0.8;
         triggers.push(EventTrigger {
             id: "dynamic_negative_g".to_string(),
             name: format!("Negative G Warning ({:.1} G)", warning_g_neg),
@@ -185,6 +191,8 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             is_builtin: false,
             pattern: None,
             curve_points: None,
+            continuous: false,
+            is_event_based: false,
         });
     }
     
@@ -209,6 +217,8 @@ fn generate_ground_triggers(ground: &crate::datamine::types::GroundLimits) -> Ve
             is_builtin: false,
             pattern: None,
             curve_points: None,
+            continuous: false,
+            is_event_based: false,
         });
     }
     

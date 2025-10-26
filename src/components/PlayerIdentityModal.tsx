@@ -10,8 +10,12 @@ interface PlayerIdentityModalProps {
 export function PlayerIdentityModal({ isOpen, onClose }: PlayerIdentityModalProps) {
   const [playerNames, setPlayerNames] = useState<string[]>([]);
   const [clanTags, setClanTags] = useState<string[]>([]);
+  const [enemyNames, setEnemyNames] = useState<string[]>([]);
+  const [enemyClans, setEnemyClans] = useState<string[]>([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newClanTag, setNewClanTag] = useState('');
+  const [newEnemyName, setNewEnemyName] = useState('');
+  const [newEnemyClan, setNewEnemyClan] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -22,12 +26,16 @@ export function PlayerIdentityModal({ isOpen, onClose }: PlayerIdentityModalProp
 
   const loadData = async () => {
     try {
-      const [names, tags] = await Promise.all([
+      const [names, tags, enemyNamesList, enemyClansList] = await Promise.all([
         api.getPlayerNames(),
-        api.getClanTags()
+        api.getClanTags(),
+        api.getEnemyNames(),
+        api.getEnemyClans()
       ]);
       setPlayerNames(names);
       setClanTags(tags);
+      setEnemyNames(enemyNamesList);
+      setEnemyClans(enemyClansList);
     } catch (error) {
       console.error('Failed to load player identity:', error);
     }
@@ -57,15 +65,41 @@ export function PlayerIdentityModal({ isOpen, onClose }: PlayerIdentityModalProp
     setClanTags(clanTags.filter((_, i) => i !== index));
   };
 
+  const handleAddEnemyName = () => {
+    const trimmed = newEnemyName.trim();
+    if (trimmed && !enemyNames.includes(trimmed)) {
+      setEnemyNames([...enemyNames, trimmed]);
+      setNewEnemyName('');
+    }
+  };
+
+  const handleRemoveEnemyName = (index: number) => {
+    setEnemyNames(enemyNames.filter((_, i) => i !== index));
+  };
+
+  const handleAddEnemyClan = () => {
+    const trimmed = newEnemyClan.trim();
+    if (trimmed && !enemyClans.includes(trimmed)) {
+      setEnemyClans([...enemyClans, trimmed]);
+      setNewEnemyClan('');
+    }
+  };
+
+  const handleRemoveEnemyClan = (index: number) => {
+    setEnemyClans(enemyClans.filter((_, i) => i !== index));
+  };
+
   const handleSave = async () => {
     try {
       setLoading(true);
       await Promise.all([
         api.setPlayerNames(playerNames),
-        api.setClanTags(clanTags)
+        api.setClanTags(clanTags),
+        api.setEnemyNames(enemyNames),
+        api.setEnemyClans(enemyClans)
       ]);
       if ((window as any).debugLog) {
-        (window as any).debugLog('success', `🎮 Player identity saved: ${playerNames.length} names, ${clanTags.length} clans`);
+        (window as any).debugLog('success', `🎮 Player identity saved: ${playerNames.length} names, ${clanTags.length} clans | 🎯 Enemies: ${enemyNames.length} names, ${enemyClans.length} clans`);
       }
       onClose();
     } catch (error: any) {
@@ -332,6 +366,214 @@ export function PlayerIdentityModal({ isOpen, onClose }: PlayerIdentityModalProp
             </div>
           </div>
 
+          {/* Enemy Nicknames Section */}
+          <div style={{ marginTop: '24px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px'
+            }}>
+              <User size={18} color="#ef4444" />
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#ef4444' }}>
+                🎯 Enemy Nicknames
+              </h3>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '12px'
+            }}>
+              <input
+                type="text"
+                value={newEnemyName}
+                onChange={(e) => setNewEnemyName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddEnemyName()}
+                placeholder="e.g. EnemyPlayer123"
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  color: 'var(--text)',
+                  fontSize: '13px'
+                }}
+              />
+              <button
+                onClick={handleAddEnemyName}
+                style={{
+                  padding: '10px 16px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '6px',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  fontWeight: 500
+                }}
+              >
+                <Plus size={16} /> Add
+              </button>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {enemyNames.length === 0 ? (
+                <div style={{
+                  padding: '20px',
+                  color: 'var(--text-muted)',
+                  fontSize: '12px',
+                  textAlign: 'center'
+                }}>
+                  No enemy names added yet
+                </div>
+              ) : (
+                enemyNames.map((name, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      borderRadius: '6px'
+                    }}
+                  >
+                    <span style={{ fontSize: '13px', fontWeight: 500 }}>{name}</span>
+                    <button
+                      onClick={() => handleRemoveEnemyName(index)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Enemy Clans Section */}
+          <div style={{ marginTop: '24px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px'
+            }}>
+              <Users size={18} color="#ef4444" />
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#ef4444' }}>
+                ☠️ Enemy Clans
+              </h3>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '12px'
+            }}>
+              <input
+                type="text"
+                value={newEnemyClan}
+                onChange={(e) => setNewEnemyClan(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddEnemyClan()}
+                placeholder="e.g. [ENEMY]"
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  color: 'var(--text)',
+                  fontSize: '13px'
+                }}
+              />
+              <button
+                onClick={handleAddEnemyClan}
+                style={{
+                  padding: '10px 16px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '6px',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  fontWeight: 500
+                }}
+              >
+                <Plus size={16} /> Add
+              </button>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {enemyClans.length === 0 ? (
+                <div style={{
+                  padding: '20px',
+                  color: 'var(--text-muted)',
+                  fontSize: '12px',
+                  textAlign: 'center'
+                }}>
+                  No enemy clans added yet
+                </div>
+              ) : (
+                enemyClans.map((clan, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      borderRadius: '6px'
+                    }}
+                  >
+                    <span style={{ fontSize: '13px', fontWeight: 500 }}>{clan}</span>
+                    <button
+                      onClick={() => handleRemoveEnemyClan(index)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           {/* Info */}
           <div style={{
             marginTop: '20px',
@@ -343,9 +585,8 @@ export function PlayerIdentityModal({ isOpen, onClose }: PlayerIdentityModalProp
             color: 'var(--text-muted)',
             lineHeight: '1.5'
           }}>
-            💡 <strong>Used to filter HUD events:</strong> kills, achievements, damage, etc.
-            <br/>
-            Add multiple nicknames if you play on different accounts or with squadmates.
+            💡 <strong>Player identity:</strong> filters your own events (kills, achievements)<br/>
+            🎯 <strong>Enemy list:</strong> tracks kills of specific enemies for priority triggers
           </div>
         </div>
 
