@@ -3,7 +3,7 @@
 
 use crate::datamine::{self, VehicleLimits, AircraftLimits};
 use crate::event_triggers::{TriggerCondition, EventTrigger};
-use crate::pattern_engine::GameEvent;
+use crate::pattern_engine::{GameEvent, VibrationPattern};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -125,16 +125,19 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
     
     // Flutter Warning (if available)
     if let Some(flutter_speed) = aircraft.flutter_speed {
+        // Create short pattern for continuous vibration (repeats every 200ms)
+        let pattern = Some(VibrationPattern::simple(0.3, 200));
+        
         triggers.push(EventTrigger {
             id: "dynamic_flutter".to_string(),
             name: format!("Flutter Warning ({}+ km/h)", flutter_speed as i32),
             description: format!("Wings starting to flutter! Rip at {} km/h", aircraft.vne_kmh as i32),
             condition: TriggerCondition::SpeedAbove(flutter_speed),
             event: GameEvent::Overspeed,
-            cooldown_ms: 3000,
+            cooldown_ms: 0,  // No cooldown for continuous triggers
             enabled: false,
             is_builtin: false,
-            pattern: None,
+            pattern,
             curve_points: None,
             continuous: true,  // ✅ Вибрация пока скорость выше порога
             is_event_based: false,
@@ -145,16 +148,18 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
     
     // Critical Speed Warning (95% of Vne)
     let critical_speed = aircraft.vne_kmh * 0.95;
+    let pattern = Some(VibrationPattern::simple(0.5, 200)); // Stronger for critical warning
+    
     triggers.push(EventTrigger {
         id: "dynamic_overspeed".to_string(),
         name: format!("CRITICAL SPEED ({}+ km/h)", critical_speed as i32),
         description: format!("DANGER! Wings will rip at {} km/h!", aircraft.vne_kmh as i32),
         condition: TriggerCondition::SpeedAbove(critical_speed),
         event: GameEvent::Overspeed,
-        cooldown_ms: 2000,
+        cooldown_ms: 0,  // No cooldown for continuous triggers
         enabled: false,
         is_builtin: false,
-        pattern: None,
+        pattern,
         curve_points: None,
         continuous: true,  // ✅ Вибрация пока скорость критическая
         is_event_based: false,
@@ -165,16 +170,18 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
     // Max +G Warning (80% of max) - only if data available
     if let Some(max_g) = aircraft.max_positive_g {
         let warning_g = max_g * 0.8;
+        let pattern = Some(VibrationPattern::simple(0.4, 200)); // Medium intensity
+        
         triggers.push(EventTrigger {
             id: "dynamic_high_g".to_string(),
             name: format!("High G Warning ({:.1}+ G)", warning_g),
             description: format!("Approaching max +G of {:.1}G", max_g),
             condition: TriggerCondition::GLoadAbove(warning_g),
             event: GameEvent::OverG,
-            cooldown_ms: 3000,
+            cooldown_ms: 0,  // No cooldown for continuous triggers
             enabled: false,
             is_builtin: false,
-            pattern: None,
+            pattern,
             curve_points: None,
             continuous: true,  // ✅ Вибрация пока G-нагрузка высокая
             is_event_based: false,
@@ -186,16 +193,18 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
     // Max -G Warning (80% of max) - only if data available
     if let Some(max_g_neg) = aircraft.max_negative_g {
         let warning_g_neg = max_g_neg * 0.8;
+        let pattern = Some(VibrationPattern::simple(0.4, 200)); // Medium intensity
+        
         triggers.push(EventTrigger {
             id: "dynamic_negative_g".to_string(),
             name: format!("Negative G Warning ({:.1} G)", warning_g_neg),
             description: format!("Approaching max -G of {:.1}G", max_g_neg),
             condition: TriggerCondition::GLoadBelow(warning_g_neg),
             event: GameEvent::OverG,
-            cooldown_ms: 3000,
+            cooldown_ms: 0,  // No cooldown for continuous triggers
             enabled: false,
             is_builtin: false,
-            pattern: None,
+            pattern,
             curve_points: None,
             continuous: true,  // ✅ Вибрация пока отрицательная G-нагрузка
             is_event_based: false,
