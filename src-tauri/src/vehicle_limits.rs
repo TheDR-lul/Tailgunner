@@ -136,7 +136,7 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             is_builtin: false,
             pattern: None,
             curve_points: None,
-            continuous: false,
+            continuous: true,  // ✅ Вибрация пока скорость выше порога
             is_event_based: false,
             filter_type: None,
             filter_text: None,
@@ -156,7 +156,7 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
         is_builtin: false,
         pattern: None,
         curve_points: None,
-        continuous: false,
+        continuous: true,  // ✅ Вибрация пока скорость критическая
         is_event_based: false,
         filter_type: None,
         filter_text: None,
@@ -176,7 +176,7 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             is_builtin: false,
             pattern: None,
             curve_points: None,
-            continuous: false,
+            continuous: true,  // ✅ Вибрация пока G-нагрузка высокая
             is_event_based: false,
             filter_type: None,
             filter_text: None,
@@ -197,7 +197,7 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             is_builtin: false,
             pattern: None,
             curve_points: None,
-            continuous: false,
+            continuous: true,  // ✅ Вибрация пока отрицательная G-нагрузка
             is_event_based: false,
             filter_type: None,
             filter_text: None,
