@@ -1074,6 +1074,13 @@ async fn emulator_set_vehicle_type(state: tauri::State<'_, AppState>, vehicle_ty
 }
 
 #[tauri::command]
+async fn emulator_set_vehicle_name(state: tauri::State<'_, AppState>, name: String, display_name: String) -> Result<(), String> {
+    log::info!("[Emulator] Vehicle set to: {}", display_name);
+    state.emulator.set_vehicle_name(name, display_name);
+    Ok(())
+}
+
+#[tauri::command]
 async fn emulator_set_speed(state: tauri::State<'_, AppState>, speed: f32) -> Result<(), String> {
     state.emulator.set_speed(speed);
     Ok(())
@@ -1124,21 +1131,23 @@ async fn emulator_trigger_event(state: tauri::State<'_, AppState>, event_type: S
 }
 
 #[tauri::command]
-async fn emulator_send_chat(message: String, mode: String) -> Result<(), String> {
+async fn emulator_send_chat(message: String, mode: String, sender: String, enemy: bool) -> Result<(), String> {
     // Send to emulator API server on port 8112
     let client = reqwest::Client::new();
     let response = client
         .post("http://127.0.0.1:8112/gamechat/send")
         .json(&serde_json::json!({
             "message": message,
-            "mode": mode
+            "mode": mode,
+            "sender": sender,
+            "enemy": enemy
         }))
         .send()
         .await;
     
     match response {
         Ok(_) => {
-            log::info!("[Emulator] Chat sent: {}", message);
+            log::info!("[Emulator] Chat sent from {}: {}", sender, message);
             Ok(())
         }
         Err(e) => {
@@ -1247,6 +1256,7 @@ pub fn run() {
             emulator_get_state,
             emulator_set_enabled,
             emulator_set_vehicle_type,
+            emulator_set_vehicle_name,
             emulator_set_speed,
             emulator_set_altitude,
             emulator_set_heading,

@@ -185,6 +185,8 @@ async fn gamechat_handler(
 struct SendChatRequest {
     message: String,
     mode: Option<String>,
+    sender: Option<String>,
+    enemy: Option<bool>,
 }
 
 async fn gamechat_send_handler(
@@ -195,21 +197,24 @@ async fn gamechat_send_handler(
     let id = *next_id;
     *next_id += 1;
     
+    let sender = payload.sender.clone().unwrap_or_else(|| "TestPlayer".to_string());
+    let enemy = payload.enemy.unwrap_or(false);
+    
     let message = ChatMessage {
         id,
         time: (std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as u32),
-        sender: Some("TestPlayer".to_string()),
+        sender: Some(sender.clone()),
         mode: payload.mode.clone(),
         msg: payload.message.clone(),
-        enemy: false,
+        enemy,
     };
     
     state.chat_messages.write().await.push(message.clone());
     
-    log::info!("[API Server] Chat message sent: {}", payload.message);
+    log::info!("[API Server] Chat from {}: {}", sender, payload.message);
     
     Json(message)
 }

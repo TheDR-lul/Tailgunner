@@ -11,31 +11,105 @@ pub enum VehicleType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmulatorState {
+    // Core state
     pub enabled: bool,
     pub vehicle_type: VehicleType,
-    pub speed: f32,
-    pub altitude: f32,
-    pub heading: f32,
-    pub position: [f32; 2],
-    pub ammo: i32,
-    pub hp: f32,
-    pub engine_running: bool,
+    pub vehicle_name: String,        // Actual vehicle name (e.g. "f_16a")
+    pub vehicle_display_name: String, // Display name (e.g. "F-16A")
     pub in_battle: bool,
+    
+    // Movement
+    pub speed: f32,           // km/h (IAS equivalent)
+    pub altitude: f32,        // meters
+    pub heading: f32,         // degrees 0-360
+    pub position: [f32; 2],   // map coordinates [0..1, 0..1]
+    
+    // Combat
+    pub ammo: i32,            // rounds
+    pub hp: f32,              // % health
+    pub engine_running: bool,
+    
+    // Aircraft specific (for /state)
+    pub tas: f32,             // True Air Speed km/h
+    pub ias: f32,             // Indicated Air Speed km/h
+    pub mach: f32,            // Mach number
+    pub aoa: f32,             // Angle of Attack deg
+    pub aos: f32,             // Angle of Sideslip deg
+    pub g_load: f32,          // Ny (G-load)
+    pub vertical_speed: f32,  // Vy m/s
+    pub roll_rate: f32,       // Wx deg/s
+    
+    // Fuel
+    pub fuel_kg: f32,         // Current fuel kg
+    pub fuel_max_kg: f32,     // Max fuel kg
+    
+    // Engine (for /indicators)
+    pub rpm: f32,             // Engine RPM
+    pub throttle: f32,        // 0-100%
+    pub manifold_pressure: f32, // atm
+    pub oil_temp: f32,        // Celsius
+    pub water_temp: f32,      // Celsius
+    pub thrust: f32,          // kgs
+    
+    // Controls
+    pub stick_elevator: f32,  // -1 to 1
+    pub stick_ailerons: f32,  // -1 to 1
+    pub pedals: f32,          // -1 to 1
+    pub flaps: f32,           // 0-1
+    pub gear: f32,            // 0-1 (0=retracted, 1=extended)
+    
+    // Orientation
+    pub pitch: f32,           // aviahorizon_pitch deg
+    pub roll: f32,            // aviahorizon_roll deg
+    pub compass: f32,         // heading deg
 }
 
 impl Default for EmulatorState {
     fn default() -> Self {
         Self {
             enabled: false,
-            vehicle_type: VehicleType::Tank,
+            vehicle_type: VehicleType::Aircraft,
+            vehicle_name: "f_16a".to_string(),
+            vehicle_display_name: "F-16A".to_string(),
+            in_battle: false,
+            
             speed: 0.0,
-            altitude: 100.0,
+            altitude: 1000.0,
             heading: 0.0,
             position: [0.5, 0.5],
-            ammo: 50,
+            
+            ammo: 300,
             hp: 100.0,
             engine_running: true,
-            in_battle: false,
+            
+            tas: 0.0,
+            ias: 0.0,
+            mach: 0.0,
+            aoa: 0.0,
+            aos: 0.0,
+            g_load: 1.0,
+            vertical_speed: 0.0,
+            roll_rate: 0.0,
+            
+            fuel_kg: 3000.0,
+            fuel_max_kg: 5000.0,
+            
+            rpm: 0.0,
+            throttle: 0.0,
+            manifold_pressure: 1.0,
+            oil_temp: 15.0,
+            water_temp: 15.0,
+            thrust: 0.0,
+            
+            stick_elevator: 0.0,
+            stick_ailerons: 0.0,
+            pedals: 0.0,
+            flaps: 0.0,
+            gear: 1.0, // Down by default
+            
+            pitch: 0.0,
+            roll: 0.0,
+            compass: 0.0,
         }
     }
 }
@@ -71,17 +145,66 @@ impl APIEmulator {
     pub fn set_vehicle_type(&self, vehicle_type: VehicleType) {
         self.state.lock().unwrap().vehicle_type = vehicle_type;
     }
+    
+    pub fn set_vehicle_name(&self, name: String, display_name: String) {
+        let mut state = self.state.lock().unwrap();
+        state.vehicle_name = name;
+        state.vehicle_display_name = display_name;
+    }
 
     pub fn set_speed(&self, speed: f32) {
-        self.state.lock().unwrap().speed = speed;
+        let mut state = self.state.lock().unwrap();
+        state.speed = speed;
+        state.ias = speed;
+        
+        // Calculate TAS based on altitude (TAS increases with altitude)
+        let altitude_factor = 1.0 + (state.altitude / 10000.0) * 0.15;
+        state.tas = speed * altitude_factor;
+        
+        // Calculate Mach number (speed of sound ~1225 km/h at sea level)
+        state.mach = state.tas / 1225.0;
+        
+        // Calculate RPM based on speed (realistic for jet engines)
+        state.rpm = if state.engine_running && speed > 0.0 {
+            (speed * 8.0).max(1000.0).min(10000.0)
+        } else {
+            0.0
+        };
+        
+        // Calculate throttle % from speed
+        state.throttle = (speed / 1000.0 * 100.0).min(100.0).max(0.0);
+        
+        // Calculate thrust (realistic for jets)
+        state.thrust = if state.engine_running {
+            state.throttle * 100.0 // ~10,000 kgs max thrust
+        } else {
+            0.0
+        };
+        
+        // Update temperatures based on throttle
+        if state.engine_running {
+            state.oil_temp = 50.0 + state.throttle * 0.5;
+            state.water_temp = 50.0 + state.throttle * 0.7;
+        }
+        
+        // Calculate manifold pressure
+        state.manifold_pressure = 1.0 + (state.throttle / 100.0) * 0.5;
     }
 
     pub fn set_altitude(&self, altitude: f32) {
-        self.state.lock().unwrap().altitude = altitude;
+        let mut state = self.state.lock().unwrap();
+        state.altitude = altitude;
+        
+        // Recalculate TAS when altitude changes
+        let altitude_factor = 1.0 + (altitude / 10000.0) * 0.15;
+        state.tas = state.ias * altitude_factor;
+        state.mach = state.tas / 1225.0;
     }
 
     pub fn set_heading(&self, heading: f32) {
-        self.state.lock().unwrap().heading = heading;
+        let mut state = self.state.lock().unwrap();
+        state.heading = heading;
+        state.compass = heading; // Sync compass with heading
     }
 
     pub fn set_position(&self, x: f32, y: f32) {
@@ -140,25 +263,65 @@ impl APIEmulator {
         match state.vehicle_type {
             VehicleType::Tank => serde_json::json!({
                 "valid": true,
+                "army": "ground",
                 "type": "tank",
                 "speed": state.speed,
-                "rpm": (state.speed * 20.0).round(),
-                "gear": if state.speed > 0.0 { 3 } else { 1 },
+                "rpm": state.rpm,
+                "gear": if state.gear > 0.5 { 1 } else { 0 },
+                "throttle": state.throttle,
+                "oil_temperature": state.oil_temp,
+                "water_temperature": state.water_temp,
                 "ammo_count": state.ammo,
-                "throttle": (state.speed / 60.0 * 100.0).min(100.0),
             }),
-            VehicleType::Aircraft => serde_json::json!({
-                "valid": true,
-                "type": "aircraft",
-                "speed": state.speed,
-                "altitude_hour": (state.altitude / 1000.0).floor(),
-                "altitude_min": ((state.altitude % 1000.0) / 100.0).floor(),
-                "rpm": (state.speed * 10.0).round(),
-                "throttle": (state.speed / 500.0 * 100.0).min(100.0),
-                "ammo_counter": state.ammo,
-            }),
+            VehicleType::Aircraft => {
+                // Calculate realistic altimeter digits
+                let alt_m = state.altitude;
+                let alt_hour = (alt_m / 1000.0).floor();
+                let alt_min = ((alt_m % 1000.0) / 100.0).floor();
+                
+                serde_json::json!({
+                    "valid": true,
+                    "army": "air",
+                    "type": &state.vehicle_name,
+                    "speed": state.ias,
+                    "pedals": state.pedals,
+                    "pedals1": state.pedals,
+                    "pedals2": state.pedals,
+                    "stick_elevator": state.stick_elevator,
+                    "stick_ailerons": state.stick_ailerons,
+                    "altitude_hour": alt_hour,
+                    "altitude_min": alt_min,
+                    "aviahorizon_roll": state.roll,
+                    "aviahorizon_pitch": state.pitch,
+                    "compass": state.compass,
+                    "compass1": state.compass,
+                    "rpm": state.rpm,
+                    "throttle": state.throttle,
+                    "water_temperature": state.water_temp,
+                    "gears": state.gear,
+                    "gear_lamp_down": if state.gear > 0.9 { 1.0 } else { 0.0 },
+                    "gear_lamp_up": if state.gear < 0.1 { 1.0 } else { 0.0 },
+                    "gear_lamp_off": if state.gear > 0.1 && state.gear < 0.9 { 1.0 } else { 0.0 },
+                    "weapon2": if state.ammo > 0 { 1.0 } else { 0.0 },
+                    "weapon4": if state.ammo > 0 { 1.0 } else { 0.0 },
+                    "blister1": 0.0,
+                    "blister2": 0.0,
+                    "blister3": 0.0,
+                    "blister4": 0.0,
+                    "blister5": 0.0,
+                    "blister6": 0.0,
+                    "blister11": 0.0,
+                })
+            },
             VehicleType::Ship => serde_json::json!({
-                "valid": false,  // Ships use HUD only
+                "valid": true,
+                "army": "sea",
+                "type": "ship",
+                "speed": state.speed,
+                "rpm": state.rpm,
+                "throttle": state.throttle,
+                "compass": state.compass,
+                "ammo_count": state.ammo,
             }),
         }
     }
@@ -172,14 +335,43 @@ impl APIEmulator {
         match state.vehicle_type {
             VehicleType::Aircraft => serde_json::json!({
                 "valid": true,
+                // Altitude & Speed
                 "H, m": state.altitude,
-                "TAS, km/h": state.speed,
-                "IAS, km/h": state.speed * 0.95,
-                "AoA, deg": 5.0,
-                "Ny": 1.0,
-                "throttle 1, %": (state.speed / 500.0 * 100.0).min(100.0),
-                "RPM 1": (state.speed * 10.0).round(),
-                "Mfuel, kg": 500.0,
+                "TAS, km/h": state.tas,
+                "IAS, km/h": state.ias,
+                "M": state.mach,
+                
+                // Angles
+                "AoA, deg": state.aoa,
+                "AoS, deg": state.aos,
+                
+                // G-load & vertical speed
+                "Ny": state.g_load,
+                "Vy, m/s": state.vertical_speed,
+                "Wx, deg/s": state.roll_rate,
+                
+                // Fuel
+                "Mfuel, kg": state.fuel_kg,
+                "Mfuel0, kg": state.fuel_max_kg,
+                
+                // Engine 1
+                "throttle 1, %": state.throttle,
+                "RPM throttle 1, %": state.throttle,
+                "power 1, hp": if state.engine_running { state.throttle * 15.0 } else { 0.0 },
+                "RPM 1": state.rpm,
+                "manifold pressure 1, atm": state.manifold_pressure,
+                "oil temp 1, C": state.oil_temp,
+                "water temp 1, C": state.water_temp,
+                "thrust 1, kgs": state.thrust,
+                "efficiency 1, %": if state.throttle > 0.0 { 85.0 } else { 0.0 },
+                
+                // Controls
+                "aileron, %": state.stick_ailerons * 100.0,
+                "elevator, %": state.stick_elevator * 100.0,
+                "rudder, %": state.pedals * 100.0,
+                "flaps, %": state.flaps * 100.0,
+                "gear, %": state.gear * 100.0,
+                "airbrake, %": 0.0,
             }),
             _ => serde_json::json!({ "valid": false }),
         }

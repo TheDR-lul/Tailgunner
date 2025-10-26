@@ -227,6 +227,10 @@ export const api = {
     return invoke('emulator_set_vehicle_type', { vehicleType });
   },
 
+  async emulatorSetVehicleName(name: string, displayName: string): Promise<void> {
+    return invoke('emulator_set_vehicle_name', { name, displayName });
+  },
+
   async emulatorSetSpeed(speed: number): Promise<void> {
     return invoke('emulator_set_speed', { speed });
   },
@@ -259,8 +263,8 @@ export const api = {
     return invoke('emulator_trigger_event', { eventType });
   },
 
-  async emulatorSendChat(message: string, mode: string): Promise<void> {
-    return invoke('emulator_send_chat', { message, mode });
+  async emulatorSendChat(message: string, mode: string, sender: string, enemy: boolean): Promise<void> {
+    return invoke('emulator_send_chat', { message, mode, sender, enemy });
   },
 };
 
