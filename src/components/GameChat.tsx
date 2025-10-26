@@ -21,6 +21,7 @@ export function GameChat() {
   const [lastDmgId, setLastDmgId] = useState<number>(0);
   const [isEnabled, setIsEnabled] = useState(false);
   const [lastBattleId, setLastBattleId] = useState<number>(0); // Track battle changes
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export function GameChat() {
         if (mapInfo && mapInfo.info.map_generation !== lastBattleId) {
           // New battle detected - clear old messages
           if (lastBattleId !== 0) {
-            console.log('[GameChat] New battle detected, clearing feed');
+            console.log(`[GameChat] New battle detected (${lastBattleId} → ${mapInfo.info.map_generation}), clearing feed`);
             setMessages([]);
             setLastChatId(0);
             setLastEvtId(0);
@@ -48,41 +49,69 @@ export function GameChat() {
         const [chat, hud] = await Promise.all([
           invoke<ChatMessage[]>('get_game_chat', { 
             lastId: lastChatId > 0 ? lastChatId : null 
-          }).catch(() => []),
+          }).catch((e) => {
+            console.log('[GameChat] get_game_chat error:', e);
+            return [];
+          }),
           invoke<{ events: ChatMessage[], damage: ChatMessage[] }>('get_hud_messages', {
             lastEvtId: lastEvtId > 0 ? lastEvtId : null,
             lastDmgId: lastDmgId > 0 ? lastDmgId : null,
-          }).catch(() => ({ events: [], damage: [] }))
+          }).catch((e) => {
+            console.log('[GameChat] get_hud_messages error:', e);
+            return { events: [], damage: [] };
+          })
         ]);
         
         const newMessages: ChatMessage[] = [];
         
         // Add chat messages
         if (chat && Array.isArray(chat) && chat.length > 0) {
+          console.log(`[GameChat] Received ${chat.length} new chat messages`);
           newMessages.push(...chat.map(msg => ({ ...msg, type: 'chat' as const })));
           setLastChatId(chat[chat.length - 1].id);
         }
         
         // Add HUD event messages
         if (hud.events && hud.events.length > 0) {
+          console.log(`[GameChat] Received ${hud.events.length} new event messages`);
           newMessages.push(...hud.events.map(msg => ({ ...msg, type: 'event' as const })));
           setLastEvtId(hud.events[hud.events.length - 1].id);
         }
         
         // Add HUD damage messages (kills, hits, etc)
         if (hud.damage && hud.damage.length > 0) {
+          console.log(`[GameChat] Received ${hud.damage.length} new damage messages`);
           newMessages.push(...hud.damage.map(msg => ({ ...msg, type: 'damage' as const })));
           setLastDmgId(hud.damage[hud.damage.length - 1].id);
         }
         
         if (newMessages.length > 0) {
+          console.log(`[GameChat] Adding ${newMessages.length} new messages to feed`);
           setMessages(prev => {
-            // Combine and sort by time
+            // Check if battle restarted: new message time < last message time
+            if (prev.length > 0 && newMessages.length > 0) {
+              const lastOldTime = prev[prev.length - 1].time;
+              const firstNewTime = Math.min(...newMessages.map(m => m.time));
+              
+              if (firstNewTime < lastOldTime) {
+                console.log(`[GameChat] Battle restart detected! Time reset: ${lastOldTime} → ${firstNewTime}. Clearing feed.`);
+                return newMessages.slice().sort((a, b) => a.time - b.time).slice(-100);
+              }
+            }
+            
+            // Normal case: combine and sort by time
             const combined = [...prev, ...newMessages];
             combined.sort((a, b) => a.time - b.time);
-            return combined.slice(-100); // Keep last 100 messages
+            const result = combined.slice(-100); // Keep last 100 messages
+            console.log(`[GameChat] Total messages in feed: ${result.length}`);
+            return result;
           });
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          // Scroll only the messages container to the bottom
+          setTimeout(() => {
+            if (messagesContainerRef.current) {
+              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            }
+          }, 0);
         }
       } catch (err) {
         // Silently ignore errors (game not running)
@@ -118,7 +147,7 @@ export function GameChat() {
         </button>
       </div>
       {isEnabled && (
-        <div className="game-chat-messages">
+        <div className="game-chat-messages" ref={messagesContainerRef}>
           {messages.length === 0 ? (
             <div className="game-chat-empty">{t('chat.waiting')}</div>
           ) : (

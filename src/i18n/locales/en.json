@@ -67,7 +67,8 @@
     "game_mode_arcade": "Arcade",
     "game_mode_realistic": "Realistic",
     "game_mode_simulator": "Simulator",
-    "game_mode_any": "All modes"
+    "game_mode_any": "All modes",
+    "enable_profile_first": "Enable profile first"
   },
   "triggers": {
     "title": "Built-in Triggers",

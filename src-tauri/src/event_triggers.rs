@@ -313,10 +313,66 @@ impl TriggerManager {
     
     /// Load built-in triggers (common events for all vehicle types)
     fn load_default_triggers(&mut self) {
-        // NOTE: Built-in triggers have been removed as they relied on API data
-        // that War Thunder does not provide (fuel, ammo, G-forces, speed limits, damage).
-        // All events are now detected from HUD messages or indicators changes.
-        // Users can still create custom triggers through UI patterns.
+        use crate::pattern_engine::{GameEvent, VibrationPattern};
+        
+        // Create standard triggers for HUD/API events
+        // These are "AlwaysTrue" triggers - they fire whenever the event is detected
+        
+        let hud_events = vec![
+            (GameEvent::Hit, "Standard Hit Detection"),
+            (GameEvent::CriticalHit, "Standard Critical Hit Detection"),
+            (GameEvent::TargetHit, "Standard Target Hit Detection"),
+            (GameEvent::TargetDestroyed, "Standard Target Destroyed Detection"),
+            (GameEvent::TargetSetOnFire, "Standard Enemy Set on Fire Detection"),
+            (GameEvent::TargetSeverelyDamaged, "Standard Severely Damaged Detection"),
+            (GameEvent::AircraftDestroyed, "Standard Aircraft Destroyed Detection"),
+            (GameEvent::ShipDestroyed, "Standard Ship Destroyed Detection"),
+            (GameEvent::TankDestroyed, "Standard Tank Destroyed Detection"),
+            (GameEvent::VehicleDestroyed, "Standard Vehicle Destroyed Detection"),
+            (GameEvent::Crashed, "Standard Crashed Detection"),
+            (GameEvent::EngineRunning, "Standard Engine Running Detection"),
+            (GameEvent::EngineOverheat, "Standard Engine Overheat Detection"),
+            (GameEvent::OilOverheated, "Standard Oil Overheated Detection"),
+            (GameEvent::Shooting, "Standard Shooting Detection"),
+            (GameEvent::CrewKnocked, "Standard Crew Knocked Out Detection"),
+            (GameEvent::MissionObjectiveCompleted, "Standard Objective Completed Detection"),
+            (GameEvent::MissionFailed, "Standard Mission Failed Detection"),
+            (GameEvent::MissionSuccess, "Standard Mission Success Detection"),
+            (GameEvent::Achievement, "Standard Achievement Detection"),
+            (GameEvent::ChatMessage, "Standard Chat Message Detection"),
+            (GameEvent::TeamChatMessage, "Standard Team Chat Detection"),
+            (GameEvent::AllChatMessage, "Standard All Chat Detection"),
+            (GameEvent::SquadChatMessage, "Standard Squad Chat Detection"),
+            (GameEvent::EnemyChatMessage, "Standard Enemy Chat Detection"),
+            (GameEvent::FirstStrike, "Standard First Strike Detection"),
+            (GameEvent::ShipRescuer, "Standard Ship Rescuer Detection"),
+            (GameEvent::Assist, "Standard Assist Detection"),
+            (GameEvent::BaseCapture, "Standard Base Capture Detection"),
+            (GameEvent::TeamKill, "Standard Team Kill Detection"),
+            (GameEvent::PlayerDisconnected, "Standard Player Disconnected Detection"),
+        ];
+        
+        for (event, name) in hud_events {
+            let trigger = EventTrigger {
+                id: format!("builtin_{:?}", event).to_lowercase(),
+                name: name.to_string(),
+                description: format!("Automatically fires when {:?} event is detected from War Thunder HUD/API", event),
+                condition: TriggerCondition::AlwaysTrue,
+                event,
+                cooldown_ms: 200, // 200ms default cooldown
+                enabled: false, // Disabled by default - user must enable them in profiles
+                is_builtin: true,
+                pattern: Some(VibrationPattern::preset_simple_hit()),
+                curve_points: None,
+                continuous: false,
+                is_event_based: true, // These are event-based, not condition-based
+                filter_type: None,
+                filter_text: None,
+            };
+            self.triggers.push(trigger);
+        }
+        
+        log::info!("[Triggers] Loaded {} standard HUD/API triggers", self.triggers.len());
     }
     
     /// Check all triggers
@@ -776,8 +832,12 @@ impl TriggerManager {
             
             Some("text_contains") => {
                 if let Some(filter_text) = &trigger.filter_text {
-                    entity_name.to_lowercase().contains(&filter_text.to_lowercase())
+                    let matches = entity_name.to_lowercase().contains(&filter_text.to_lowercase());
+                    log::info!("[Filter] 🔍 text_contains filter: '{}' in '{}' = {}", 
+                        filter_text, entity_name, matches);
+                    matches
                 } else {
+                    log::warn!("[Filter] ❌ text_contains filter has no filter_text!");
                     false
                 }
             },

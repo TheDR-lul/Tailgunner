@@ -67,7 +67,8 @@
     "game_mode_arcade": "Аркада",
     "game_mode_realistic": "Реалистика",
     "game_mode_simulator": "Симулятор",
-    "game_mode_any": "Все режимы"
+    "game_mode_any": "Все режимы",
+    "enable_profile_first": "Сначала включите профиль"
   },
   "triggers": {
     "title": "Встроенные триггеры",

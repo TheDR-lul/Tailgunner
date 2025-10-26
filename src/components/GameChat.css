@@ -9,6 +9,12 @@
   flex-direction: column;
   gap: 12px;
   height: 350px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.game-chat-container:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
 }
 
 .game-chat-container::before {

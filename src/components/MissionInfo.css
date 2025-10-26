@@ -8,6 +8,12 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.mission-info-container:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
 }
 
 .mission-info-container::before {
@@ -46,6 +52,27 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Scrollbar styling (same as Game Feed) */
+.mission-info-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mission-info-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.mission-info-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.mission-info-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .objectives-section {

@@ -410,6 +410,15 @@ struct SimpleVibration {
 }
 
 #[tauri::command]
+async fn toggle_profile(state: tauri::State<'_, AppState>, id: String, enabled: bool) -> Result<String, String> {
+    let engine = state.engine.lock().await;
+    engine.toggle_profile(&id, enabled).await;
+    
+    log::info!("[Profiles] Toggle '{}' to {}", id, enabled);
+    Ok(format!("Profile {} toggled to {}", id, enabled))
+}
+
+#[tauri::command]
 async fn update_trigger(
     state: tauri::State<'_, AppState>, 
     id: String, 
@@ -1072,6 +1081,7 @@ pub fn run() {
             get_debug_info,
             get_triggers,
             toggle_trigger,
+            toggle_profile,
             update_trigger,
             save_trigger_settings,
             get_vehicle_info,

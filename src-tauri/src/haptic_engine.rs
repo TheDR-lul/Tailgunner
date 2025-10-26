@@ -308,18 +308,32 @@ impl HapticEngine {
                             (name.as_str(), GameEvent::Achievement)
                         }
                         HudEvent::ChatMessage(details) => {
-                            log::debug!("[HUD] 💬 Chat message: {}", details.message);
+                            log::info!("[HUD] 💬 Chat message received: '{}'", details.message);
                             // Determine event type based on chat details
                             let event = if details.is_enemy {
+                                log::info!("[HUD] 💬 Chat type: EnemyChatMessage");
                                 GameEvent::EnemyChatMessage
                             } else if let Some(mode) = &details.mode {
                                 match mode.to_lowercase().as_str() {
-                                    "team" => GameEvent::TeamChatMessage,
-                                    "all" => GameEvent::AllChatMessage,
-                                    "squad" => GameEvent::SquadChatMessage,
-                                    _ => GameEvent::ChatMessage
+                                    "team" => {
+                                        log::info!("[HUD] 💬 Chat type: TeamChatMessage");
+                                        GameEvent::TeamChatMessage
+                                    },
+                                    "all" => {
+                                        log::info!("[HUD] 💬 Chat type: AllChatMessage");
+                                        GameEvent::AllChatMessage
+                                    },
+                                    "squad" => {
+                                        log::info!("[HUD] 💬 Chat type: SquadChatMessage");
+                                        GameEvent::SquadChatMessage
+                                    },
+                                    _ => {
+                                        log::info!("[HUD] 💬 Chat type: ChatMessage (generic)");
+                                        GameEvent::ChatMessage
+                                    }
                                 }
                             } else {
+                                log::info!("[HUD] 💬 Chat type: ChatMessage (no mode)");
                                 GameEvent::ChatMessage
                             };
                             (details.message.as_str(), event)
@@ -327,14 +341,23 @@ impl HapticEngine {
                     };
                     
                     // Find matching event-based triggers
+                    log::info!("[HUD] 🔍 Checking {} triggers for event {:?}", all_triggers.len(), game_event);
+                    let mut matched_count = 0;
                     for trigger in &all_triggers {
                         if !trigger.enabled || !trigger.is_event_based {
+                            log::debug!("[HUD] ⏭️ Skipping trigger '{}' (enabled={}, is_event_based={})", 
+                                trigger.name, trigger.enabled, trigger.is_event_based);
                             continue;
                         }
                         
                         if trigger.event != game_event {
+                            log::debug!("[HUD] ⏭️ Skipping trigger '{}' (event mismatch: {:?} != {:?})", 
+                                trigger.name, trigger.event, game_event);
                             continue;
                         }
+                        
+                        log::info!("[HUD] 🎯 Trigger '{}' event matched! Checking filter (type={:?}, text={:?})...", 
+                            trigger.name, trigger.filter_type, trigger.filter_text);
                         
                         // Apply filter
                         if !crate::event_triggers::TriggerManager::should_fire_event_trigger(
@@ -345,11 +368,12 @@ impl HapticEngine {
                             &enemy_names,
                             &enemy_clans,
                         ) {
-                            log::debug!("[HUD] ❌ Trigger '{}' filtered out for entity '{}'", trigger.name, entity_name);
+                            log::warn!("[HUD] ❌ Trigger '{}' FILTERED OUT for text: '{}'", trigger.name, entity_name);
                             continue;
                         }
                         
-                        log::info!("[HUD] ✅ Trigger '{}' matched for entity '{}'", trigger.name, entity_name);
+                        matched_count += 1;
+                        log::info!("[HUD] ✅ Trigger '{}' MATCHED for text: '{}'", trigger.name, entity_name);
                         
                         // Record trigger event for debug console
                         {
@@ -367,6 +391,9 @@ impl HapticEngine {
                         
                         hud_events_with_patterns.push((game_event.clone(), trigger.pattern.clone()));
                     }
+                    
+                    log::info!("[HUD] 📊 Trigger check result: {} triggers matched for event {:?}", 
+                        matched_count, game_event);
                 }
                 
                 // Combine events: basic, triggers (including dynamic), and HUD events
@@ -608,6 +635,12 @@ impl HapticEngine {
         tokio::time::sleep(Duration::from_millis(duration_ms)).await;
         self.device_manager.send_vibration(0.0).await?;
         Ok(())
+    }
+
+    /// Toggle profile on/off
+    pub async fn toggle_profile(&self, id: &str, enabled: bool) {
+        let mut manager = self.profile_manager.write().await;
+        manager.toggle_profile(id, enabled);
     }
 }
 

@@ -17,8 +17,8 @@ export function validatePattern(nodes: Node[], edges: Edge[]): ValidationError[]
     return errors;
   }
 
-  // Check for input nodes
-  const inputNodes = nodes.filter(n => n.type === 'inputNode');
+  // Check for input nodes (input OR event - both are valid sources)
+  const inputNodes = nodes.filter(n => n.type === 'input' || n.type === 'event');
   if (inputNodes.length === 0) {
     errors.push({
       type: 'error',
@@ -27,7 +27,7 @@ export function validatePattern(nodes: Node[], edges: Edge[]): ValidationError[]
   }
 
   // Check for vibration nodes
-  const vibrationNodes = nodes.filter(n => n.type === 'vibrationNode');
+  const vibrationNodes = nodes.filter(n => n.type === 'vibration' || n.type === 'linear' || n.type === 'rotate');
   if (vibrationNodes.length === 0) {
     errors.push({
       type: 'error',
