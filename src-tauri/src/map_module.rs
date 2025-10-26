@@ -70,14 +70,15 @@ impl MapObject {
     }
     
     /// Get heading angle in degrees (0° = North, clockwise)
-    /// Synchronized with War Thunder compass
+    /// Synchronized with War Thunder compass (hull direction)
     pub fn get_heading(&self) -> f32 {
         if self.dx == 0.0 && self.dy == 0.0 {
             return 0.0;
         }
+        // API Y coordinate is inverted (y=0 is North, y=1 is South)
+        let dy_inverted = -self.dy;
         // atan2 gives angle from X axis
-        // Convert to compass bearing (0° = North/up, 90° = East/right)
-        let angle_from_x = self.dy.atan2(self.dx).to_degrees();
+        let angle_from_x = dy_inverted.atan2(self.dx).to_degrees();
         // Convert: X-axis angle → North-based compass bearing
         let compass_bearing = (90.0 - angle_from_x + 360.0) % 360.0;
         compass_bearing
