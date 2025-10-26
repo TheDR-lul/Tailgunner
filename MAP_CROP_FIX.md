@@ -33,20 +33,24 @@ War Thunder API provides crop information:
 
 **Grid reference calculation:**
 
-API coords are **already relative to visible area** (0..1), so grid calculation is simple:
+API coords are **relative to full map** (0..1), must convert to world coords first:
 
 ```rust
-// API coords are relative to visible area (0..1)
-// Convert to position in meters from top-left
-let pos_x = x * grid_size[0];
-let pos_y = y * grid_size[1];
+// API coords are normalized to FULL map (0..1)
+// NOTE: API Y is INVERTED! y=0 is North (top), y=1 is South (bottom)
+let world_x = x * (map_max[0] - map_min[0]) + map_min[0];
+let world_y = (1.0 - y) * (map_max[1] - map_min[1]) + map_min[1];
+
+// Convert world coords to position relative to visible area (grid_zero)
+let pos_x = world_x - grid_zero[0];
+let pos_y = world_y - grid_zero[1];  // NO inversion
 
 // Calculate grid cell
 let grid_x = (pos_x / grid_step_x).floor() as i32;  // Column (0, 1, 2, ...)
 let grid_y = (pos_y / grid_step_y).floor() as i32;  // Row (0=A, 1=B, ...)
 
 // Format as "A-1", "B-3", etc.
-let letter = ('A' as u8 + grid_y) as char;
+let letter = ('A' as u8 + grid_y as u8) as char;
 let number = grid_x + 1;
 ```
 
@@ -80,21 +84,34 @@ ctx.drawImage(
 
 **Object coordinate conversion:**
 
-**CRITICAL:** API coordinates are **ALREADY relative to the visible area**, NOT the full map!
+**CRITICAL:** API coordinates are **relative to the FULL map** (0..1), same as image!
 
-The coordinates can be:
-- Negative (object is above/left of visible area)
-- Greater than 1 (object is below/right of visible area)  
-- Between 0 and 1 (object is visible on screen)
+Objects must be converted using the **SAME logic** as image cropping:
 
 ```typescript
-// API coords are directly usable - no conversion needed!
-const x = obj.x * canvas.width;
-const y = obj.y * canvas.height;
+// Convert API coords (0..1 of full map) to visible area coords
+const toCanvasCoords = (apiX, apiY) => {
+  // 1. Convert normalized API coords to world coords (meters)
+  // NOTE: API Y is INVERTED! y=0 is North (top), y=1 is South (bottom)
+  const worldX = apiX * (map_max[0] - map_min[0]) + map_min[0];
+  const worldY = (1 - apiY) * (map_max[1] - map_min[1]) + map_min[1];
+  
+  // 2. Convert world coords to visible area coords (same as image crop!)
+  const visibleX = (worldX - grid_zero[0]) / grid_size[0];
+  const visibleY = (grid_zero[1] - worldY) / grid_size[1];
+  
+  return { x: visibleX, y: visibleY };
+};
 
-// For distance calculations, use grid_size (visible area size in meters)
-const dx = enemy.x - player.x;  // Normalized difference
-const distanceMeters = dx * grid_size[0];  // Convert to meters
+// Then draw on canvas
+const pos = toCanvasCoords(obj.x, obj.y);
+const x = pos.x * canvas.width;
+const y = pos.y * canvas.height;
+
+// For distance calculations, use world coords (meters)
+const playerWorldX = player.x * mapWidth + map_min[0];
+const enemyWorldX = enemy.x * mapWidth + map_min[0];
+const distanceMeters = Math.abs(enemyWorldX - playerWorldX);
 ```
 
 **Functions updated:**

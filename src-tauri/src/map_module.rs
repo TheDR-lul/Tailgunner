@@ -139,18 +139,21 @@ impl MapData {
     pub fn get_player_grid_reference(&self) -> Option<String> {
         let (x, y) = self.player_position?;
         
-        // API coords are ALREADY relative to visible area (0..1)
-        // Convert to grid cells using grid_steps
+        // API coords are normalized to FULL map (0..1), convert to world coords (meters)
+        // NOTE: API Y is inverted! y=0 is North (top), y=1 is South (bottom)
+        let map_width = self.info.map_max[0] - self.info.map_min[0];
+        let map_height = self.info.map_max[1] - self.info.map_min[1];
+        let world_x = x * map_width + self.info.map_min[0];
+        let world_y = (1.0 - y) * map_height + self.info.map_min[1];
+        
+        // Convert world coords to position relative to visible area
+        // grid_zero[1] is TOP, grid_size goes DOWN
+        let pos_x = world_x - self.info.grid_zero[0];
+        let pos_y = self.info.grid_zero[1] - world_y; // Y inverted
+        
+        // Calculate grid cell using grid_steps
         let grid_step_x = self.info.grid_steps[0];
         let grid_step_y = self.info.grid_steps[1];
-        let grid_size_x = self.info.grid_size[0];
-        let grid_size_y = self.info.grid_size[1];
-        
-        // Calculate position in meters from top-left of visible area
-        let pos_x = x * grid_size_x;
-        let pos_y = y * grid_size_y;
-        
-        // Calculate grid cell
         let grid_x = (pos_x / grid_step_x).floor() as i32;
         let grid_y = (pos_y / grid_step_y).floor() as i32;
         

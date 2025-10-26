@@ -143,10 +143,14 @@ export function MiniMap() {
       const cropHeight = mapData.info.grid_size[1] / mapHeight;
       
       // grid_zero[1] is the TOP of visible area in WT coords (Y goes up)
-      // Convert to image coords where Y goes down
-      const wtTop = mapData.info.grid_zero[1];
-      const wtBottom = wtTop - mapData.info.grid_size[1];
-      const cropTop = (mapHeight - wtTop) / mapHeight;  // Invert Y
+      // grid_size goes DOWN from grid_zero
+      // Image Y goes DOWN (0=top), need to convert WT coords to image coords
+      const gridTop = mapData.info.grid_zero[1];
+      const gridBottom = gridTop - mapData.info.grid_size[1];
+      
+      // Convert WT Y coords to image Y coords (invert)
+      // WT: Y=map_max is top of image, Y=map_min is bottom of image
+      const cropTop = (mapData.info.map_max[1] - gridTop) / mapHeight;
       
       // Draw cropped portion of the image
       ctx.drawImage(
@@ -199,9 +203,12 @@ export function MiniMap() {
 
     const enemies: EnemyDistance[] = [];
     
-    // API coords are relative to visible area, convert to meters using grid_size
-    const visibleSizeX = info.grid_size[0]; // meters
-    const visibleSizeY = info.grid_size[1]; // meters
+    // Convert player API coords to world coords (meters)
+    // NOTE: API Y is inverted! y=0 is North (top), y=1 is South (bottom)
+    const mapWidth = info.map_max[0] - info.map_min[0];
+    const mapHeight = info.map_max[1] - info.map_min[1];
+    const playerWorldX = player.x * mapWidth + info.map_min[0];
+    const playerWorldY = (1 - player.y) * mapHeight + info.map_min[1];
 
     for (const obj of objects) {
       // Check if object is enemy (red color) and has position
@@ -220,13 +227,13 @@ export function MiniMap() {
       if (!isEnemy) continue;
       if (obj.type !== 'ground_model' && obj.type !== 'aircraft' && obj.type !== 'Ship') continue;
 
-      // Calculate distance using normalized visible area coords
-      const dx = obj.x - player.x;
-      const dy = obj.y - player.y;
+      // Convert enemy API coords to world coords (meters)
+      const enemyWorldX = obj.x * mapWidth + info.map_min[0];
+      const enemyWorldY = (1 - obj.y) * mapHeight + info.map_min[1]; // API Y inverted!
       
-      // Convert to real-world meters
-      const distX = dx * visibleSizeX;
-      const distY = dy * visibleSizeY;
+      // Calculate distance in real-world meters
+      const distX = enemyWorldX - playerWorldX;
+      const distY = enemyWorldY - playerWorldY;
       const distance = Math.sqrt(distX * distX + distY * distY);
       
       // Calculate bearing/azimuth to enemy (0° = North, clockwise)
@@ -306,14 +313,34 @@ export function MiniMap() {
     obj: MapObject,
     info: MapInfo
   ) => {
-    // API coords are ALREADY relative to visible area (can be negative or >1 for off-screen objects)
+    // Convert API coords (relative to full map) to canvas coords (relative to cropped visible area)
+    // Same logic as image cropping!
+    const mapWidth = info.map_max[0] - info.map_min[0];
+    const mapHeight = info.map_max[1] - info.map_min[1];
+    
+    const toCanvasCoords = (apiX: number, apiY: number) => {
+      // 1. Convert normalized API coords to world coords (meters)
+      // NOTE: API Y is inverted! y=0 is North (top), y=1 is South (bottom)
+      const worldX = apiX * mapWidth + info.map_min[0];
+      const worldY = (1 - apiY) * mapHeight + info.map_min[1];
+      
+      // 2. Convert world coords to visible area coords
+      const visibleX = (worldX - info.grid_zero[0]) / info.grid_size[0];
+      const visibleY = (info.grid_zero[1] - worldY) / info.grid_size[1];
+      
+      return { x: visibleX, y: visibleY };
+    };
+    
     if (obj.x === undefined || obj.y === undefined) {
       // Line object (airfield)
       if (obj.sx !== undefined && obj.sy !== undefined && obj.ex !== undefined && obj.ey !== undefined) {
-        const sx = obj.sx * canvas.width;
-        const sy = obj.sy * canvas.height;
-        const ex = obj.ex * canvas.width;
-        const ey = obj.ey * canvas.height;
+        const start = toCanvasCoords(obj.sx, obj.sy);
+        const end = toCanvasCoords(obj.ex, obj.ey);
+        
+        const sx = start.x * canvas.width;
+        const sy = start.y * canvas.height;
+        const ex = end.x * canvas.width;
+        const ey = end.y * canvas.height;
 
         ctx.strokeStyle = obj.color;
         ctx.lineWidth = 3;
@@ -325,9 +352,10 @@ export function MiniMap() {
       return;
     }
 
-    // API coords are directly usable (relative to visible area)
-    const x = obj.x * canvas.width;
-    const y = obj.y * canvas.height;
+    // Convert API coords to canvas coords
+    const pos = toCanvasCoords(obj.x, obj.y);
+    const x = pos.x * canvas.width;
+    const y = pos.y * canvas.height;
 
     // Draw icon based on type
     ctx.fillStyle = obj.color;
@@ -372,9 +400,16 @@ export function MiniMap() {
   ) => {
     if (obj.x === undefined || obj.y === undefined) return;
 
-    // API coords are directly usable (relative to visible area)
-    const x = obj.x * canvas.width;
-    const y = obj.y * canvas.height;
+    // Convert API coords (relative to full map) to canvas coords (same as image crop)
+    const mapWidth = info.map_max[0] - info.map_min[0];
+    const mapHeight = info.map_max[1] - info.map_min[1];
+    const worldX = obj.x * mapWidth + info.map_min[0];
+    const worldY = (1 - obj.y) * mapHeight + info.map_min[1]; // API Y inverted!
+    const visibleX = (worldX - info.grid_zero[0]) / info.grid_size[0];
+    const visibleY = (info.grid_zero[1] - worldY) / info.grid_size[1];
+    
+    const x = visibleX * canvas.width;
+    const y = visibleY * canvas.height;
 
     // Calculate heading angle
     let angle = 0;
