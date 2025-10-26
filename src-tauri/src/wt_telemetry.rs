@@ -354,7 +354,8 @@ impl WTTelemetryReader {
         let mut events = Vec::new();
         
         // Parse event messages
-        if let Some(event_array) = json.get("event").and_then(|v| v.as_array()) {
+        // Note: API returns "events" (plural), not "event"
+        if let Some(event_array) = json.get("events").and_then(|v| v.as_array()) {
             for msg_value in event_array {
                 let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 
@@ -367,30 +368,66 @@ impl WTTelemetryReader {
         
         // Parse damage messages (contain kill feed, crashes, overheats)
         if let Some(damage_array) = json.get("damage").and_then(|v| v.as_array()) {
-            log::error!("[HUD DEBUG] 📥 Received {} damage messages", damage_array.len());
+            if damage_array.len() > 0 {
+                log::info!("[HUD] 📥 Received {} damage messages", damage_array.len());
+            }
             
+            // INIT PHASE: Find max time and ID to establish baseline
+            if !self.hud_initialized && !damage_array.is_empty() {
+                let max_time = damage_array.iter()
+                    .filter_map(|v| v.get("time").and_then(|t| t.as_u64()))
+                    .max()
+                    .unwrap_or(0) as u32;
+                
+                let max_id = damage_array.iter()
+                    .filter_map(|v| v.get("id").and_then(|i| i.as_u64()))
+                    .max()
+                    .unwrap_or(0) as u32;
+                
+                // Process recent events (within last 15 seconds)
+                // This allows catching events that happened just before app started
+                let recent_threshold = max_time.saturating_sub(15);
+                
+                log::info!("[HUD] 🔧 Initializing: max_time={}s, max_id={}, processing events after {}s", 
+                    max_time, max_id, recent_threshold);
+                
+                // First pass: process recent events
+                for msg_value in damage_array {
+                    let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
+                    let time = msg_value.get("time").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    
+                    // Only process recent events during initialization
+                    if time >= recent_threshold {
+                        let message_key = format!("{}:{}", time, msg);
+                        if !self.processed_messages.contains(&message_key) {
+                            if let Some(event) = self.parse_hud_message(msg) {
+                                log::info!("[HUD] ✅ INIT event at {}s: {:?}", time, event);
+                                events.push(event);
+                                self.processed_messages.insert(message_key);
+                                self.last_message = Some(msg.to_string());
+                            }
+                        }
+                    }
+                }
+                
+                // Set baseline to max ID after processing recent events
+                self.last_hud_dmg_id = max_id;
+                self.hud_initialized = true;
+                log::info!("[HUD] ✅ Initialized with baseline ID={}", max_id);
+                
+                // Return early - we've processed everything
+                return Ok(events);
+            }
+            
+            // NORMAL PHASE: Only process NEW events (ID > baseline)
             for msg_value in damage_array {
                 let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
                 let time = msg_value.get("time").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 
-                log::error!("[HUD DEBUG] 📨 RAW MSG: ID={}, time={}s, msg='{}', baseline={}, initialized={}", 
-                    id, time, msg, self.last_hud_dmg_id, self.hud_initialized);
-                
-                // INIT PHASE: Just collect baseline IDs, don't process events
-                if !self.hud_initialized {
-                    // Update baseline with max ID seen
-                    if id > self.last_hud_dmg_id {
-                        self.last_hud_dmg_id = id;
-                    }
-                    log::error!("[HUD DEBUG] ⏭️ INIT PHASE: Skipping OLD event ID={}, baseline now={}", id, self.last_hud_dmg_id);
-                    continue;
-                }
-                
-                // NORMAL PHASE: Only process NEW events (ID > baseline)
                 if id <= self.last_hud_dmg_id {
-                    log::error!("[HUD DEBUG] ⏭️ BLOCKED OLD ID: {} <= baseline {} (msg: '{}')", id, self.last_hud_dmg_id, msg);
-                    continue;
+                    continue; // Skip old events
                 }
                 
                 // Update baseline for next check
@@ -409,7 +446,8 @@ impl WTTelemetryReader {
                     self.processed_messages.retain(|m| {
                         // Parse time from cached message key (format: "time:msg")
                         if let Some(cached_time) = m.split(':').next().and_then(|t| t.parse::<u32>().ok()) {
-                            time - cached_time < 10
+                            // Use saturating_sub to prevent overflow when starting new battle
+                            time.saturating_sub(cached_time) < 10
                         } else {
                             false
                         }
@@ -419,7 +457,7 @@ impl WTTelemetryReader {
                 // IMMEDIATE duplicate check: same message as last one
                 if let Some(ref last_msg) = self.last_message {
                     if last_msg == msg {
-                        log::error!("[HUD DEBUG] ⏭️ BLOCKED IMMEDIATE duplicate: '{}'", msg);
+                        // log::debug!("[HUD DEBUG] ⏭️ BLOCKED IMMEDIATE duplicate: '{}'", msg);
                         continue;
                     }
                 }
@@ -427,15 +465,15 @@ impl WTTelemetryReader {
                 // Check for duplicates (same message within 10 seconds)
                 let message_key = format!("{}:{}", time, msg);
                 if self.processed_messages.contains(&message_key) {
-                    log::error!("[HUD DEBUG] ⏭️ BLOCKED CACHED duplicate: '{}' (key: {})", msg, message_key);
+                    // log::debug!("[HUD DEBUG] ⏭️ BLOCKED CACHED duplicate: '{}' (key: {})", msg, message_key);
                     continue;
                 }
                 
                 // Mark as processed
-                log::error!("[HUD DEBUG] ✅ PASSED filter, marking as processed: '{}'", msg);
+                // log::debug!("[HUD DEBUG] ✅ PASSED filter, marking as processed: '{}'", msg);
                 self.processed_messages.insert(message_key.clone());
                 self.last_message = Some(msg.to_string());
-                log::error!("[HUD DEBUG] 📝 Cached messages count: {}, cache key: {}", self.processed_messages.len(), message_key);
+                // log::debug!("[HUD DEBUG] 📝 Cached messages count: {}, cache key: {}", self.processed_messages.len(), message_key);
                 
                 // Try to parse as specific player event
                 if let Some(event) = self.parse_hud_message(msg) {
@@ -457,7 +495,7 @@ impl WTTelemetryReader {
         // Mark HUD as initialized after first call
         if !self.hud_initialized {
             self.hud_initialized = true;
-            log::error!("[HUD DEBUG] ✅ INITIALIZED - baseline IDs set: evt={}, dmg={}", self.last_hud_evt_id, self.last_hud_dmg_id);
+            // log::debug!("[HUD DEBUG] ✅ INITIALIZED - baseline IDs set: evt={}, dmg={}", self.last_hud_evt_id, self.last_hud_dmg_id);
             log::info!("[HUD] ✅ Initialized - will only process NEW events (ID > {})", self.last_hud_dmg_id);
         }
         
@@ -650,7 +688,8 @@ impl WTTelemetryReader {
         let type_str = indicators_json.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
         let army_str = indicators_json.get("army").and_then(|v| v.as_str()).unwrap_or("unknown");
         
-        log::info!("[WT Parser] From /indicators: type='{}', army='{}', valid={}", type_str, army_str, valid);
+        // Reduced logging spam - only log on vehicle changes
+        // log::info!("[WT Parser] From /indicators: type='{}', army='{}', valid={}", type_str, army_str, valid);
         
         // Extract vehicle name from type string
         // Examples:
@@ -854,14 +893,14 @@ impl WTTelemetryReader {
         let in_battle = (is_tank && get_i32("crew_total") > 0) || (!is_tank && speed > 1.0);
         
         if in_battle {
-            log::debug!("[WT Parser] 🎮 Type={}, Speed={:.0} km/h, RPM={:.0}, Gear={:.0}", 
-                if is_tank { "TANK" } else { "AIRCRAFT" }, speed, engine_rpm, gear_value);
-            
-            if is_tank {
-                log::debug!("[WT Parser] 🚜 Tank data: Crew={}/{}, Ammo={}, Stabilizer={}", 
-                    get_i32("crew_current"), get_i32("crew_total"), 
-                    get_i32("first_stage_ammo"), get_f32("stabilizer"));
-            }
+            // Reduced logging spam
+            // log::debug!("[WT Parser] 🎮 Type={}, Speed={:.0} km/h, RPM={:.0}, Gear={:.0}", 
+            //     if is_tank { "TANK" } else { "AIRCRAFT" }, speed, engine_rpm, gear_value);
+            // if is_tank {
+            //     log::debug!("[WT Parser] 🚜 Tank data: Crew={}/{}, Ammo={}, Stabilizer={}", 
+            //         get_i32("crew_current"), get_i32("crew_total"), 
+            //         get_i32("first_stage_ammo"), get_f32("stabilizer"));
+            // }
         }
 
         Indicators {

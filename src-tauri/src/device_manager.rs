@@ -196,11 +196,12 @@ impl DeviceManager {
             buttplug_count = devices.len();
             
             if buttplug_count > 0 {
-                log::debug!("🎮 Sending vibration {} to {} Buttplug devices", intensity, buttplug_count);
+                // Reduced logging spam - only log errors
+                // log::debug!("🎮 Sending vibration {} to {} Buttplug devices", intensity, buttplug_count);
                 
                 for device in devices {
                     match device.vibrate(&buttplug::client::ScalarValueCommand::ScalarValue(intensity.into())).await {
-                        Ok(_) => log::debug!("  ✅ {} vibrated", device.name()),
+                        Ok(_) => {}, // log::debug!("  ✅ {} vibrated", device.name()),
                         Err(e) => log::error!("  ❌ {} error: {}", device.name(), e),
                     }
                 }

@@ -148,13 +148,10 @@ impl HapticEngine {
                                 connection_lost_counter = 0;
                             }
                             
-                            log::debug!("[WT] Vehicle: {:?}, Speed: {:.0} km/h, Alt: {:.0}m, Fuel: {:.0}/{:.0} kg", 
-                                state.type_, 
-                                state.indicators.speed,  // Already in km/h from API
-                                state.indicators.altitude,
-                                state.indicators.fuel,
-                                state.indicators.fuel_max
-                            );
+                            // Reduced logging spam - only log on significant changes
+                            // log::debug!("[WT] Vehicle: {:?}, Speed: {:.0} km/h, Alt: {:.0}m, Fuel: {:.0}/{:.0} kg", 
+                            //     state.type_, state.indicators.speed, state.indicators.altitude,
+                            //     state.indicators.fuel, state.indicators.fuel_max);
                             state
                         },
                         Err(_) => {
