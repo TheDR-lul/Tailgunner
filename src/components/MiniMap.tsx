@@ -261,26 +261,37 @@ export function MiniMap() {
     // Use grid_steps from API
     const gridStepX = info.grid_steps[0];
     const gridStepY = info.grid_steps[1];
-    const gridCountX = Math.ceil(mapSizeX / gridStepX);
-    const gridCountY = Math.ceil(mapSizeY / gridStepY);
+    
+    // Calculate EXACT number of grid squares (NOT rounded!)
+    // e.g. 1600/225 = 7.111... means 7 full squares + 11% of 8th
+    const gridCountX = mapSizeX / gridStepX;
+    const gridCountY = mapSizeY / gridStepY;
+    
+    // Number of FULL squares for labels
+    const fullGridX = Math.floor(gridCountX);
+    const fullGridY = Math.floor(gridCountY);
     
     // Make grid more visible when map image is present
     ctx.strokeStyle = mapImage ? 'rgba(255, 255, 255, 0.25)' : '#333';
     ctx.lineWidth = 1;
     ctx.beginPath();
 
-    // Draw vertical lines and top numbers
-    for (let i = 0; i <= gridCountX; i++) {
-      const x = (canvas.width / gridCountX) * i;
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
+    // Draw vertical lines (including partial last line if needed)
+    for (let i = 0; i <= Math.ceil(gridCountX); i++) {
+      if (i <= gridCountX) {
+        const x = (canvas.width / gridCountX) * i;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+      }
     }
 
-    // Draw horizontal lines and left letters
-    for (let i = 0; i <= gridCountY; i++) {
-      const y = (canvas.height / gridCountY) * i;
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
+    // Draw horizontal lines (including partial last line if needed)
+    for (let i = 0; i <= Math.ceil(gridCountY); i++) {
+      if (i <= gridCountY) {
+        const y = (canvas.height / gridCountY) * i;
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+      }
     }
 
     ctx.stroke();
@@ -289,18 +300,18 @@ export function MiniMap() {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.font = '10px monospace';
     
-    // Top numbers (1, 2, 3, ...)
+    // Top numbers (1, 2, 3, ...) - only for FULL squares
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    for (let i = 0; i < gridCountX && i < 20; i++) {
+    for (let i = 0; i < fullGridX && i < 20; i++) {
       const x = (canvas.width / gridCountX) * (i + 0.5);
       ctx.fillText((i + 1).toString(), x, 2);
     }
     
-    // Left letters (A, B, C, ...)
+    // Left letters (A, B, C, ...) - only for FULL squares
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    for (let i = 0; i < gridCountY && i < 26; i++) {
+    for (let i = 0; i < fullGridY && i < 26; i++) {
       const y = (canvas.height / gridCountY) * (i + 0.5);
       const letter = String.fromCharCode(65 + i); // A=65, B=66, ...
       ctx.fillText(letter, 2, y);
