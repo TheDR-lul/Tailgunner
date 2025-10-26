@@ -47,6 +47,8 @@ interface EnemyDistance {
   bearing: number;  // Bearing/azimuth to enemy in degrees
 }
 
+type MapMode = 'current' | 'full';
+
 export function MiniMap() {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -56,6 +58,7 @@ export function MiniMap() {
   const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
   const [currentMapGen, setCurrentMapGen] = useState<number>(-1);
   const [nearestEnemies, setNearestEnemies] = useState<EnemyDistance[]>([]);
+  const [mapMode, setMapMode] = useState<MapMode>('current');
 
   const getCompassDirection = (heading: number): string => {
     if (heading >= 337.5 || heading < 22.5) return 'N';
@@ -130,27 +133,30 @@ export function MiniMap() {
       return;
     }
 
-    // Draw map image as background (cropped to visible grid area)
+    // Draw map image as background
     if (mapImage) {
-      // Calculate crop region based on grid_zero and grid_size
       const mapWidth = mapData.info.map_max[0] - mapData.info.map_min[0];
       const mapHeight = mapData.info.map_max[1] - mapData.info.map_min[1];
       
-      // Normalize grid_zero to 0..1 range
-      // Note: War Thunder Y coordinates go bottom-to-top, image Y goes top-to-bottom
-      const cropLeft = (mapData.info.grid_zero[0] - mapData.info.map_min[0]) / mapWidth;
-      const cropWidth = mapData.info.grid_size[0] / mapWidth;
-      const cropHeight = mapData.info.grid_size[1] / mapHeight;
+      let cropLeft, cropTop, cropWidth, cropHeight;
       
-      // grid_zero[1] is the TOP of visible area in WT coords (Y goes up)
-      // grid_size goes DOWN from grid_zero
-      // Image Y goes DOWN (0=top), need to convert WT coords to image coords
-      const gridTop = mapData.info.grid_zero[1];
-      const gridBottom = gridTop - mapData.info.grid_size[1];
-      
-      // Convert WT Y coords to image Y coords (invert)
-      // WT: Y=map_max is top of image, Y=map_min is bottom of image
-      const cropTop = (mapData.info.map_max[1] - gridTop) / mapHeight;
+      if (mapMode === 'full') {
+        // Full map mode: show entire map without crop
+        cropLeft = 0;
+        cropTop = 0;
+        cropWidth = 1;
+        cropHeight = 1;
+      } else {
+        // Current mode: crop to visible grid area (tank/aircraft view)
+        cropLeft = (mapData.info.grid_zero[0] - mapData.info.map_min[0]) / mapWidth;
+        cropWidth = mapData.info.grid_size[0] / mapWidth;
+        cropHeight = mapData.info.grid_size[1] / mapHeight;
+        
+        // grid_zero[1] is the TOP of visible area in WT coords (Y goes up)
+        const gridTop = mapData.info.grid_zero[1];
+        // Convert WT Y coords to image Y coords (invert)
+        cropTop = (mapData.info.map_max[1] - gridTop) / mapHeight;
+      }
       
       // Draw cropped portion of the image
       ctx.drawImage(
@@ -192,7 +198,7 @@ export function MiniMap() {
     if (playerObj) {
       drawPlayer(ctx, canvas, playerObj, mapData.info);
     }
-  }, [mapData, mapImage]);
+  }, [mapData, mapImage, mapMode]);
 
   const calculateEnemyDistances = (
     player: MapObject,
@@ -254,9 +260,13 @@ export function MiniMap() {
   };
 
   const drawGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, info: MapInfo) => {
-    // Use visible grid size (matches in-game view)
-    const mapSizeX = info.grid_size[0];
-    const mapSizeY = info.grid_size[1];
+    // Use grid size based on map mode
+    const mapSizeX = mapMode === 'full' 
+      ? info.map_max[0] - info.map_min[0] 
+      : info.grid_size[0];
+    const mapSizeY = mapMode === 'full'
+      ? info.map_max[1] - info.map_min[1]
+      : info.grid_size[1];
     
     // Use grid_steps from API
     const gridStepX = info.grid_steps[0];
@@ -335,11 +345,17 @@ export function MiniMap() {
       const worldX = apiX * mapWidth + info.map_min[0];
       const worldY = (1 - apiY) * mapHeight + info.map_min[1];
       
-      // 2. Convert world coords to visible area coords
-      const visibleX = (worldX - info.grid_zero[0]) / info.grid_size[0];
-      const visibleY = (info.grid_zero[1] - worldY) / info.grid_size[1];
-      
-      return { x: visibleX, y: visibleY };
+      if (mapMode === 'full') {
+        // Full map mode: convert world coords to normalized 0..1 directly
+        const visibleX = (worldX - info.map_min[0]) / mapWidth;
+        const visibleY = (info.map_max[1] - worldY) / mapHeight;
+        return { x: visibleX, y: visibleY };
+      } else {
+        // Current mode: convert to visible area coords (grid_zero/grid_size)
+        const visibleX = (worldX - info.grid_zero[0]) / info.grid_size[0];
+        const visibleY = (info.grid_zero[1] - worldY) / info.grid_size[1];
+        return { x: visibleX, y: visibleY };
+      }
     };
     
     if (obj.x === undefined || obj.y === undefined) {
@@ -411,13 +427,20 @@ export function MiniMap() {
   ) => {
     if (obj.x === undefined || obj.y === undefined) return;
 
-    // Convert API coords (relative to full map) to canvas coords (same as image crop)
+    // Convert API coords to canvas coords
     const mapWidth = info.map_max[0] - info.map_min[0];
     const mapHeight = info.map_max[1] - info.map_min[1];
     const worldX = obj.x * mapWidth + info.map_min[0];
     const worldY = (1 - obj.y) * mapHeight + info.map_min[1]; // API Y inverted!
-    const visibleX = (worldX - info.grid_zero[0]) / info.grid_size[0];
-    const visibleY = (info.grid_zero[1] - worldY) / info.grid_size[1];
+    
+    let visibleX, visibleY;
+    if (mapMode === 'full') {
+      visibleX = (worldX - info.map_min[0]) / mapWidth;
+      visibleY = (info.map_max[1] - worldY) / mapHeight;
+    } else {
+      visibleX = (worldX - info.grid_zero[0]) / info.grid_size[0];
+      visibleY = (info.grid_zero[1] - worldY) / info.grid_size[1];
+    }
     
     const x = visibleX * canvas.width;
     const y = visibleY * canvas.height;
@@ -454,6 +477,26 @@ export function MiniMap() {
       <div className="minimap-header">
         <h3>{t('map.title')}</h3>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              className={`btn btn-${mapMode === 'current' ? 'primary' : 'secondary'}`}
+              onClick={() => setMapMode('current')}
+              disabled={!isEnabled}
+              title="Current vehicle view (tank/aircraft)"
+              style={{ fontSize: '11px', padding: '4px 8px' }}
+            >
+              Current
+            </button>
+            <button
+              className={`btn btn-${mapMode === 'full' ? 'primary' : 'secondary'}`}
+              onClick={() => setMapMode('full')}
+              disabled={!isEnabled}
+              title="Full map view"
+              style={{ fontSize: '11px', padding: '4px 8px' }}
+            >
+              Full
+            </button>
+          </div>
           <button 
             className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
             onClick={() => setIsEnabled(!isEnabled)}
@@ -478,30 +521,34 @@ export function MiniMap() {
             {error.includes('connect') ? 'War Thunder not running' : t('map.no_data')}
           </div>
         )}
-        {mapData && isEnabled && (
-          <div className="minimap-stats">
-            {mapData.map_name && (
-              <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', color: '#64c8ff' }}>
-                📍 {mapData.map_name}
-              </div>
-            )}
-            <div>{t('map.objects')} {mapData.objects.length}</div>
-            {mapData.player_grid && (
-              <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: 'bold' }}>
-                🎯 Grid: {mapData.player_grid}
-              </div>
-            )}
-            {mapData.player_position && (
-              <div style={{ fontSize: '10px', color: '#888' }}>
-                ({mapData.player_position[0].toFixed(3)}, {mapData.player_position[1].toFixed(3)})
-              </div>
-            )}
-            {mapData.player_heading !== null && (
-              <div>🧭 {mapData.player_heading.toFixed(0)}° {getCompassDirection(mapData.player_heading)}</div>
-            )}
+      </div>
+      {mapData && isEnabled && (
+        <div className="minimap-stats-bottom">
+          {mapData.map_name && (
+            <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px', color: '#64c8ff' }}>
+              📍 {mapData.map_name}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div>
+              <div>{t('map.objects')} {mapData.objects.length}</div>
+              {mapData.player_grid && (
+                <div style={{ fontSize: '11px', color: '#22c55e', fontWeight: 'bold' }}>
+                  🎯 Grid: {mapData.player_grid}
+                </div>
+              )}
+              {mapData.player_position && (
+                <div style={{ fontSize: '10px', color: '#888' }}>
+                  ({mapData.player_position[0].toFixed(3)}, {mapData.player_position[1].toFixed(3)})
+                </div>
+              )}
+              {mapData.player_heading !== null && (
+                <div>🧭 {mapData.player_heading.toFixed(0)}° {getCompassDirection(mapData.player_heading)}</div>
+              )}
+            </div>
             {nearestEnemies.length > 0 && (
               <div className="minimap-enemies">
-                <div style={{ fontWeight: 'bold', marginTop: '8px' }}>{t('map.nearest_enemies')}</div>
+                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{t('map.nearest_enemies')}</div>
                 {nearestEnemies.map((enemy, idx) => (
                   <div key={idx} style={{ fontSize: '11px', color: '#ff6666' }}>
                     {idx + 1}. {enemy.type}: {enemy.distance.toFixed(0)}m @ {enemy.bearing.toFixed(0)}° {getCompassDirection(enemy.bearing)}
@@ -509,14 +556,14 @@ export function MiniMap() {
                 ))}
               </div>
             )}
-            {isEnabled && nearestEnemies.length === 0 && mapData && mapData.info.valid && (
-              <div style={{ fontSize: '11px', color: '#888', marginTop: '8px', fontStyle: 'italic' }}>
+            {nearestEnemies.length === 0 && mapData.info.valid && (
+              <div style={{ fontSize: '11px', color: '#888', fontStyle: 'italic' }}>
                 {t('map.no_enemies')}
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

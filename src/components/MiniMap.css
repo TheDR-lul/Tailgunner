@@ -93,6 +93,25 @@
   margin: 0;
 }
 
+.minimap-stats-bottom {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+.minimap-stats-bottom > div {
+  margin: 0;
+}
+
+.minimap-enemies {
+  flex-shrink: 0;
+}
+
 /* Button styling */
 .minimap-header .btn {
   padding: 6px 16px;
