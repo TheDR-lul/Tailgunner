@@ -835,6 +835,34 @@ async fn get_map_data() -> Result<map_module::MapData, String> {
     Ok(map_module::MapData::new(objects, info))
 }
 
+/// Get map image as base64
+#[tauri::command]
+async fn get_map_image(map_generation: u32) -> Result<String, String> {
+    let url = format!("http://127.0.0.1:8111/map.img?gen={}", map_generation);
+    
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch map image: {}", e))?;
+    
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read image bytes: {}", e))?;
+    
+    // Convert to base64
+    use base64::{Engine as _, engine::general_purpose};
+    let base64_image = general_purpose::STANDARD.encode(&bytes);
+    
+    Ok(format!("data:image/png;base64,{}", base64_image))
+}
+
 /// Vehicle mode info for UI
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct VehicleModeInfo {
@@ -984,6 +1012,7 @@ pub fn run() {
             get_map_objects,
             get_map_info,
             get_map_data,
+            get_map_image,
             get_vehicle_mode,
         ])
         .run(tauri::generate_context!())

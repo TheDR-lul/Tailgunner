@@ -38,6 +38,7 @@ rusqlite = { version = "0.37.0", features = ["bundled"] }
 dirs = "6.0.0"
 zstd = "0.13"
 flate2 = "1.1.5"
+base64 = "0.22"
 wt_blk = "0.3.1"
 
 [target.'cfg(windows)'.dependencies]

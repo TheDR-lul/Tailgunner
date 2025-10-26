@@ -550,6 +550,7 @@ name = "butt_thunder"
 version = "0.8.1"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "buttplug",
  "chrono",
  "dirs",

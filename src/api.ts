@@ -191,6 +191,10 @@ export const api = {
     return invoke('get_map_data');
   },
 
+  async getMapImage(mapGeneration: number): Promise<string> {
+    return invoke('get_map_image', { mapGeneration });
+  },
+
   async getVehicleMode(): Promise<any> {
     return invoke('get_vehicle_mode');
   },

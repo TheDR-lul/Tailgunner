@@ -56,17 +56,26 @@ export function MiniMap() {
         
         // Load map image if map generation changed
         if (data.info.valid && data.info.map_generation !== currentMapGen) {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            setMapImage(img);
-            setCurrentMapGen(data.info.map_generation);
-          };
-          img.onerror = () => {
-            console.warn('Failed to load map image');
+          try {
+            // Load image through Tauri backend to avoid CORS issues
+            const base64Image = await invoke<string>('get_map_image', { 
+              mapGeneration: data.info.map_generation 
+            });
+            
+            const img = new Image();
+            img.onload = () => {
+              setMapImage(img);
+              setCurrentMapGen(data.info.map_generation);
+            };
+            img.onerror = () => {
+              console.warn('Failed to load map image');
+              setMapImage(null);
+            };
+            img.src = base64Image;
+          } catch (error) {
+            console.warn('Failed to fetch map image:', error);
             setMapImage(null);
-          };
-          img.src = `http://127.0.0.1:8111/map.img?gen=${data.info.map_generation}`;
+          }
         }
       } catch (err) {
         setError(String(err));
