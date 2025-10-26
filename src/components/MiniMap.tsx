@@ -42,6 +42,8 @@ export function MiniMap() {
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [mapImage, setMapImage] = useState<HTMLImageElement | null>(null);
+  const [currentMapGen, setCurrentMapGen] = useState<number>(-1);
 
   useEffect(() => {
     if (!isEnabled) return;
@@ -51,13 +53,28 @@ export function MiniMap() {
         const data = await invoke<MapData>('get_map_data');
         setMapData(data);
         setError(null);
+        
+        // Load map image if map generation changed
+        if (data.info.valid && data.info.map_generation !== currentMapGen) {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            setMapImage(img);
+            setCurrentMapGen(data.info.map_generation);
+          };
+          img.onerror = () => {
+            console.warn('Failed to load map image');
+            setMapImage(null);
+          };
+          img.src = `http://127.0.0.1:8111/map.img?gen=${data.info.map_generation}`;
+        }
       } catch (err) {
         setError(String(err));
       }
     }, 500); // Update every 500ms
 
     return () => clearInterval(interval);
-  }, [isEnabled]);
+  }, [isEnabled, currentMapGen]);
 
   useEffect(() => {
     if (!mapData || !canvasRef.current) return;
@@ -80,6 +97,15 @@ export function MiniMap() {
       return;
     }
 
+    // Draw map image as background
+    if (mapImage) {
+      ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
+      
+      // Draw semi-transparent overlay for better object visibility
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     // Draw grid
     drawGrid(ctx, canvas, mapData.info);
 
@@ -97,10 +123,11 @@ export function MiniMap() {
     if (playerObj) {
       drawPlayer(ctx, canvas, playerObj, mapData.info);
     }
-  }, [mapData]);
+  }, [mapData, mapImage]);
 
   const drawGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, info: MapInfo) => {
-    ctx.strokeStyle = '#333';
+    // Make grid more visible when map image is present
+    ctx.strokeStyle = mapImage ? 'rgba(255, 255, 255, 0.3)' : '#333';
     ctx.lineWidth = 1;
     ctx.beginPath();
 
