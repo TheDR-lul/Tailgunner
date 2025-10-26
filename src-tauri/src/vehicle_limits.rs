@@ -138,6 +138,8 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
     }
     
@@ -156,6 +158,8 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
         curve_points: None,
         continuous: false,
         is_event_based: false,
+        filter_type: None,
+        filter_text: None,
     });
     
     // Max +G Warning (80% of max) - only if data available
@@ -174,6 +178,8 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
     }
     
@@ -193,6 +199,8 @@ fn generate_aircraft_triggers(aircraft: &AircraftLimits) -> Vec<EventTrigger> {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
     }
     
@@ -219,6 +227,8 @@ fn generate_ground_triggers(ground: &crate::datamine::types::GroundLimits) -> Ve
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
     }
     

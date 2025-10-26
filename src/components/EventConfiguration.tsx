@@ -108,9 +108,19 @@ export function EventConfiguration() {
     }
   };
 
-  // Get triggers for a specific event
+  // Get triggers for a specific event (ONLY system triggers, NO user patterns)
   const getTriggersForEvent = (eventName: string): EventTrigger[] => {
-    return triggers.filter(trigger => trigger.event === eventName);
+    return triggers.filter(trigger => {
+      // Match event name
+      if (trigger.event !== eventName) return false;
+      
+      // ❌ EXCLUDE user patterns from Pattern Manager
+      const isUserPattern = (trigger.is_builtin === false && !trigger.id.startsWith('dynamic_'));
+      if (isUserPattern) return false;
+      
+      // ✅ INCLUDE built-in and dynamic triggers
+      return true;
+    });
   };
 
   const vehicleIcons: Record<string, string> = {
@@ -155,11 +165,31 @@ export function EventConfiguration() {
         {/* All Triggers Section - ONLY Built-in + Vehicle-specific Dynamic (NO user patterns!) */}
         <div style={{ marginBottom: '32px' }}>
           {(() => {
-            // Filter: show ONLY built-in and vehicle-specific dynamic triggers
-            // User-created patterns (from Pattern Manager) should NOT appear here
-            const systemTriggers = triggers.filter(t => 
-              t.is_builtin || t.id.startsWith('dynamic_')
-            );
+            // Filter: show ONLY built-in triggers that are NOT assigned to any profile
+            // If a trigger's event is in a profile, it should appear ONLY there (no duplicates!)
+            const systemTriggers = triggers.filter(t => {
+              // ❌ EXCLUDE user-created patterns from Pattern Manager
+              // User patterns have is_builtin=false and are managed in Pattern Manager tab
+              const isUserPattern = (t.is_builtin === false && !t.id.startsWith('dynamic_'));
+              if (isUserPattern) {
+                return false; // Hide from "All Triggers"
+              }
+              
+              // ✅ At this point: built-in triggers OR dynamic vehicle-specific triggers
+              
+              // Check if this trigger's event is already handled by ANY active profile
+              const isInProfile = profiles.some(profile => 
+                profile.event_mappings && Object.keys(profile.event_mappings).includes(t.event)
+              );
+              
+              // Show ONLY if NOT in any profile (avoid duplicates)
+              return !isInProfile;
+            });
+            
+            // Don't show "All Triggers" section if empty (all triggers are in profiles)
+            if (systemTriggers.length === 0) {
+              return null;
+            }
             
             return (
               <>

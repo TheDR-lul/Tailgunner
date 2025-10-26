@@ -762,7 +762,7 @@ pub fn run() {
     }
     env_logger::init();
 
-    let mut engine = HapticEngine::new();
+    let engine = HapticEngine::new();
     
     // Load player identity from database
     match player_identity_db::PlayerIdentityDB::new() {

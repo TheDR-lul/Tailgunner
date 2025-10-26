@@ -226,85 +226,116 @@ impl HapticEngine {
                     ee.detect_events(&game_state)
                 };
                 
-                // Check ONLY indicator-based triggers (overspeed, over-G, etc.)
-                // Event-based triggers (with AlwaysTrue condition) should ONLY fire when HUD events occur
+                // Check indicator-based triggers (overspeed, over-G, etc.)
+                // Event-based triggers are automatically skipped in check_triggers() and handled separately below
                 let trigger_events = {
                     let mut tm = trigger_manager.write().await;
                     let events = tm.check_triggers(&game_state);
                     
-                    // Filter out AlwaysTrue triggers (they are event-based and should be checked against HUD events)
-                    let filtered_events: Vec<_> = events.into_iter()
-                        .filter(|(event, _pattern)| {
-                            // Only keep non-event-based triggers
-                            // Event-based triggers have AlwaysTrue condition and should be matched against HUD events below
-                            !matches!(event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire | 
-                                      GameEvent::TakingDamage | GameEvent::SeverelyDamaged | 
-                                      GameEvent::ShotDown | GameEvent::Achievement | GameEvent::ChatMessage)
-                        })
-                        .collect();
-                    
-                    if !filtered_events.is_empty() {
-                        log::info!("[Triggers] 🎯 {} indicator triggers fired", filtered_events.len());
-                        for (event, pattern) in &filtered_events {
+                    if !events.is_empty() {
+                        log::info!("[Triggers] 🎯 {} indicator triggers fired", events.len());
+                        for (event, pattern) in &events {
                             log::info!("[Triggers]   - {:?} (pattern: {})", 
                                 event, pattern.is_some());
                         }
                     }
                     
-                    filtered_events
+                    events
                 };
                 
-                // Process HUD events (kills, crashes, overheats) and match against event-based triggers
-                let hud_events: Vec<GameEvent> = game_state.hud_events.iter().map(|hud_evt| {
+                // Process HUD events and filter by event-based triggers
+                let telemetry_lock = telemetry.read().await;
+                let player_names = telemetry_lock.get_player_names().to_vec();
+                let clan_tags = telemetry_lock.get_clan_tags().to_vec();
+                let enemy_names = telemetry_lock.get_enemy_names().to_vec();
+                let enemy_clans = telemetry_lock.get_enemy_clans().to_vec();
+                drop(telemetry_lock);
+                
+                let trigger_manager_lock = trigger_manager.read().await;
+                let all_triggers = trigger_manager_lock.get_triggers().to_vec();
+                drop(trigger_manager_lock);
+                
+                let mut hud_events_with_patterns: Vec<(GameEvent, Option<VibrationPattern>)> = Vec::new();
+                
+                for hud_evt in &game_state.hud_events {
                     use crate::wt_telemetry::HudEvent;
-                    match hud_evt {
+                    
+                    // Extract entity name and game event
+                    let (entity_name, game_event) = match hud_evt {
                         HudEvent::Kill(enemy) => {
                             log::info!("[HUD] 🎯 Kill: {}", enemy);
-                            GameEvent::TargetDestroyed
+                            (enemy.as_str(), GameEvent::TargetDestroyed)
                         }
                         HudEvent::Crashed => {
                             log::warn!("[HUD] 💥 Crashed!");
-                            GameEvent::Crashed
+                            ("", GameEvent::Crashed)
                         }
                         HudEvent::EngineOverheated => {
                             log::warn!("[HUD] 🔥 Engine overheated!");
-                            GameEvent::EngineOverheat
+                            ("", GameEvent::EngineOverheat)
                         }
                         HudEvent::OilOverheated => {
                             log::warn!("[HUD] 🛢️ Oil overheated!");
-                            GameEvent::OilOverheated
+                            ("", GameEvent::OilOverheated)
                         }
                         HudEvent::SetAfire(victim) => {
                             log::info!("[HUD] 🔥 Set enemy on fire: {}", victim);
-                            GameEvent::EnemySetAfire
+                            (victim.as_str(), GameEvent::EnemySetAfire)
                         }
                         HudEvent::TakeDamage(attacker) => {
                             log::warn!("[HUD] 💥 Taking damage from: {}", attacker);
-                            GameEvent::TakingDamage
+                            (attacker.as_str(), GameEvent::TakingDamage)
                         }
                         HudEvent::SeverelyDamaged(attacker) => {
                             log::warn!("[HUD] 💔 Severely damaged by: {}", attacker);
-                            GameEvent::SeverelyDamaged
+                            (attacker.as_str(), GameEvent::SeverelyDamaged)
                         }
                         HudEvent::ShotDown(attacker) => {
                             log::warn!("[HUD] ✈️💥 Shot down by: {}", attacker);
-                            GameEvent::ShotDown
+                            (attacker.as_str(), GameEvent::ShotDown)
                         }
                         HudEvent::Achievement(name) => {
                             log::info!("[HUD] 🏆 Achievement: {}", name);
-                            GameEvent::Achievement
+                            (name.as_str(), GameEvent::Achievement)
                         }
                         HudEvent::ChatMessage(text) => {
                             log::debug!("[HUD] 💬 Chat message: {}", text);
-                            GameEvent::ChatMessage
+                            (text.as_str(), GameEvent::ChatMessage)
                         }
+                    };
+                    
+                    // Find matching event-based triggers
+                    for trigger in &all_triggers {
+                        if !trigger.enabled || !trigger.is_event_based {
+                            continue;
+                        }
+                        
+                        if trigger.event != game_event {
+                            continue;
+                        }
+                        
+                        // Apply filter
+                        if !crate::event_triggers::TriggerManager::should_fire_event_trigger(
+                            trigger,
+                            entity_name,
+                            &player_names,
+                            &clan_tags,
+                            &enemy_names,
+                            &enemy_clans,
+                        ) {
+                            log::debug!("[HUD] ❌ Trigger '{}' filtered out for entity '{}'", trigger.name, entity_name);
+                            continue;
+                        }
+                        
+                        log::info!("[HUD] ✅ Trigger '{}' matched for entity '{}'", trigger.name, entity_name);
+                        hud_events_with_patterns.push((game_event.clone(), trigger.pattern.clone()));
                     }
-                }).collect();
+                }
                 
                 // Combine events: basic, triggers (including dynamic), and HUD events
                 let mut all_events: Vec<(GameEvent, Option<VibrationPattern>)> = trigger_events;
                 all_events.extend(basic_events.into_iter().map(|e| (e, None)));
-                all_events.extend(hud_events.into_iter().map(|e| (e, None)));
+                all_events.extend(hud_events_with_patterns);
                 
                 // Process each event
                 if !all_events.is_empty() {
@@ -510,6 +541,11 @@ impl HapticEngine {
     /// Get telemetry reader (for loading player identity from DB)
     pub fn get_telemetry(&self) -> Arc<RwLock<crate::wt_telemetry::WTTelemetryReader>> {
         Arc::clone(&self.telemetry)
+    }
+    
+    /// Get vehicle limits manager (for % of max value calculations in patterns)
+    pub fn get_vehicle_limits_manager(&self) -> Arc<RwLock<VehicleLimitsManager>> {
+        Arc::new(RwLock::new(VehicleLimitsManager::new().expect("Failed to get vehicle limits manager")))
     }
 
     pub fn get_device_manager(&self) -> Arc<DeviceManager> {

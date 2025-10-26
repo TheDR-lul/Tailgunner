@@ -1,0 +1,85 @@
+   Compiling butt_thunder v0.8.0 (G:\projects\Butt_Thunder\src-tauri)
+error[E0521]: borrowed data escapes outside of method
+   --> src\haptic_engine.rs:119:9
+    |
+105 |       pub async fn start(&self) -> Result<()> {
+    |                          -----
+    |                          |
+    |                          `self` is a reference that is only valid in the method body
+    |                          let's call the lifetime of this reference `'1`
+...
+119 | /         tokio::spawn(async move {
+120 | |             let mut tick_interval = interval(WTTelemetryReader::get_poll_interval());
+121 | |             let mut connection_lost_counter = 0u32;
+122 | |             let mut connection_established = false;
+...   |
+401 | |             let _ = device_manager.stop_all().await;
+402 | |         });
+    | |          ^
+    | |          |
+    | |__________`self` escapes the method body here
+    |            argument requires that `'1` must outlive `'static`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:319:28
+    |
+319 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:335:28
+    |
+335 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:353:28
+    |
+353 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:371:28
+    |
+371 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:387:28
+    |
+387 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:405:28
+    |
+405 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:421:28
+    |
+421 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:439:28
+    |
+439 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:455:28
+    |
+455 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+error[E0063]: missing fields `filter_text` and `filter_type` in initializer of `EventTrigger`
+   --> src\event_triggers.rs:473:28
+    |
+473 |         self.triggers.push(EventTrigger {
+    |                            ^^^^^^^^^^^^ missing `filter_text` and `filter_type`
+
+Some errors have detailed explanations: E0063, E0521.
+For more information about an error, try `rustc --explain E0063`.
+error: could not compile `butt_thunder` (lib) due to 11 previous errors

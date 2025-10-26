@@ -49,10 +49,9 @@ impl ProfileManager {
         // Common events (controlled by built-in triggers)
         tank_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         tank_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
-        tank_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
-        tank_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
-        tank_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
-        tank_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_simple_hit());
+        // NOTE: Tanks don't use fuel in War Thunder, so LowFuel/CriticalFuel are omitted
+        tank_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_critical_hit());
+        tank_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_critical_hit());
         tank_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
         
         // Tank-specific events
@@ -79,15 +78,21 @@ impl ProfileManager {
         // Common events (controlled by built-in triggers)
         aircraft_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
+        
+        // Fuel warnings (aircraft-specific)
         aircraft_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
+        
+        // Ammo and engine
         aircraft_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
-        aircraft_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
         
-        // Aircraft-specific flight dynamics
+        // Aircraft-specific flight dynamics (different patterns for variety)
         aircraft_mappings.insert(GameEvent::Stall, VibrationPattern::preset_fire());
         aircraft_mappings.insert(GameEvent::Spin, VibrationPattern::preset_fire());
+        
+        // Overspeed & OverG - stronger patterns for critical warnings
         aircraft_mappings.insert(GameEvent::Overspeed, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::OverG, VibrationPattern::preset_critical_hit());
         aircraft_mappings.insert(GameEvent::HighAOA, VibrationPattern::preset_simple_hit());

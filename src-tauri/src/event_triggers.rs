@@ -286,6 +286,10 @@ pub struct EventTrigger {
     pub continuous: bool, // If true, vibrates continuously while condition is true
     #[serde(default)]
     pub is_event_based: bool, // If true, only fires on HUD events, not on check_triggers
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter_type: Option<String>, // Filter type: "any", "my_players", "my_clans", "text_contains", "enemy_players", "enemy_clans"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter_text: Option<String>, // Filter text for "text_contains" mode
 }
 
 /// Trigger Manager
@@ -325,6 +329,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // Critical fuel (<5%)
@@ -341,6 +347,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // === AMMO WARNINGS (COMMON FOR ALL) ===
@@ -359,6 +367,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // === ENGINE WARNINGS (COMMON FOR ALL) ===
@@ -377,6 +387,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // Engine fire
@@ -393,6 +405,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // === AIRCRAFT G-LOAD WARNINGS (VEHICLE-SPECIFIC, UPDATED ON VEHICLE CHANGE) ===
@@ -411,6 +425,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // Negative G Warning (default -4G, updated from datamine to 80% of vehicle max)
@@ -427,6 +443,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // === AIRCRAFT SPEED WARNINGS (VEHICLE-SPECIFIC, UPDATED ON VEHICLE CHANGE) ===
@@ -445,6 +463,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // Overspeed Warning (default 1550 km/h, updated from datamine to Vne)
@@ -461,6 +481,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
         
         // === GROUND SPEED WARNING (VEHICLE-SPECIFIC, UPDATED ON VEHICLE CHANGE) ===
@@ -479,6 +501,8 @@ impl TriggerManager {
             curve_points: None,
             continuous: false,
             is_event_based: false,
+            filter_type: None,
+            filter_text: None,
         });
     }
     
@@ -511,6 +535,12 @@ impl TriggerManager {
         
         for trigger in &self.triggers {
             if !trigger.enabled {
+                continue;
+            }
+            
+            // ❌ SKIP event-based triggers - they should ONLY fire on HUD events!
+            // Event-based triggers are handled separately in haptic_engine when HUD events occur
+            if trigger.is_event_based {
                 continue;
             }
             
@@ -866,6 +896,76 @@ impl TriggerManager {
         } else {
             log::warn!("[Triggers] Trigger not found: {}", id);
             false
+        }
+    }
+    
+    /// Check if event-based trigger should fire based on filter
+    pub fn should_fire_event_trigger(
+        trigger: &EventTrigger,
+        entity_name: &str,
+        player_names: &[String],
+        clan_tags: &[String],
+        enemy_names: &[String],
+        enemy_clans: &[String],
+    ) -> bool {
+        match trigger.filter_type.as_deref() {
+            None | Some("any") => true,
+            
+            // For TargetDestroyed (kills), "my_players" means YOU are the attacker
+            // wt_telemetry.rs already filtered out other players' kills
+            // So if we got this event, it's OUR kill - always pass
+            Some("my_players") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire) {
+                    // For kill/afire events, entity_name is the VICTIM
+                    // If we got this event, WE are the attacker (wt_telemetry filtered it)
+                    // So always return true for "my_players" filter
+                    log::info!("[HUD] ✅ KILL event - 'my_players' filter passed (you are attacker)");
+                    true
+                } else {
+                    // For other events (TakingDamage, ShotDown), entity_name is the attacker
+                    // Check if attacker is us
+                    player_names.iter().any(|name| entity_name.contains(name))
+                }
+            },
+            
+            Some("my_clans") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire) {
+                    // Same logic for clan filter
+                    log::info!("[HUD] ✅ KILL event - 'my_clans' filter passed (you are attacker)");
+                    true
+                } else {
+                    clan_tags.iter().any(|tag| entity_name.contains(tag))
+                }
+            },
+            
+            Some("enemy_players") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire) {
+                    // For kills, check if VICTIM is in enemy list
+                    enemy_names.iter().any(|name| entity_name.contains(name))
+                } else {
+                    // For damage events, check if ATTACKER is in enemy list
+                    enemy_names.iter().any(|name| entity_name.contains(name))
+                }
+            },
+            
+            Some("enemy_clans") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire) {
+                    // For kills, check if VICTIM is in enemy clan list
+                    enemy_clans.iter().any(|tag| entity_name.contains(tag))
+                } else {
+                    // For damage events, check if ATTACKER is in enemy clan list
+                    enemy_clans.iter().any(|tag| entity_name.contains(tag))
+                }
+            },
+            
+            Some("text_contains") => {
+                if let Some(filter_text) = &trigger.filter_text {
+                    entity_name.to_lowercase().contains(&filter_text.to_lowercase())
+                } else {
+                    false
+                }
+            },
+            _ => false,
         }
     }
 }

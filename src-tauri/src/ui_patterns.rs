@@ -175,6 +175,8 @@ impl UIPattern {
             curve_points: None,
             continuous,
             is_event_based: false, // These are indicator-based, check on every frame
+            filter_type: None,
+            filter_text: None,
         })
     }
     
@@ -185,7 +187,7 @@ impl UIPattern {
         condition_node: &UINode
     ) -> Option<TriggerCondition> {
         let operator = condition_node.data.get("operator")?.as_str()?;
-        let mut value = condition_node.data.get("value")?.as_f64()? as f32;
+        let value = condition_node.data.get("value")?.as_f64()? as f32;
         
         // ⚠️ TODO: "% of max value" (usePercentage) NOT implemented yet!
         // Requires vehicle limits context to calculate actual threshold
@@ -378,6 +380,8 @@ impl UIPattern {
             curve_points: None,
             continuous: false, // Events are NOT continuous (one-shot)
             is_event_based: true, // Only fire on HUD events, NOT on check_triggers
+            filter_type: if filter_type == "any" { None } else { Some(filter_type.to_string()) },
+            filter_text: if filter_text.is_empty() { None } else { Some(filter_text.to_string()) },
         })
     }
     
@@ -659,16 +663,7 @@ impl UIPattern {
         let duration = data.get("duration")?.as_f64()? as u64;
         let duration_ms = duration * 1000;
         
-        let curve = data.get("curve")?.as_array()?;
-        
-        let intensity = if curve.is_empty() {
-            0.5
-        } else {
-            let sum: f64 = curve.iter()
-                .filter_map(|p| p.get("y")?.as_f64())
-                .sum();
-            (sum / curve.len() as f64) as f32
-        };
+        let curve_array = data.get("curve")?.as_array()?;
         
         let mode = data.get("mode")?.as_str().unwrap_or("once");
         let repeat_count = data.get("repeatCount")
@@ -685,35 +680,33 @@ impl UIPattern {
         
         log::info!("[UI Pattern] Vibration mode: '{}', repeat: {}, pause: {}ms", mode, final_repeat_count, pause_ms);
         
-        let attack_duration = duration_ms / 4;
-        let hold_duration = duration_ms / 2;
-        let decay_duration = duration_ms / 4;
+        // Parse curve points from JSON
+        let curve_points: Vec<crate::pattern_engine::CurvePoint> = curve_array.iter()
+            .filter_map(|p| {
+                Some(crate::pattern_engine::CurvePoint {
+                    x: p.get("x")?.as_f64()? as f32,
+                    y: p.get("y")?.as_f64()? as f32,
+                })
+            })
+            .collect();
         
-        Some(VibrationPattern {
-            name: "UI Custom Pattern".to_string(),
-            attack: EnvelopeStage {
-                duration_ms: attack_duration,
-                start_intensity: 0.0,
-                end_intensity: intensity,
-                curve: Curve::EaseIn,
-            },
-            hold: EnvelopeStage {
-                duration_ms: hold_duration,
-                start_intensity: intensity,
-                end_intensity: intensity,
-                curve: Curve::Linear,
-            },
-            decay: EnvelopeStage {
-                duration_ms: decay_duration,
-                start_intensity: intensity,
-                end_intensity: 0.0,
-                curve: Curve::EaseOut,
-            },
-            burst: BurstConfig {
-                repeat_count: final_repeat_count,
-                pause_between_ms: pause_ms,
-            },
-        })
+        if curve_points.is_empty() {
+            log::warn!("[UI Pattern] ⚠️ No curve points, using default simple pattern");
+            return Some(VibrationPattern::simple(0.5, duration_ms));
+        }
+        
+        log::info!("[UI Pattern] ✅ Using custom curve with {} points", curve_points.len());
+        
+        // Use from_curve_points to create pattern that follows the actual curve!
+        let mut pattern = VibrationPattern::from_curve_points(curve_points, duration_ms);
+        
+        // Override burst config with user settings
+        pattern.burst = BurstConfig {
+            repeat_count: final_repeat_count,
+            pause_between_ms: pause_ms,
+        };
+        
+        Some(pattern)
     }
     
     /// Parse linear pattern from LinearNode

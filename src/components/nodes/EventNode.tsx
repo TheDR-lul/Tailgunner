@@ -65,6 +65,38 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
   const needsPlayerFilter = ['TargetDestroyed', 'EnemySetAfire', 'TakingDamage', 'SeverelyDamaged', 'ShotDown', 'Achievement'].includes(event);
   const showFilter = needsTextFilter || needsPlayerFilter;
   
+  // Context-dependent filter labels
+  const isKillEvent = ['TargetDestroyed', 'EnemySetAfire'].includes(event);
+  const isDamageEvent = ['TakingDamage', 'SeverelyDamaged', 'ShotDown'].includes(event);
+  
+  // Get filter description based on event type
+  const getFilterLabel = (filterValue: string) => {
+    if (isKillEvent) {
+      // For kill events: YOU are the attacker, entity_name is victim
+      switch (filterValue) {
+        case 'any': return '🌍 Any kill (anyone)';
+        case 'my_players': return '✅ I killed someone';
+        case 'my_clans': return '🏷️ My clan killed someone';
+        case 'enemy_players': return '🎯 I killed tracked enemy';
+        case 'enemy_clans': return '☠️ I killed enemy clan member';
+        default: return filterValue;
+      }
+    } else if (isDamageEvent) {
+      // For damage events: entity_name is the attacker, YOU are victim
+      switch (filterValue) {
+        case 'any': return '🌍 Anyone damaged me';
+        case 'my_players': return '👤 I damaged myself?'; // Edge case
+        case 'my_clans': return '🏷️ My clan damaged me?'; // Edge case
+        case 'enemy_players': return '🎯 Tracked enemy damaged me';
+        case 'enemy_clans': return '☠️ Enemy clan damaged me';
+        default: return filterValue;
+      }
+    } else {
+      // Generic labels
+      return filterValue;
+    }
+  };
+  
   return (
     <div 
       className="custom-node event-node" 
@@ -122,6 +154,11 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
             <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
               <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '4px' }}>
                 🎯 Filter:
+                {isKillEvent && (
+                  <div style={{ fontSize: '7px', color: '#94a3b8', marginTop: '2px' }}>
+                    💡 To trigger when <strong>YOU are killed</strong>, use "ShotDown" or "TakingDamage" event instead
+                  </div>
+                )}
               </div>
         <select
           value={filterType}
@@ -135,16 +172,16 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
             fontSize: '10px'
           }}
         >
-          <option value="any">🌍 Any {needsTextFilter ? 'message' : 'victim'}</option>
+          <option value="any">{getFilterLabel('any')}</option>
           {needsTextFilter && (
             <option value="text_contains">💬 Contains text</option>
           )}
           {needsPlayerFilter && (
             <>
-              <option value="my_players">👤 My players (attacker)</option>
-              <option value="my_clans">🏷️ My clans (attacker)</option>
-              <option value="enemy_players">🎯 Enemy players (victim)</option>
-              <option value="enemy_clans">☠️ Enemy clans (victim)</option>
+              <option value="my_players">{getFilterLabel('my_players')}</option>
+              <option value="my_clans">{getFilterLabel('my_clans')}</option>
+              <option value="enemy_players">{getFilterLabel('enemy_players')}</option>
+              <option value="enemy_clans">{getFilterLabel('enemy_clans')}</option>
             </>
           )}
         </select>
@@ -181,7 +218,21 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
             background: 'rgba(99, 102, 241, 0.1)',
             borderRadius: '3px'
           }}>
-            💡 Uses names from Player Identity
+            {isKillEvent ? (
+              <div>
+                💡 <strong>How it works:</strong><br/>
+                • Set your nickname in <strong>Player Identity</strong><br/>
+                • Fires when <strong>YOU</strong> kill anyone
+              </div>
+            ) : isDamageEvent ? (
+              <div>
+                💡 <strong>How it works:</strong><br/>
+                • Set your nickname in <strong>Player Identity</strong><br/>
+                • Fires when attacker matches your name (rare)
+              </div>
+            ) : (
+              '💡 Uses names from Player Identity'
+            )}
           </div>
         )}
         
@@ -194,7 +245,21 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
             background: 'rgba(239, 68, 68, 0.1)',
             borderRadius: '3px'
           }}>
-            🎯 Uses names from Enemy List
+            {isKillEvent ? (
+              <div>
+                🎯 <strong>How it works:</strong><br/>
+                • Add enemies in <strong>Player Identity → Enemy List</strong><br/>
+                • Fires when <strong>YOU</strong> kill tracked enemy
+              </div>
+            ) : isDamageEvent ? (
+              <div>
+                🎯 <strong>How it works:</strong><br/>
+                • Add enemies in <strong>Player Identity → Enemy List</strong><br/>
+                • Fires when tracked enemy damages <strong>YOU</strong>
+              </div>
+            ) : (
+              '🎯 Uses names from Enemy List'
+            )}
           </div>
         )}
             </div>
@@ -213,7 +278,7 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
             {showFilter && filterType === 'text_contains' && filterText ? 
               `🎯 "${filterText}"` :
               showFilter && filterType !== 'any' ? 
-                `🎯 ${filterType === 'my_players' ? 'My players' : 'My clans'}` : 
+                `🎯 ${getFilterLabel(filterType).replace(/^[🌍✅🎯☠️🏷️👤] /, '')}` : 
                 `Triggers on: ${t(`game_events.${event}`, event)}`
             }
           </div>
