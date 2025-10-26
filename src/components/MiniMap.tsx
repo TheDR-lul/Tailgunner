@@ -105,20 +105,17 @@ export function MiniMap() {
     return () => window.removeEventListener('localStorageChange', handleStorageChange);
   }, []);
 
-  // Update canvas size based on wrapper size - FORCE SQUARE 1:1
+  // Update canvas size based on wrapper size
   useEffect(() => {
     const wrapper = canvasWrapperRef.current;
     if (!wrapper) return;
 
     const updateSize = () => {
       const rect = wrapper.getBoundingClientRect();
-      // Force square: use minimum of width/height
+      // CSS aspect-ratio: 1/1 ensures wrapper is always square
+      // Just use the actual size
       const size = Math.min(rect.width, rect.height);
       setCanvasSize(size);
-      
-      // Force wrapper to be square
-      wrapper.style.width = `${size}px`;
-      wrapper.style.height = `${size}px`;
     };
 
     updateSize();
@@ -1097,91 +1094,101 @@ export function MiniMap() {
 
   return (
     <div className="minimap-container">
+      {/* Header at the top */}
+      <div className="minimap-header">
+        <div className="minimap-title">
+          <Map size={18} />
+          <h3>{t('map.title')}</h3>
+        </div>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button
+            className={`btn btn-${mapMode === 'current' ? 'primary' : 'secondary'}`}
+            onClick={() => setMapMode('current')}
+            disabled={!isEnabled}
+            title="Current vehicle view"
+            style={{ fontSize: '11px', padding: '4px 8px' }}
+          >
+            Current
+          </button>
+          <button
+            className={`btn btn-${mapMode === 'full' ? 'primary' : 'secondary'}`}
+            onClick={() => setMapMode('full')}
+            disabled={!isEnabled}
+            title="Full map view"
+            style={{ fontSize: '11px', padding: '4px 8px' }}
+          >
+            Full
+          </button>
+          <button
+            className={`btn btn-${followPlayer ? 'primary' : 'secondary'}`}
+            onClick={() => {
+              setFollowPlayer(!followPlayer);
+              if (!followPlayer) {
+                setPanOffset({ x: 0, y: 0 });
+              }
+            }}
+            disabled={!isEnabled}
+            title="Center map on player"
+            style={{ fontSize: '11px', padding: '4px 8px' }}
+          >
+            📍 Follow
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setZoomLevel(1.0);
+              setPanOffset({ x: 0, y: 0 });
+              setFollowPlayer(false);
+            }}
+            disabled={!isEnabled}
+            title="Reset view"
+            style={{ fontSize: '11px', padding: '4px 8px' }}
+          >
+            🔄 Reset
+          </button>
+          <button 
+            className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
+            onClick={() => setIsEnabled(!isEnabled)}
+            title={t('map.rb_warning')}
+          >
+            {isEnabled ? t('map.enabled') : t('map.disabled')}
+          </button>
+        </div>
+      </div>
+
+      {/* Separator line like in Mission */}
+      <div style={{ 
+        height: '1px', 
+        background: 'var(--border)', 
+        marginBottom: '12px' 
+      }} />
+
+      {/* Content below header */}
       <div style={{ display: 'flex', gap: '16px', width: '100%', alignItems: 'flex-start' }}>
         {/* Left side - Map Canvas */}
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-          <div className="minimap-header">
-            <div className="minimap-title">
-              <Map size={18} />
-              <h3>{t('map.title')}</h3>
-            </div>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <button
-                className={`btn btn-${mapMode === 'current' ? 'primary' : 'secondary'}`}
-                onClick={() => setMapMode('current')}
-                disabled={!isEnabled}
-                title="Current vehicle view"
-                style={{ fontSize: '11px', padding: '4px 8px' }}
-              >
-                Current
-              </button>
-              <button
-                className={`btn btn-${mapMode === 'full' ? 'primary' : 'secondary'}`}
-                onClick={() => setMapMode('full')}
-                disabled={!isEnabled}
-                title="Full map view"
-                style={{ fontSize: '11px', padding: '4px 8px' }}
-              >
-                Full
-              </button>
-              <button
-                className={`btn btn-${followPlayer ? 'primary' : 'secondary'}`}
-                onClick={() => {
-                  setFollowPlayer(!followPlayer);
-                  if (!followPlayer) {
-                    setPanOffset({ x: 0, y: 0 });
-                  }
-                }}
-                disabled={!isEnabled}
-                title="Center map on player"
-                style={{ fontSize: '11px', padding: '4px 8px' }}
-              >
-                📍 Follow
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setZoomLevel(1.0);
-                  setPanOffset({ x: 0, y: 0 });
-                  setFollowPlayer(false);
-                }}
-                disabled={!isEnabled}
-                title="Reset view"
-                style={{ fontSize: '11px', padding: '4px 8px' }}
-              >
-                🔄 Reset
-              </button>
-              <button 
-                className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
-                onClick={() => setIsEnabled(!isEnabled)}
-                title={t('map.rb_warning')}
-              >
-                {isEnabled ? t('map.enabled') : t('map.disabled')}
-              </button>
-            </div>
+          <div 
+            className="minimap-canvas-wrapper" 
+            ref={canvasWrapperRef}
+            title={`Zoom: ${(zoomLevel * 100).toFixed(0)}% (scroll to zoom)`}
+          >
+            <canvas
+              ref={canvasRef}
+              width={canvasSize}
+              height={canvasSize}
+              className="minimap-canvas"
+              style={{ cursor: isDragging ? 'grabbing' : activeTool !== 'none' ? 'crosshair' : 'grab' }}
+              onClick={handleCanvasClick}
+            />
+            {error && !isEnabled && (
+              <div className="minimap-info">{t('map.disabled')}</div>
+            )}
+            {error && isEnabled && (
+              <div className="minimap-error">
+                {error.includes('connect') ? 'War Thunder not running' : t('map.no_data')}
+              </div>
+            )}
           </div>
-      <div 
-        className="minimap-canvas-wrapper" 
-        ref={canvasWrapperRef}
-        title={`Zoom: ${(zoomLevel * 100).toFixed(0)}% (scroll to zoom)`}
-      >
-        <canvas
-          ref={canvasRef}
-          width={canvasSize}
-          height={canvasSize}
-          className="minimap-canvas"
-          style={{ cursor: isDragging ? 'grabbing' : activeTool !== 'none' ? 'crosshair' : 'grab' }}
-          onClick={handleCanvasClick}
-        />
-        {error && !isEnabled && (
-          <div className="minimap-info">{t('map.disabled')}</div>
-        )}
-        {error && isEnabled && (
-          <div className="minimap-error">
-            {error.includes('connect') ? 'War Thunder not running' : t('map.no_data')}
-          </div>
-        )}
-      </div>
         </div>
 
         {/* Right side - Tools & Info */}
@@ -1291,24 +1298,6 @@ export function MiniMap() {
                   <div>Grid: <span style={{ fontWeight: 'bold', color: '#ff9933' }}>{measurement.gridRef}</span></div>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* Active Tool Hint */}
-          {activeTool !== 'none' && !measurement && (
-            <div style={{
-              background: 'rgba(100, 200, 255, 0.1)',
-              border: '1px solid #64c8ff',
-              borderRadius: '4px',
-              padding: '8px',
-              fontSize: '10px',
-              color: '#64c8ff',
-              fontStyle: 'italic',
-            }}>
-              {activeTool === 'measure' && !measurePoint && '🖱️ Click to set start point'}
-              {activeTool === 'measure' && measurePoint && !measurement && '🖱️ Click to set end point'}
-              {activeTool === 'distance' && '🖱️ Click to measure from player'}
-              {activeTool === 'marker' && '🖱️ Click to place marker'}
             </div>
           )}
 
