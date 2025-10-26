@@ -327,6 +327,7 @@ struct DebugInfo {
     indicators: String,
     triggers_count: usize,
     patterns_active: usize,
+    recent_triggers: Vec<haptic_engine::TriggerEvent>,
 }
 
 #[tauri::command]
@@ -339,6 +340,9 @@ async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<DebugInfo, 
     let triggers_count = trigger_manager.get_triggers().len();
     let patterns_active = trigger_manager.get_triggers().iter().filter(|t| t.enabled).count();
     
+    // Get recent trigger events
+    let recent_triggers = engine.get_recent_trigger_events().await;
+    
     Ok(DebugInfo {
         indicators: format!(
             "Vehicle: {}, Speed: {} km/h, Alt: {} m, G: {:.1}, RPM: {}, Fuel: {}%",
@@ -347,6 +351,7 @@ async fn get_debug_info(state: tauri::State<'_, AppState>) -> Result<DebugInfo, 
         ),
         triggers_count,
         patterns_active,
+        recent_triggers,
     })
 }
 

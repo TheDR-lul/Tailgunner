@@ -15,6 +15,7 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use std::sync::Arc;
+use std::collections::VecDeque;
 use tokio::time::{interval, Duration};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,6 +27,14 @@ pub struct GameStatusInfo {
     pub g_load: f32,
     pub engine_rpm: i32,
     pub fuel_percent: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriggerEvent {
+    pub trigger_name: String,
+    pub event_type: String,
+    pub entity: String,
+    pub timestamp: String,
 }
 
 impl GameStatusInfo {
@@ -53,6 +62,7 @@ pub struct HapticEngine {
     running: Arc<RwLock<bool>>,
     current_intensity: Arc<RwLock<f32>>,
     last_vehicle_name: Arc<RwLock<String>>,
+    recent_trigger_events: Arc<RwLock<VecDeque<TriggerEvent>>>,
 }
 
 impl HapticEngine {
@@ -85,6 +95,7 @@ impl HapticEngine {
             running: Arc::new(RwLock::new(false)),
             current_intensity: Arc::new(RwLock::new(0.0)),
             last_vehicle_name: Arc::new(RwLock::new(String::new())),
+            recent_trigger_events: Arc::new(RwLock::new(VecDeque::with_capacity(10))),
         }
     }
 
@@ -115,6 +126,7 @@ impl HapticEngine {
         let current_intensity = Arc::clone(&self.current_intensity);
         let vehicle_limits_manager = Arc::clone(&self.vehicle_limits_manager);
         let last_vehicle_name = Arc::clone(&self.last_vehicle_name);
+        let recent_trigger_events = Arc::clone(&self.recent_trigger_events);
 
         tokio::spawn(async move {
             let mut tick_interval = interval(WTTelemetryReader::get_poll_interval());
@@ -328,6 +340,21 @@ impl HapticEngine {
                         }
                         
                         log::info!("[HUD] ✅ Trigger '{}' matched for entity '{}'", trigger.name, entity_name);
+                        
+                        // Record trigger event for debug console
+                        {
+                            let mut events = recent_trigger_events.write().await;
+                            if events.len() >= 10 {
+                                events.pop_front();
+                            }
+                            events.push_back(TriggerEvent {
+                                trigger_name: trigger.name.clone(),
+                                event_type: format!("{:?}", game_event),
+                                entity: entity_name.to_string(),
+                                timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                            });
+                        }
+                        
                         hud_events_with_patterns.push((game_event.clone(), trigger.pattern.clone()));
                     }
                 }
@@ -354,8 +381,9 @@ impl HapticEngine {
                     };
                     
                     if let Some(pattern) = pattern {
-                        log::info!("[Pattern] Executing pattern for event {:?}: Attack={:.0}ms, Hold={:.0}ms", 
-                            event, pattern.attack.duration_ms, pattern.hold.duration_ms);
+                        log::info!("[Pattern] Executing pattern for event {:?}: Attack={:.0}ms, Hold={:.0}ms, Decay={:.0}ms, Repeat={}, Pause={}ms", 
+                            event, pattern.attack.duration_ms, pattern.hold.duration_ms, pattern.decay.duration_ms,
+                            pattern.burst.repeat_count, pattern.burst.pause_between_ms);
                         Self::execute_pattern_async(
                             Arc::clone(&device_manager),
                             Arc::clone(&rate_limiter),
@@ -429,14 +457,19 @@ impl HapticEngine {
         tokio::spawn(async move {
             let points = pattern.generate_points(20); // 20 Hz sampling
             
-            for (delay, intensity) in points {
+            let mut last_time = Duration::from_millis(0);
+            
+            for (absolute_time, intensity) in points {
                 // Check if engine is still running
                 if !*running.read().await {
                     log::info!("[Pattern] ⏹️ Pattern interrupted by Stop");
                     break;
                 }
                 
-                tokio::time::sleep(delay).await;
+                // Sleep for the DIFFERENCE between current and last time point
+                let sleep_duration = absolute_time.saturating_sub(last_time);
+                tokio::time::sleep(sleep_duration).await;
+                last_time = absolute_time;
                 
                 // Check again after sleep
                 if !*running.read().await {
@@ -491,6 +524,12 @@ impl HapticEngine {
     /// Check running status
     pub async fn is_running(&self) -> bool {
         *self.running.read().await
+    }
+    
+    /// Get recent trigger events for debug console
+    pub async fn get_recent_trigger_events(&self) -> Vec<TriggerEvent> {
+        let events = self.recent_trigger_events.read().await;
+        events.iter().cloned().collect()
     }
     
     /// Get current player names (for filtering HUD events)

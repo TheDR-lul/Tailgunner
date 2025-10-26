@@ -381,7 +381,7 @@ impl VibrationPattern {
         let mut points = Vec::new();
         let dt = Duration::from_millis(1000 / sample_rate_hz as u64);
         
-        for burst_idx in 0..=self.burst.repeat_count {
+        for burst_idx in 0..self.burst.repeat_count {
             let burst_offset = Duration::from_millis(
                 (self.attack.duration_ms + self.hold.duration_ms + self.decay.duration_ms + self.burst.pause_between_ms) * burst_idx as u64
             );
