@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
+import { MapInfoBox } from './MapInfoBox';
 import './MiniMap.css';
 
 interface MapObject {
@@ -38,6 +39,7 @@ interface MapData {
   player_heading: number | null;
   map_name: string | null;
   player_grid: string | null;
+  correct_grid_step: [number, number] | null;
 }
 
 interface EnemyDistance {
@@ -218,14 +220,16 @@ export function MiniMap() {
   };
 
   const drawGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, info: MapInfo) => {
+    if (!mapData) return;
+    
     // Calculate real map size
     const mapSizeX = info.map_max[0] - info.map_min[0];
     const mapSizeY = info.map_max[1] - info.map_min[1];
     
-    // Use grid_steps from API (different for tanks/air/naval)
-    // Tanks: 200m, Air: 13100m, etc
-    const gridStepX = info.grid_steps[0];
-    const gridStepY = info.grid_steps[1];
+    // Use correct grid_steps from database (if available), fallback to API
+    // Database has real values (e.g. Attica: 225m, not 200m from API!)
+    const gridStepX = mapData.correct_grid_step?.[0] ?? info.grid_steps[0];
+    const gridStepY = mapData.correct_grid_step?.[1] ?? info.grid_steps[1];
     const gridCountX = Math.ceil(mapSizeX / gridStepX);
     const gridCountY = Math.ceil(mapSizeY / gridStepY);
     
@@ -376,13 +380,22 @@ export function MiniMap() {
     <div className="minimap-container">
       <div className="minimap-header">
         <h3>{t('map.title')}</h3>
-        <button 
-          className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
-          onClick={() => setIsEnabled(!isEnabled)}
-          title={t('map.rb_warning')}
-        >
-          {isEnabled ? t('map.enabled') : t('map.disabled')}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {mapData && mapData.info.valid && (
+            <MapInfoBox 
+              mapName={mapData.map_name}
+              apiGridStep={mapData.info.grid_steps as [number, number]}
+              correctGridStep={mapData.correct_grid_step}
+            />
+          )}
+          <button 
+            className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
+            onClick={() => setIsEnabled(!isEnabled)}
+            title={t('map.rb_warning')}
+          >
+            {isEnabled ? t('map.enabled') : t('map.disabled')}
+          </button>
+        </div>
       </div>
       <div className="minimap-canvas-wrapper">
         <canvas

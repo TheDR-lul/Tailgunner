@@ -2,6 +2,7 @@
 /// Provides map objects, boundaries, and player positions
 use serde::{Deserialize, Serialize};
 use crate::map_detection;
+use crate::map_database::MapDatabase;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapObject {
@@ -131,6 +132,7 @@ pub struct MapData {
     pub player_heading: Option<f32>,
     pub map_name: Option<String>,  // Detected map name
     pub player_grid: Option<String>,  // Grid reference (e.g. "P-10")
+    pub correct_grid_step: Option<[f32; 2]>,  // Correct grid step from database (overrides API)
 }
 
 impl MapData {
@@ -141,11 +143,22 @@ impl MapData {
         let player_heading = player.map(|p| p.get_heading());
         
         // Detect map name by coordinates
-        let map_name = map_detection::detect_map_by_coordinates(
+        let identity = map_detection::detect_map_by_coordinates(
             &[info.map_min[0], info.map_min[1]],
             &[info.map_max[0], info.map_max[1]],
             Some(&[info.grid_zero[0], info.grid_zero[1]])
-        ).map(|identity| identity.localized_name);
+        );
+        
+        let map_name = identity.as_ref().map(|i| i.localized_name.clone());
+        
+        // Get correct grid step from database
+        let correct_grid_step = if let Some(ref identity) = identity {
+            let db = MapDatabase::new();
+            db.get_grid_step(&identity.name, &identity.game_mode)
+                .map(|step| [step, step])
+        } else {
+            None
+        };
         
         let mut data = Self {
             objects,
@@ -154,6 +167,7 @@ impl MapData {
             player_heading,
             map_name,
             player_grid: None,
+            correct_grid_step,
         };
         
         // Calculate grid reference
@@ -174,10 +188,14 @@ impl MapData {
         let abs_x = x * map_width + self.info.map_min[0];
         let abs_y = y * map_height + self.info.map_min[1];
         
-        // Use grid_steps from API (different for tanks/air/naval)
-        // Tanks: 200m, Air: 13100m, Naval: varies
-        let grid_step_x = self.info.grid_steps[0];
-        let grid_step_y = self.info.grid_steps[1];
+        // Use correct grid_steps from database, fallback to API
+        // Database has real values from game files (e.g. Attica: 225m, not 200m!)
+        let (grid_step_x, grid_step_y) = if let Some(correct) = self.correct_grid_step {
+            (correct[0], correct[1])
+        } else {
+            // Fallback to API (may be incorrect!)
+            (self.info.grid_steps[0], self.info.grid_steps[1])
+        };
         
         // Calculate grid position
         let grid_x = (abs_x / grid_step_x).floor() as i32;

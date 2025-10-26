@@ -20,6 +20,7 @@ export function GameChat() {
   const [lastEvtId, setLastEvtId] = useState<number>(0);
   const [lastDmgId, setLastDmgId] = useState<number>(0);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [lastBattleId, setLastBattleId] = useState<number>(0); // Track battle changes
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,6 +28,22 @@ export function GameChat() {
 
     const interval = setInterval(async () => {
       try {
+        // Check if we're in a new battle (map_generation changed)
+        const mapInfo = await invoke<{info: {map_generation: number}}>('get_map_data')
+          .catch(() => null);
+        
+        if (mapInfo && mapInfo.info.map_generation !== lastBattleId) {
+          // New battle detected - clear old messages
+          if (lastBattleId !== 0) {
+            console.log('[GameChat] New battle detected, clearing feed');
+            setMessages([]);
+            setLastChatId(0);
+            setLastEvtId(0);
+            setLastDmgId(0);
+          }
+          setLastBattleId(mapInfo.info.map_generation);
+        }
+        
         // Fetch both chat and HUD messages
         const [chat, hud] = await Promise.all([
           invoke<ChatMessage[]>('get_game_chat', { 
@@ -73,7 +90,7 @@ export function GameChat() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isEnabled, lastChatId, lastEvtId, lastDmgId]);
+  }, [isEnabled, lastChatId, lastEvtId, lastDmgId, lastBattleId]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);

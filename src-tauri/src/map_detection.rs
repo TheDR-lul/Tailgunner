@@ -2,6 +2,7 @@
 /// Identifies maps by their coordinates since WT API doesn't provide map names
 
 use serde::{Serialize, Deserialize};
+use crate::map_database::MapDatabase;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapIdentity {
@@ -11,11 +12,25 @@ pub struct MapIdentity {
 }
 
 /// Detect map by its coordinate boundaries
+/// First tries database, then falls back to heuristics
 pub fn detect_map_by_coordinates(
     map_min: &[f32; 2],
     map_max: &[f32; 2],
     grid_zero: Option<&[f32; 2]>
 ) -> Option<MapIdentity> {
+    // Try database first
+    let db = MapDatabase::new();
+    if let Some(map_info) = db.detect_map_by_coords(map_min, map_max, grid_zero) {
+        return Some(MapIdentity {
+            name: map_info.name.clone(),
+            localized_name: map_info.localized_name.clone(),
+            game_mode: map_info.game_modes.first()
+                .unwrap_or(&"unknown".to_string())
+                .clone(),
+        });
+    }
+    
+    // Fallback to heuristic detection
     // Maps are identified by their unique coordinate bounds
     // These values are extracted from multiple game sessions
     
