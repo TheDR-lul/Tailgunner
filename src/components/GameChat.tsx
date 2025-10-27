@@ -52,14 +52,12 @@ export function GameChat() {
         
         if (mapInfo && mapInfo.info.map_generation !== lastBattleId) {
           // New battle detected - clear old messages
-          if (lastBattleId !== 0) {
-            console.log(`[GameChat] New battle detected (${lastBattleId} → ${mapInfo.info.map_generation}), clearing streams`);
-            setChatMessages([]);
-            setHudMessages([]);
-            setLastChatId(0);
-            setLastEvtId(0);
-            setLastDmgId(0);
-          }
+          console.log(`[GameChat] New battle detected (${lastBattleId} → ${mapInfo.info.map_generation}), clearing streams`);
+          setChatMessages([]);
+          setHudMessages([]);
+          setLastChatId(0);
+          setLastEvtId(0);
+          setLastDmgId(0);
           setLastBattleId(mapInfo.info.map_generation);
         }
         

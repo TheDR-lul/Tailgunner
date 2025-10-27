@@ -830,6 +830,44 @@ impl TriggerManager {
                 }
             },
             
+            // Reverse filters (when YOU or YOUR ALLIES were killed)
+            Some("i_was_killed") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
+                    // For kill events, entity_name is the VICTIM
+                    // Check if victim is YOU
+                    let is_me = player_names.iter().any(|name| entity_name.contains(name));
+                    log::info!("[Filter] {} 'i_was_killed': victim '{}' is_me={}", 
+                        if is_me { "✅" } else { "❌" }, entity_name, is_me);
+                    is_me
+                } else {
+                    false
+                }
+            },
+            
+            Some("my_clan_was_killed") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
+                    // Check if victim is from your clan
+                    let is_clan = clan_tags.iter().any(|tag| entity_name.contains(tag));
+                    log::info!("[Filter] {} 'my_clan_was_killed': victim '{}' is_clan={}", 
+                        if is_clan { "✅" } else { "❌" }, entity_name, is_clan);
+                    is_clan
+                } else {
+                    false
+                }
+            },
+            
+            Some("tracked_was_killed") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
+                    // Check if victim is a tracked enemy player
+                    let is_tracked = enemy_names.iter().any(|name| entity_name.contains(name));
+                    log::info!("[Filter] {} 'tracked_was_killed': victim '{}' is_tracked={}", 
+                        if is_tracked { "✅" } else { "❌" }, entity_name, is_tracked);
+                    is_tracked
+                } else {
+                    false
+                }
+            },
+            
             Some("text_contains") => {
                 if let Some(filter_text) = &trigger.filter_text {
                     let matches = entity_name.to_lowercase().contains(&filter_text.to_lowercase());

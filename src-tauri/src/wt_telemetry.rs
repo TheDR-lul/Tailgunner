@@ -393,6 +393,8 @@ impl WTTelemetryReader {
         let url = format!("{}/hudmsg?lastEvt={}&lastDmg={}", 
             &self.base_url, self.last_hud_evt_id, self.last_hud_dmg_id);
         
+        log::debug!("[HUD Fetch] 🌐 Requesting: {}", url);
+        
         let response = self.client
             .get(&url)
             .send()
@@ -403,6 +405,8 @@ impl WTTelemetryReader {
             .json()
             .await
             .context("Failed to parse HUD messages")?;
+        
+        log::debug!("[HUD Fetch] 📦 Response: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
         
         let mut events = Vec::new();
         
@@ -466,14 +470,41 @@ impl WTTelemetryReader {
                 
                 // Set baseline to max ID after processing recent events
                 self.last_hud_dmg_id = max_id;
+                self.last_battle_time = max_time; // ← SET last_battle_time to prevent old events!
                 self.hud_initialized = true;
-                log::info!("[HUD] ✅ Initialized with baseline ID={}", max_id);
+                log::info!("[HUD] ✅ Initialized with baseline ID={}, time={}s", max_id, max_time);
                 
                 // Return early - we've processed everything
                 return Ok(events);
             }
             
             // NORMAL PHASE: Only process NEW events (ID > baseline)
+            
+            // DETECT TIME RESET (new battle): if time went DOWN significantly
+            let max_time_in_batch = damage_array.iter()
+                .filter_map(|v| v.get("time").and_then(|t| t.as_u64()))
+                .max()
+                .unwrap_or(0) as u32;
+            
+            // If time DECREASED by >60 seconds → NEW BATTLE detected!
+            if max_time_in_batch > 0 && self.last_battle_time > 0 {
+                let time_diff = self.last_battle_time.saturating_sub(max_time_in_batch);
+                if time_diff > 60 {
+                    log::warn!("[HUD] 🔄 NEW BATTLE DETECTED! Time reset: {}s → {}s (diff: -{}s)", 
+                        self.last_battle_time, max_time_in_batch, time_diff);
+                    log::warn!("[HUD] 🧹 Clearing old events cache ({} entries)", self.processed_messages.len());
+                    
+                    // Reset battle tracking
+                    self.last_battle_time = 0;
+                    self.processed_messages.clear();
+                    
+                    // Skip ALL events from this batch (they're from the new battle start, likely old)
+                    // We'll catch them on the next poll
+                    log::warn!("[HUD] ⏭️ Skipping batch of {} events (new battle initialization)", damage_array.len());
+                    return Ok(events);
+                }
+            }
+            
             for msg_value in damage_array {
                 let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
@@ -586,9 +617,11 @@ impl WTTelemetryReader {
                     .max()
                     .unwrap_or(0) as u32;
                 
+                let message_count = chat_array.len();
+                
                 self.last_chat_id = max_id;
                 self.chat_initialized = true;
-                log::info!("[Chat] ✅ Initialized with baseline ID={}", max_id);
+                log::info!("[Chat] ✅ Initialized with baseline ID={}, skipping {} old messages", max_id, message_count);
                 
                 // Don't process old messages on first connect
                 return Ok(events);
@@ -626,6 +659,11 @@ impl WTTelemetryReader {
     
     /// Check if message contains player identity
     fn is_player_message(&self, msg: &str) -> bool {
+        // In emulator mode, accept all events
+        if self.is_emulator_mode() {
+            return true;
+        }
+        
         // Check if any of our player names match
         for name in &self.player_names {
             if msg.contains(name) {
@@ -691,23 +729,21 @@ impl WTTelemetryReader {
         
         // Set enemy on fire
         if msg.contains("set afire") {
-            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-                let parts: Vec<&str> = msg.split("set afire").collect();
-                if parts.len() == 2 {
-                    let attacker = parts[0].trim();
-                    let victim = parts[1].trim();
-                    
-                    // Player set enemy on fire
-                    if self.is_player_message(attacker) {
-                        log::info!("[HUD Event] 🔥 SET AFIRE: {}", victim);
-                        return Some(HudEvent::SetAfire(victim.to_string()));
-                    }
-                    
-                    // Player was set on fire
-                    if self.is_player_message(victim) {
-                        log::info!("[HUD Event] 💥 TAKING FIRE from: {}", attacker);
-                        return Some(HudEvent::TakeDamage(attacker.to_string()));
-                    }
+            let parts: Vec<&str> = msg.split("set afire").collect();
+            if parts.len() == 2 {
+                let attacker = parts[0].trim();
+                let victim = parts[1].trim();
+                
+                // Player set enemy on fire
+                if self.is_player_message(attacker) {
+                    log::info!("[HUD Event] 🔥 SET AFIRE: {}", victim);
+                    return Some(HudEvent::SetAfire(victim.to_string()));
+                }
+                
+                // Player was set on fire
+                if self.is_player_message(victim) {
+                    log::info!("[HUD Event] 💥 TAKING FIRE from: {}", attacker);
+                    return Some(HudEvent::TakeDamage(attacker.to_string()));
                 }
             }
             return None;
@@ -715,17 +751,15 @@ impl WTTelemetryReader {
         
         // Critically damaged
         if msg.contains("critically damaged") {
-            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-                let parts: Vec<&str> = msg.split("critically damaged").collect();
-                if parts.len() == 2 {
-                    let attacker = parts[0].trim();
-                    let victim = parts[1].trim();
-                    
-                    // Player was critically damaged
-                    if self.is_player_message(victim) {
-                        log::info!("[HUD Event] 💥 CRITICALLY DAMAGED by: {}", attacker);
-                        return Some(HudEvent::CriticallyDamaged(attacker.to_string()));
-                    }
+            let parts: Vec<&str> = msg.split("critically damaged").collect();
+            if parts.len() == 2 {
+                let attacker = parts[0].trim();
+                let victim = parts[1].trim();
+                
+                // Player was critically damaged
+                if self.is_player_message(victim) {
+                    log::info!("[HUD Event] 💥 CRITICALLY DAMAGED by: {}", attacker);
+                    return Some(HudEvent::CriticallyDamaged(attacker.to_string()));
                 }
             }
             return None;
@@ -733,17 +767,15 @@ impl WTTelemetryReader {
         
         // Severely damaged
         if msg.contains("severely damaged") {
-            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-                let parts: Vec<&str> = msg.split("severely damaged").collect();
-                if parts.len() == 2 {
-                    let attacker = parts[0].trim();
-                    let victim = parts[1].trim();
-                    
-                    // Player was severely damaged
-                    if self.is_player_message(victim) {
-                        log::info!("[HUD Event] 💔 SEVERELY DAMAGED by: {}", attacker);
-                        return Some(HudEvent::SeverelyDamaged(attacker.to_string()));
-                    }
+            let parts: Vec<&str> = msg.split("severely damaged").collect();
+            if parts.len() == 2 {
+                let attacker = parts[0].trim();
+                let victim = parts[1].trim();
+                
+                // Player was severely damaged
+                if self.is_player_message(victim) {
+                    log::info!("[HUD Event] 💔 SEVERELY DAMAGED by: {}", attacker);
+                    return Some(HudEvent::SeverelyDamaged(attacker.to_string()));
                 }
             }
             return None;
@@ -751,17 +783,15 @@ impl WTTelemetryReader {
         
         // Shot down
         if msg.contains("shot down") {
-            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-                let parts: Vec<&str> = msg.split("shot down").collect();
-                if parts.len() == 2 {
-                    let attacker = parts[0].trim();
-                    let victim = parts[1].trim();
-                    
-                    // Player was shot down
-                    if self.is_player_message(victim) {
-                        log::info!("[HUD Event] ✈️💥 SHOT DOWN by: {}", attacker);
-                        return Some(HudEvent::ShotDown(attacker.to_string()));
-                    }
+            let parts: Vec<&str> = msg.split("shot down").collect();
+            if parts.len() == 2 {
+                let attacker = parts[0].trim();
+                let victim = parts[1].trim();
+                
+                // Player was shot down
+                if self.is_player_message(victim) {
+                    log::info!("[HUD Event] ✈️💥 SHOT DOWN by: {}", attacker);
+                    return Some(HudEvent::ShotDown(attacker.to_string()));
                 }
             }
             return None;
@@ -769,62 +799,62 @@ impl WTTelemetryReader {
         
     // Destroyed (kill)
     if msg.contains("destroyed") {
-        // Check if player identity is set
-        if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-            // ONLY count kills if our player identity is the attacker
-            if let Some(before_destroyed) = msg.split("destroyed").next() {
-                if self.is_player_message(before_destroyed) {
-                    // Extract victim name (after "destroyed")
-                    if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
-                        let victim = destroyed_part.trim().to_string();
-                        
-                        // Check if victim is in our enemy tracking list
-                        let is_priority = self.is_enemy_message(&victim);
-                        
-                        if is_priority {
-                            log::info!("[HUD Event] 🎯💀 PRIORITY KILL (tracked enemy player): {}", victim);
-                        } else {
-                            log::info!("[HUD Event] 🎯 KILL (bot/random): {}", victim);
-                        }
-                        
-                        // Return kill event with victim name
-                        // Frontend can filter by enemy list if needed
-                        return Some(HudEvent::Kill(victim));
+        log::debug!("[HUD Parse] 🔍 Parsing destroyed message: '{}'", msg);
+        
+        if let Some(before_destroyed) = msg.split("destroyed").next() {
+            let attacker = before_destroyed.trim();
+            log::debug!("[HUD Parse] 📊 Attacker: '{}', is_player: {}", 
+                attacker, self.is_player_message(attacker));
+            
+            if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
+                let victim = destroyed_part.trim().to_string();
+                log::debug!("[HUD Parse] 🎯 Victim: '{}'", victim);
+                
+                // Case 1: YOU are the attacker (your kill)
+                if self.is_player_message(attacker) {
+                    let is_priority = self.is_enemy_message(&victim);
+                    if is_priority {
+                        log::info!("[HUD Event] 🎯💀 YOU KILLED tracked enemy: {}", victim);
+                    } else {
+                        log::info!("[HUD Event] 🎯 YOU KILLED: {}", victim);
                     }
+                    return Some(HudEvent::Kill(victim));
+                }
+                
+                // Case 2: YOU or YOUR ALLY is the victim (someone killed you/ally)
+                // This enables filters like "i_was_killed" and "my_clan_was_killed"
+                if self.is_player_message(&victim) || 
+                   self.clan_tags.iter().any(|tag| victim.contains(tag)) ||
+                   self.enemy_names.iter().any(|name| victim.contains(name)) {
+                    log::info!("[HUD Event] 💀 KILL FEED: {} killed {}", attacker, victim);
+                    // Return as Kill event, but entity_name is the VICTIM
+                    // Filters will check if victim matches player/clan
+                    return Some(HudEvent::Kill(victim));
                 }
             }
-            // If player identity doesn't match, this is someone else's kill - ignore
-            return None;
-        } else {
-            // Without player identity, we can't reliably filter
-            // Skip to avoid false positives from other players' kills
-            return None;
         }
+        return None;
     }
     
     // "has been wrecked" (alternative kill message)
     if msg.contains("has been wrecked") {
-        if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-            if let Some(before_wrecked) = msg.split("has been wrecked").next() {
-                if self.is_player_message(before_wrecked) {
-                    if let Some(victim_part) = msg.split("has been wrecked").nth(1) {
-                        let victim = victim_part.trim().to_string();
-                        
-                        let is_priority = self.is_enemy_message(&victim);
-                        if is_priority {
-                            log::info!("[HUD Event] 🎯💀 PRIORITY KILL (wrecked, tracked enemy): {}", victim);
-                        } else {
-                            log::info!("[HUD Event] 🎯 KILL (wrecked): {}", victim);
-                        }
-                        
-                        return Some(HudEvent::Kill(victim));
+        if let Some(before_wrecked) = msg.split("has been wrecked").next() {
+            if self.is_player_message(before_wrecked) {
+                if let Some(victim_part) = msg.split("has been wrecked").nth(1) {
+                    let victim = victim_part.trim().to_string();
+                    
+                    let is_priority = self.is_enemy_message(&victim);
+                    if is_priority {
+                        log::info!("[HUD Event] 🎯💀 PRIORITY KILL (wrecked, tracked enemy): {}", victim);
+                    } else {
+                        log::info!("[HUD Event] 🎯 KILL (wrecked): {}", victim);
                     }
+                    
+                    return Some(HudEvent::Kill(victim));
                 }
             }
-            return None;
-        } else {
-            return None;
         }
+        return None;
     }
         
         None

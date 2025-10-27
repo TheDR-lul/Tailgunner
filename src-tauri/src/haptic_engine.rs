@@ -451,7 +451,20 @@ impl HapticEngine {
                                 continue;
                             }
                             
-                            if trigger.event != game_event {
+                            // Allow ChatMessage to match any chat type if filter is "any" or "text_contains"
+                            let event_matches = if trigger.event == GameEvent::ChatMessage {
+                                // ChatMessage with "any" or "text_contains" matches all chat types
+                                matches!(game_event, 
+                                    GameEvent::ChatMessage | 
+                                    GameEvent::TeamChatMessage | 
+                                    GameEvent::AllChatMessage | 
+                                    GameEvent::SquadChatMessage | 
+                                    GameEvent::EnemyChatMessage)
+                            } else {
+                                trigger.event == game_event
+                            };
+                            
+                            if !event_matches {
                                 log::debug!("[Chat] ⏭️ Skipping trigger '{}' (event mismatch: {:?} != {:?})", 
                                     trigger.name, trigger.event, game_event);
                                 continue;
@@ -460,17 +473,66 @@ impl HapticEngine {
                             log::info!("[Chat] 🎯 Trigger '{}' event matched! Checking filter (type={:?}, text={:?})...", 
                                 trigger.name, trigger.filter_type, trigger.filter_text);
                             
-                            // Apply filter
-                            if !crate::event_triggers::TriggerManager::should_fire_event_trigger(
-                                trigger,
-                                &details.message,
-                                &player_names,
-                                &clan_tags,
-                                &enemy_names,
-                                &enemy_clans,
-                            ) {
-                                log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT for text: '{}'", trigger.name, details.message);
-                                continue;
+                            // Check chat mode filter FIRST (team/all/squad/enemy)
+                            if let Some(filter_type) = &trigger.filter_type {
+                                match filter_type.as_str() {
+                                    "team" => {
+                                        if let Some(mode) = &details.mode {
+                                            if mode.to_lowercase() != "team" {
+                                                log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: not Team chat (mode='{}')", trigger.name, mode);
+                                                continue;
+                                            }
+                                        } else {
+                                            log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: no mode (expected Team)", trigger.name);
+                                            continue;
+                                        }
+                                    },
+                                    "all" => {
+                                        if let Some(mode) = &details.mode {
+                                            if mode.to_lowercase() != "all" {
+                                                log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: not All chat (mode='{}')", trigger.name, mode);
+                                                continue;
+                                            }
+                                        } else {
+                                            log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: no mode (expected All)", trigger.name);
+                                            continue;
+                                        }
+                                    },
+                                    "squad" => {
+                                        if let Some(mode) = &details.mode {
+                                            if mode.to_lowercase() != "squad" {
+                                                log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: not Squad chat (mode='{}')", trigger.name, mode);
+                                                continue;
+                                            }
+                                        } else {
+                                            log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: no mode (expected Squad)", trigger.name);
+                                            continue;
+                                        }
+                                    },
+                                    "enemy" => {
+                                        if !details.is_enemy {
+                                            log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: not Enemy chat", trigger.name);
+                                            continue;
+                                        }
+                                    },
+                                    "any" | "text_contains" => {
+                                        // These filters are handled below
+                                    },
+                                    _ => {}
+                                }
+                            }
+                            
+                            // Apply text filter (if specified)
+                            if let Some(filter_text) = &trigger.filter_text {
+                                if !filter_text.is_empty() {
+                                    let matches = details.message.to_lowercase().contains(&filter_text.to_lowercase());
+                                    if !matches {
+                                        log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: text '{}' not in message '{}'", 
+                                            trigger.name, filter_text, details.message);
+                                        continue;
+                                    }
+                                    log::info!("[Chat] ✅ Text filter passed: '{}' found in '{}'", filter_text, details.message);
+                                }
                             }
                             
                             matched_count += 1;

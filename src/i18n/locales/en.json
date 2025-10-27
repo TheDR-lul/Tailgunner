@@ -201,7 +201,9 @@
     "language_ru": "Русский",
     "language_en": "English",
     "intiface_auto": "Auto-connect to Intiface",
-    "save_config": "Auto-save configuration"
+    "save_config": "Auto-save configuration",
+    "update_rates": "Update Rates",
+    "update_rates_desc": "Control how often components fetch data. Lower = faster updates, Higher = less CPU usage."
   },
   "validation": {
     "no_nodes": "Pattern has no nodes",

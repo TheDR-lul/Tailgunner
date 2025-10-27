@@ -53,12 +53,8 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
     
     // === MULTIPLAYER (HUD + /gamechat) ===
     { id: 'Achievement', icon: Award, color: '#fbbf24', category: 'Multiplayer' },
-  { id: 'ChatMessage', icon: MessageSquare, color: '#6366f1', category: 'Multiplayer' },
-  { id: 'TeamChatMessage', icon: MessageSquare, color: '#22c55e', category: 'Multiplayer' },
-  { id: 'AllChatMessage', icon: MessageSquare, color: '#f97316', category: 'Multiplayer' },
-  { id: 'SquadChatMessage', icon: MessageSquare, color: '#8b5cf6', category: 'Multiplayer' },
-  { id: 'EnemyChatMessage', icon: MessageSquare, color: '#ef4444', category: 'Multiplayer' },
-  { id: 'FirstStrike', icon: Zap, color: '#8b5cf6', category: 'Multiplayer' },
+    { id: 'ChatMessage', icon: MessageSquare, color: '#6366f1', category: 'Multiplayer' },
+    { id: 'FirstStrike', icon: Zap, color: '#8b5cf6', category: 'Multiplayer' },
     { id: 'ShipRescuer', icon: Heart, color: '#0891b2', category: 'Multiplayer' },
     { id: 'Assist', icon: Target, color: '#eab308', category: 'Multiplayer' },
     { id: 'BaseCapture', icon: Flame, color: '#22c55e', category: 'Multiplayer' },
@@ -70,13 +66,13 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
   const EventIcon = selectedEvent.icon;
   
   // Determine if this event needs filtering
-  const needsTextFilter = ['ChatMessage'].includes(event);
+  const needsChatFilter = ['ChatMessage'].includes(event);
   const needsPlayerFilter = [
     'TargetDestroyed', 'TargetSetOnFire', 'TargetSeverelyDamaged', 'AircraftDestroyed',
     'ShipDestroyed', 'TankDestroyed', 'VehicleDestroyed',
     'Hit', 'CriticalHit', 'Achievement'
   ].includes(event);
-  const showFilter = needsTextFilter || needsPlayerFilter;
+  const showFilter = needsChatFilter || needsPlayerFilter;
   
   // Context-dependent filter labels
   const isKillEvent = [
@@ -87,7 +83,17 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
   
   // Get filter description based on event type
   const getFilterLabel = (filterValue: string) => {
-    if (isKillEvent) {
+    if (needsChatFilter) {
+      // For chat events
+      switch (filterValue) {
+        case 'any': return '💬 Any chat';
+        case 'team': return '🟢 Team chat';
+        case 'all': return '🌍 All chat';
+        case 'squad': return '🟣 Squad chat';
+        case 'enemy': return '🔴 Enemy chat';
+        default: return filterValue;
+      }
+    } else if (isKillEvent) {
       // For kill events: YOU are the attacker, entity_name is victim
       switch (filterValue) {
         case 'any': return '🌍 Any kill (anyone)';
@@ -95,6 +101,10 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
         case 'my_clans': return '🏷️ My clan killed someone';
         case 'enemy_players': return '🎯 I killed tracked enemy';
         case 'enemy_clans': return '☠️ I killed enemy clan member';
+        // Reverse filters (when YOU or YOUR ALLIES are killed)
+        case 'i_was_killed': return '💀 Someone killed me';
+        case 'my_clan_was_killed': return '💔 Someone killed my clan member';
+        case 'tracked_was_killed': return '🎯 Tracked player was killed';
         default: return filterValue;
       }
     } else if (isDamageEvent) {
@@ -189,8 +199,13 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
           }}
         >
           <option value="any">{getFilterLabel('any')}</option>
-          {needsTextFilter && (
-            <option value="text_contains">💬 Contains text</option>
+          {needsChatFilter && (
+            <>
+              <option value="team">{getFilterLabel('team')}</option>
+              <option value="all">{getFilterLabel('all')}</option>
+              <option value="squad">{getFilterLabel('squad')}</option>
+              <option value="enemy">{getFilterLabel('enemy')}</option>
+            </>
           )}
           {needsPlayerFilter && (
             <>
@@ -198,31 +213,42 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
               <option value="my_clans">{getFilterLabel('my_clans')}</option>
               <option value="enemy_players">{getFilterLabel('enemy_players')}</option>
               <option value="enemy_clans">{getFilterLabel('enemy_clans')}</option>
+              {isKillEvent && (
+                <>
+                  <option value="i_was_killed">{getFilterLabel('i_was_killed')}</option>
+                  <option value="my_clan_was_killed">{getFilterLabel('my_clan_was_killed')}</option>
+                  <option value="tracked_was_killed">{getFilterLabel('tracked_was_killed')}</option>
+                </>
+              )}
             </>
           )}
         </select>
               
-              {/* Text input for ChatMessage */}
-              {needsTextFilter && filterType === 'text_contains' && (
-                <input
-                  type="text"
-                  value={filterText}
-                  onChange={(e) => setFilterText(e.target.value)}
-                  placeholder="e.g. gg wp"
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    width: '100%',
-                    marginTop: '6px',
-                    padding: '5px 8px',
-                    background: 'rgba(0, 0, 0, 0.4)',
-                    border: '1px solid #6366f1',
-                    borderRadius: '4px',
-                    color: '#fff',
-                    fontSize: '11px',
-                    outline: 'none'
-                  }}
-                />
+              {/* Text input for ChatMessage - always visible */}
+              {needsChatFilter && (
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '4px' }}>
+                    🔍 Filter by text (optional):
+                  </div>
+                  <input
+                    type="text"
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
+                    placeholder="e.g. gg wp, gl hf"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      padding: '5px 8px',
+                      background: 'rgba(0, 0, 0, 0.4)',
+                      border: '1px solid #6366f1',
+                      borderRadius: '4px',
+                      color: '#fff',
+                      fontSize: '11px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
               )}
               
         {(filterType === 'my_players' || filterType === 'my_clans') && (

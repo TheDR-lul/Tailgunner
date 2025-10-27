@@ -39,6 +39,28 @@
   font-size: 24px;
 }
 
+/* Settings Modal Close Button */
+.settings-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ef4444;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.settings-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: scale(1.05);
+}
+
 .pattern-name-input {
   padding: 8px 12px;
   background: var(--bg);

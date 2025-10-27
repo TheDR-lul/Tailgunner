@@ -18,11 +18,22 @@ export function GameStatus() {
 
   // Use ref to track previous values without causing re-renders
   const prevStatusRef = useRef<GameStatusInfo>(status);
+  const [updateInterval, setUpdateInterval] = useState<number>(() => 
+    parseInt(localStorage.getItem('gameStatusUpdateInterval') || '200')
+  );
+
+  // Listen for localStorage changes from DebugConsole
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newInterval = parseInt(localStorage.getItem('gameStatusUpdateInterval') || '200');
+      setUpdateInterval(newInterval);
+    };
+    
+    window.addEventListener('localStorageChange', handleStorageChange);
+    return () => window.removeEventListener('localStorageChange', handleStorageChange);
+  }, []);
 
   useEffect(() => {
-    // Get update interval from localStorage (default: 200ms = 5 times per second)
-    const updateInterval = parseInt(localStorage.getItem('gameStatusUpdateInterval') || '200');
-    
     const interval = setInterval(async () => {
       try {
         const gameStatus = await api.getGameStatus();
@@ -67,7 +78,7 @@ export function GameStatus() {
     }, updateInterval);
 
     return () => clearInterval(interval);
-  }, []); // Empty deps - runs once, interval handles updates
+  }, [updateInterval]); // Recreate interval when updateInterval changes
 
   return (
     <div className="card game-status-card">

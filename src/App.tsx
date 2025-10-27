@@ -9,17 +9,17 @@ import { DeviceList } from "./components/DeviceList";
 import { PatternManager } from "./components/PatternManager";
 import { PatternEditorModal } from "./components/PatternEditorModal";
 import { DebugConsole } from "./components/DebugConsole";
-import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { GameStatus } from "./components/GameStatus";
 import { EventConfiguration } from "./components/EventConfiguration";
 import { VehicleInfoCard } from "./components/VehicleInfoCard";
 import { PlayerIdentityModal } from "./components/PlayerIdentityModal";
+import { SettingsModal } from "./components/SettingsModal";
 import { MiniMap } from "./components/MiniMap";
 import { VehicleModeCard } from "./components/VehicleModeCard";
 import { GameChat } from "./components/GameChat";
 import { MissionInfo } from "./components/MissionInfo";
 import { APIEmulator } from "./components/APIEmulator";
-import { User, Coffee } from "lucide-react";
+import { User, Coffee, Settings } from "lucide-react";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
 
@@ -28,6 +28,7 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [editingPattern, setEditingPattern] = useState<Pattern | undefined>();
   const [supportHighlight, setSupportHighlight] = useState(false);
   const [testModeEnabled, setTestModeEnabled] = useState(false);
@@ -156,7 +157,13 @@ function App() {
             >
               🧪
             </button>
-            <LanguageSwitcher />
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="settings-btn"
+              title={t('settings.title', 'Settings')}
+            >
+              <Settings size={18} />
+            </button>
             <div className={`status-chip ${isRunning ? 'running' : 'stopped'}`}>
               <span className="status-indicator"></span>
               <span className="status-text">
@@ -214,6 +221,12 @@ function App() {
       <PlayerIdentityModal 
         isOpen={isPlayerModalOpen}
         onClose={() => setIsPlayerModalOpen(false)}
+      />
+
+      {/* Settings modal */}
+      <SettingsModal 
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
     </div>
   );
