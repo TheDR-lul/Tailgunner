@@ -129,7 +129,9 @@ impl EventEngine {
             HudEvent::SetAfire(_) => Some(GameEvent::TargetSetOnFire),
             HudEvent::TakeDamage(_) => Some(GameEvent::Hit),
             HudEvent::SeverelyDamaged(_) => Some(GameEvent::TargetSeverelyDamaged),
+            HudEvent::CriticallyDamaged(_) => Some(GameEvent::CriticalHit),
             HudEvent::ShotDown(_) => Some(GameEvent::AircraftDestroyed),
+            HudEvent::FirstStrike => Some(GameEvent::FirstStrike),
             HudEvent::Achievement(msg) => {
                 // Detect special achievements
                 let msg_lower = msg.to_lowercase();

@@ -349,6 +349,23 @@ export function APIEmulator() {
   const [hudEnemyName, setHudEnemyName] = React.useState('Enemy_01');
   const [hudEnemyVehicle, setHudEnemyVehicle] = React.useState('');
   
+  // Send chat message (/gamechat)
+  const sendChatMessage = async () => {
+    if (!chatMessage.trim()) {
+      console.warn('[APIEmulator] Chat message is empty');
+      return;
+    }
+    
+    try {
+      // API signature: emulatorSendChat(message, mode, sender, enemy)
+      await api.emulatorSendChat(chatMessage, chatMode, chatSender, false);
+      console.log('[APIEmulator] Chat message sent:', chatMessage);
+      setChatMessage(''); // Clear input
+    } catch (err) {
+      console.error('[APIEmulator] Failed to send chat message:', err);
+    }
+  };
+  
   // Set default enemy vehicle when presets load
   useEffect(() => {
     if (enemyVehiclePresets.length > 0 && !hudEnemyVehicle) {
@@ -738,6 +755,67 @@ export function APIEmulator() {
                   ⚓ Rescuer
                 </button>
               </div>
+            </div>
+            
+            {/* Chat Messages (/gamechat) - REAL WT API FORMAT */}
+            <div className="emulator-section" style={{ gridColumn: '1 / -1' }}>
+              <h4>💬 Chat Messages (Real WT API)</h4>
+              
+              {/* Chat Input */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Message</label>
+                  <input
+                    type="text"
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChatMessage();
+                      }
+                    }}
+                    disabled={!state.enabled}
+                    placeholder="gl hf"
+                    style={{ width: '100%', padding: '4px 8px', fontSize: '11px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Sender</label>
+                  <input
+                    type="text"
+                    value={chatSender}
+                    onChange={(e) => setChatSender(e.target.value)}
+                    disabled={!state.enabled}
+                    placeholder="TestPlayer"
+                    style={{ width: '100%', padding: '4px 8px', fontSize: '11px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Mode</label>
+                  <select
+                    value={chatMode}
+                    onChange={(e) => setChatMode(e.target.value)}
+                    disabled={!state.enabled}
+                    style={{ width: '100%', padding: '4px 8px', fontSize: '11px' }}
+                  >
+                    <option value="Team">Team</option>
+                    <option value="All">All</option>
+                    <option value="Squad">Squad</option>
+                  </select>
+                </div>
+              </div>
+              
+              {/* Send Button */}
+              <button
+                className="btn btn-primary"
+                onClick={sendChatMessage}
+                disabled={!state.enabled || !chatMessage.trim()}
+                style={{ fontSize: '10px', padding: '6px 12px', width: '100%' }}
+              >
+                <MessageSquare size={12} />
+                Send Chat Message
+              </button>
             </div>
           </div>
 

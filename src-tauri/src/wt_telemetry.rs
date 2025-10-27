@@ -35,8 +35,10 @@ pub enum HudEvent {
     SetAfire(String),          // Set enemy on fire (enemy name)
     TakeDamage(String),        // Taking damage from attacker (attacker name)
     SeverelyDamaged(String),   // Severely damaged by attacker
+    CriticallyDamaged(String), // Critically damaged by attacker
     ShotDown(String),          // Shot down by attacker
     Achievement(String),       // Achievement unlocked (achievement name)
+    FirstStrike,               // Player delivered first strike
     ChatMessage(ChatDetails),  // Chat message with mode/enemy info       // Any chat message (full text)
 }
 
@@ -48,9 +50,13 @@ pub struct GameState {
     pub indicators: Indicators,
     pub state: Vec<String>,
     
-    // HUD events detected this frame
+    // HUD events detected this frame (kills, damage, achievements, etc.)
     #[serde(skip)]
     pub hud_events: Vec<HudEvent>,
+    
+    // Chat messages detected this frame (from /gamechat)
+    #[serde(skip)]
+    pub chat_events: Vec<HudEvent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -141,11 +147,13 @@ pub struct WTTelemetryReader {
     cache_duration_ms: u64,
     last_hud_evt_id: u32,
     last_hud_dmg_id: u32,
+    last_chat_id: u32,       // Last chat message ID
     player_names: Vec<String>,  // Player names for filtering own events
     clan_tags: Vec<String>,      // Player clan tags for filtering
     enemy_names: Vec<String>,    // Enemy player names to track
     enemy_clans: Vec<String>,    // Enemy clan tags to track
     hud_initialized: bool,  // Flag to skip old events on first connect
+    chat_initialized: bool, // Flag to skip old chat on first connect
     last_battle_time: u32,  // Last battle time (seconds) to detect old events
     processed_messages: std::collections::HashSet<String>, // Cache to prevent duplicates
     last_message: Option<String>, // Last processed message for immediate duplicate check
@@ -166,11 +174,13 @@ impl WTTelemetryReader {
             cache_duration_ms: 50, // Cache for 50ms (20 Hz max poll rate)
             last_hud_evt_id: 0,
             last_hud_dmg_id: 0,
+            last_chat_id: 0,
             player_names: Vec::new(),
             clan_tags: Vec::new(),
             enemy_names: Vec::new(),
             enemy_clans: Vec::new(),
             hud_initialized: false,
+            chat_initialized: false,
             last_battle_time: 0,
             processed_messages: std::collections::HashSet::new(),
             last_message: None,
@@ -190,6 +200,7 @@ impl WTTelemetryReader {
         // Reset state when switching
         self.last_state = None;
         self.hud_initialized = false;
+        self.chat_initialized = false;
     }
     
     /// Get current mode
@@ -338,6 +349,17 @@ impl WTTelemetryReader {
             Err(e) => {
                 log::debug!("[WT API] Failed to get HUD events: {}", e);
                 state.hud_events = Vec::new();
+            }
+        }
+        
+        // 5. Get chat messages from /gamechat (separate stream)
+        match self.get_chat_messages().await {
+            Ok(chat_events) => {
+                state.chat_events = chat_events;
+            }
+            Err(e) => {
+                log::debug!("[WT API] Failed to get chat messages: {}", e);
+                state.chat_events = Vec::new();
             }
         }
         
@@ -538,6 +560,70 @@ impl WTTelemetryReader {
         Ok(events)
     }
     
+    /// Get chat messages from /gamechat and convert to HudEvent::ChatMessage
+    pub async fn get_chat_messages(&mut self) -> Result<Vec<HudEvent>> {
+        let url = format!("{}/gamechat?lastId={}", &self.base_url, self.last_chat_id);
+        
+        let response = self.client
+            .get(&url)
+            .send()
+            .await
+            .context("Failed to get chat messages")?;
+        
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .context("Failed to parse chat messages")?;
+        
+        let mut events = Vec::new();
+        
+        // Parse chat array
+        if let Some(chat_array) = json.as_array() {
+            if !chat_array.is_empty() && !self.chat_initialized {
+                // INIT PHASE: Find max ID and skip old messages
+                let max_id = chat_array.iter()
+                    .filter_map(|v| v.get("id").and_then(|i| i.as_u64()))
+                    .max()
+                    .unwrap_or(0) as u32;
+                
+                self.last_chat_id = max_id;
+                self.chat_initialized = true;
+                log::info!("[Chat] ✅ Initialized with baseline ID={}", max_id);
+                
+                // Don't process old messages on first connect
+                return Ok(events);
+            }
+            
+            // NORMAL PHASE: Process new messages
+            for msg_value in chat_array {
+                let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
+                let sender = msg_value.get("sender").and_then(|v| v.as_str()).map(String::from);
+                let enemy = msg_value.get("enemy").and_then(|v| v.as_bool()).unwrap_or(false);
+                let mode = msg_value.get("mode").and_then(|v| v.as_str()).map(String::from);
+                
+                // Skip old messages
+                if id <= self.last_chat_id {
+                    continue;
+                }
+                
+                // Update last ID
+                self.last_chat_id = id;
+                
+                // Create ChatMessage event
+                log::info!("[Chat] 💬 New message from {:?}: '{}'", sender, msg);
+                events.push(HudEvent::ChatMessage(ChatDetails {
+                    message: msg.to_string(),
+                    sender,
+                    mode,
+                    is_enemy: enemy,
+                }));
+            }
+        }
+        
+        Ok(events)
+    }
+    
     /// Check if message contains player identity
     fn is_player_message(&self, msg: &str) -> bool {
         // Check if any of our player names match
@@ -572,6 +658,15 @@ impl WTTelemetryReader {
             // Only detect player crashes
             if self.is_player_message(msg) {
                 return Some(HudEvent::Crashed);
+            }
+            return None;
+        }
+        
+        // First Strike (special achievement)
+        if msg.contains("has delivered the first strike") {
+            if self.is_player_message(msg) {
+                log::info!("[HUD Event] ⚡ FIRST STRIKE!");
+                return Some(HudEvent::FirstStrike);
             }
             return None;
         }
@@ -612,6 +707,24 @@ impl WTTelemetryReader {
                     if self.is_player_message(victim) {
                         log::info!("[HUD Event] 💥 TAKING FIRE from: {}", attacker);
                         return Some(HudEvent::TakeDamage(attacker.to_string()));
+                    }
+                }
+            }
+            return None;
+        }
+        
+        // Critically damaged
+        if msg.contains("critically damaged") {
+            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
+                let parts: Vec<&str> = msg.split("critically damaged").collect();
+                if parts.len() == 2 {
+                    let attacker = parts[0].trim();
+                    let victim = parts[1].trim();
+                    
+                    // Player was critically damaged
+                    if self.is_player_message(victim) {
+                        log::info!("[HUD Event] 💥 CRITICALLY DAMAGED by: {}", attacker);
+                        return Some(HudEvent::CriticallyDamaged(attacker.to_string()));
                     }
                 }
             }
@@ -825,6 +938,7 @@ impl WTTelemetryReader {
             indicators,
             state,
             hud_events: Vec::new(),
+            chat_events: Vec::new(),
         })
     }
 
@@ -885,6 +999,7 @@ impl WTTelemetryReader {
             indicators,
             state,
             hud_events: Vec::new(),
+            chat_events: Vec::new(),
         })
     }
 

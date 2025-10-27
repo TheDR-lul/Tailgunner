@@ -1,4 +1,6 @@
-.game-chat-container {
+/* Common styles for both containers */
+.game-chat-container,
+.game-feed-container {
   background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-tertiary) 100%);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
@@ -14,12 +16,14 @@
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.game-chat-container:hover {
+.game-chat-container:hover,
+.game-feed-container:hover {
   border-color: var(--border-accent);
   box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 153, 51, 0.1);
 }
 
-.game-chat-container::before {
+.game-chat-container::before,
+.game-feed-container::before {
   content: '';
   position: absolute;
   top: 0;
@@ -28,6 +32,11 @@
   height: 2px;
   background: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
   opacity: 0.5;
+}
+
+/* Game Feed accent color (orange) */
+.game-feed-container::before {
+  background: linear-gradient(90deg, transparent 0%, #ff9933 50%, transparent 100%);
 }
 
 .game-chat-header {

@@ -15,17 +15,20 @@ interface ChatMessage {
 
 export function GameChat() {
   const { t } = useTranslation();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Separate streams: chat and HUD
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [hudMessages, setHudMessages] = useState<ChatMessage[]>([]);
   const [lastChatId, setLastChatId] = useState<number>(0);
   const [lastEvtId, setLastEvtId] = useState<number>(0);
   const [lastDmgId, setLastDmgId] = useState<number>(0);
-  const [isEnabled, setIsEnabled] = useState(false);
+  const [isFeedEnabled, setIsFeedEnabled] = useState(false);
+  const [isChatEnabled, setIsChatEnabled] = useState(false);
   const [lastBattleId, setLastBattleId] = useState<number>(0); // Track battle changes
   const [updateInterval, setUpdateInterval] = useState<number>(() => 
     parseInt(localStorage.getItem('feedUpdateInterval') || '500')
   );
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const feedContainerRef = useRef<HTMLDivElement>(null);
 
   // Listen for localStorage changes from DebugConsole
   useEffect(() => {
@@ -39,7 +42,7 @@ export function GameChat() {
   }, []);
 
   useEffect(() => {
-    if (!isEnabled) return;
+    if (!isFeedEnabled && !isChatEnabled) return;
 
     const interval = setInterval(async () => {
       try {
@@ -50,8 +53,9 @@ export function GameChat() {
         if (mapInfo && mapInfo.info.map_generation !== lastBattleId) {
           // New battle detected - clear old messages
           if (lastBattleId !== 0) {
-            console.log(`[GameChat] New battle detected (${lastBattleId} → ${mapInfo.info.map_generation}), clearing feed`);
-            setMessages([]);
+            console.log(`[GameChat] New battle detected (${lastBattleId} → ${mapInfo.info.map_generation}), clearing streams`);
+            setChatMessages([]);
+            setHudMessages([]);
             setLastChatId(0);
             setLastEvtId(0);
             setLastDmgId(0);
@@ -76,54 +80,46 @@ export function GameChat() {
           })
         ]);
         
-        const newMessages: ChatMessage[] = [];
-        
-        // Add chat messages
+        // Process CHAT messages (separate stream)
         if (chat && Array.isArray(chat) && chat.length > 0) {
           console.log(`[GameChat] Received ${chat.length} new chat messages`);
-          newMessages.push(...chat.map(msg => ({ ...msg, type: 'chat' as const })));
+          const newChat = chat.map(msg => ({ ...msg, type: 'chat' as const }));
+          setChatMessages(prev => {
+            const combined = [...prev, ...newChat];
+            combined.sort((a, b) => a.time - b.time);
+            return combined.slice(-100); // Keep last 100
+          });
           setLastChatId(chat[chat.length - 1].id);
+          // Auto-scroll chat
+          setTimeout(() => {
+            if (chatContainerRef.current) {
+              chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+            }
+          }, 0);
         }
         
-        // Add HUD event messages
+        // Process HUD messages (separate stream)
+        const newHud: ChatMessage[] = [];
         if (hud.events && hud.events.length > 0) {
           console.log(`[GameChat] Received ${hud.events.length} new event messages`);
-          newMessages.push(...hud.events.map(msg => ({ ...msg, type: 'event' as const })));
+          newHud.push(...hud.events.map(msg => ({ ...msg, type: 'event' as const })));
           setLastEvtId(hud.events[hud.events.length - 1].id);
         }
-        
-        // Add HUD damage messages (kills, hits, etc)
         if (hud.damage && hud.damage.length > 0) {
           console.log(`[GameChat] Received ${hud.damage.length} new damage messages`);
-          newMessages.push(...hud.damage.map(msg => ({ ...msg, type: 'damage' as const })));
+          newHud.push(...hud.damage.map(msg => ({ ...msg, type: 'damage' as const })));
           setLastDmgId(hud.damage[hud.damage.length - 1].id);
         }
-        
-        if (newMessages.length > 0) {
-          console.log(`[GameChat] Adding ${newMessages.length} new messages to feed`);
-          setMessages(prev => {
-            // Check if battle restarted: new message time < last message time
-            if (prev.length > 0 && newMessages.length > 0) {
-              const lastOldTime = prev[prev.length - 1].time;
-              const firstNewTime = Math.min(...newMessages.map(m => m.time));
-              
-              if (firstNewTime < lastOldTime) {
-                console.log(`[GameChat] Battle restart detected! Time reset: ${lastOldTime} → ${firstNewTime}. Clearing feed.`);
-                return newMessages.slice().sort((a, b) => a.time - b.time).slice(-100);
-              }
-            }
-            
-            // Normal case: combine and sort by time
-            const combined = [...prev, ...newMessages];
+        if (newHud.length > 0) {
+          setHudMessages(prev => {
+            const combined = [...prev, ...newHud];
             combined.sort((a, b) => a.time - b.time);
-            const result = combined.slice(-100); // Keep last 100 messages
-            console.log(`[GameChat] Total messages in feed: ${result.length}`);
-            return result;
+            return combined.slice(-100); // Keep last 100
           });
-          // Scroll only the messages container to the bottom
+          // Auto-scroll feed
           setTimeout(() => {
-            if (messagesContainerRef.current) {
-              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            if (feedContainerRef.current) {
+              feedContainerRef.current.scrollTop = feedContainerRef.current.scrollHeight;
             }
           }, 0);
         }
@@ -133,7 +129,7 @@ export function GameChat() {
     }, updateInterval); // Use configurable update interval
 
     return () => clearInterval(interval);
-  }, [isEnabled, lastChatId, lastEvtId, lastDmgId, lastBattleId, updateInterval]);
+  }, [isFeedEnabled, isChatEnabled, lastChatId, lastEvtId, lastDmgId, lastBattleId, updateInterval]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -142,45 +138,82 @@ export function GameChat() {
   };
 
   return (
-    <div className="game-chat-container">
-      <div className="game-chat-header">
-        <h3>{t('chat.title')}</h3>
-        <button 
-          className={`btn btn-${isEnabled ? 'primary' : 'secondary'}`}
-          onClick={() => {
-            setIsEnabled(!isEnabled);
-            if (!isEnabled) {
-              setMessages([]);
-              setLastChatId(0);
-              setLastEvtId(0);
-              setLastDmgId(0);
-            }
-          }}
-        >
-          {isEnabled ? t('chat.enabled') : t('chat.disabled')}
-        </button>
-      </div>
-      {isEnabled && (
-        <div className="game-chat-messages" ref={messagesContainerRef}>
-          {messages.length === 0 ? (
-            <div className="game-chat-empty">{t('chat.waiting')}</div>
-          ) : (
-            messages.map((msg, index) => (
-              <div 
-                key={`${msg.type}-${msg.id}-${index}`}
-                className={`chat-message ${msg.type || 'system'} ${msg.enemy ? 'enemy' : 'ally'} ${msg.sender ? 'player' : 'system'}`}
-              >
-                <span className="chat-time">{formatTime(msg.time)}</span>
-                {msg.mode && <span className="chat-mode">[{msg.mode}]</span>}
-                {msg.sender && <span className="chat-sender">{msg.sender}:</span>}
-                <span className="chat-text">{msg.msg}</span>
-              </div>
-            ))
-          )}
-          <div ref={messagesEndRef} />
+    <>
+      {/* Game Feed (HUD Events) - Separate Block */}
+      <div className="game-feed-container">
+        <div className="game-chat-header">
+          <h3>📢 Game Feed</h3>
+          <button 
+            className={`btn btn-${isFeedEnabled ? 'primary' : 'secondary'}`}
+            onClick={() => {
+              setIsFeedEnabled(!isFeedEnabled);
+              if (!isFeedEnabled) {
+                setHudMessages([]);
+                setLastEvtId(0);
+                setLastDmgId(0);
+              }
+            }}
+          >
+            {isFeedEnabled ? t('chat.enabled') : t('chat.disabled')}
+          </button>
         </div>
-      )}
-    </div>
+        {isFeedEnabled && (
+          <div className="game-chat-messages" ref={feedContainerRef}>
+            {hudMessages.length === 0 ? (
+              <div className="game-chat-empty">Waiting for messages...</div>
+            ) : (
+              hudMessages.map((msg, index) => (
+                <div 
+                  key={`hud-${msg.id}-${index}`}
+                  className={`chat-message ${msg.type || 'system'} ${msg.enemy ? 'enemy' : 'ally'} ${msg.sender ? 'player' : 'system'}`}
+                >
+                  <span className="chat-time">{formatTime(msg.time)}</span>
+                  <span className="chat-text">{msg.msg}</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Game Chat (Chat Messages) - Separate Block */}
+      <div className="game-chat-container">
+        <div className="game-chat-header">
+          <h3>💬 Game Chat</h3>
+          <button 
+            className={`btn btn-${isChatEnabled ? 'primary' : 'secondary'}`}
+            onClick={() => {
+              setIsChatEnabled(!isChatEnabled);
+              if (!isChatEnabled) {
+                setChatMessages([]);
+                setLastChatId(0);
+              }
+            }}
+          >
+            {isChatEnabled ? t('chat.enabled') : t('chat.disabled')}
+          </button>
+        </div>
+        {isChatEnabled && (
+          <div className="game-chat-messages" ref={chatContainerRef}>
+            {chatMessages.length === 0 ? (
+              <div className="game-chat-empty">Waiting for messages...</div>
+            ) : (
+              chatMessages.map((msg, index) => (
+                <div 
+                  key={`chat-${msg.id}-${index}`}
+                  className={`chat-message chat ${msg.enemy ? 'enemy' : 'ally'}`}
+                >
+                  <span className="chat-time">{formatTime(msg.time)}</span>
+                  {msg.mode && <span className="chat-mode">[{msg.mode}]</span>}
+                  {msg.sender && <span className="chat-sender">{msg.sender}:</span>}
+                  <span className="chat-text">{msg.msg}</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
