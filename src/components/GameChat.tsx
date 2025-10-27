@@ -83,6 +83,14 @@ export function GameChat() {
           console.log(`[GameChat] Received ${chat.length} new chat messages`);
           const newChat = chat.map(msg => ({ ...msg, type: 'chat' as const }));
           setChatMessages(prev => {
+            // 🔍 FILTER OLD EVENTS: If receiving >5 messages at once after empty/first load → old events
+            if (newChat.length > 5 && prev.length === 0) {
+              console.warn(`[GameChat] ⏭️ Ignoring ${newChat.length} old chat messages (bulk load detected)`);
+              // Update lastChatId but don't show messages
+              setLastChatId(chat[chat.length - 1].id);
+              return prev;
+            }
+            
             const combined = [...prev, ...newChat];
             combined.sort((a, b) => a.time - b.time);
             return combined.slice(-100); // Keep last 100
@@ -110,6 +118,12 @@ export function GameChat() {
         }
         if (newHud.length > 0) {
           setHudMessages(prev => {
+            // 🔍 FILTER OLD EVENTS: If receiving >5 messages at once after empty/first load → old events
+            if (newHud.length > 5 && prev.length === 0) {
+              console.warn(`[GameChat] ⏭️ Ignoring ${newHud.length} old HUD messages (bulk load detected)`);
+              return prev; // Don't add them!
+            }
+            
             const combined = [...prev, ...newHud];
             combined.sort((a, b) => a.time - b.time);
             return combined.slice(-100); // Keep last 100
