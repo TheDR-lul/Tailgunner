@@ -1,25 +1,43 @@
 .vehicle-mode-card {
-  background: var(--bg-dark);
-  border-radius: 8px;
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-tertiary) 100%);
+  border-radius: var(--radius-md);
   padding: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-strong);
   border-left: 4px solid transparent;
-  transition: all 0.3s ease;
+  transition: var(--transition);
+  position: relative;
+}
+
+.vehicle-mode-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
+  opacity: 0.5;
 }
 
 .vehicle-mode-card.hud-only {
-  border-left-color: #f59e0b;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, var(--bg-dark) 100%);
+  border-left-color: var(--warning);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, var(--bg-card) 50%, var(--bg-tertiary) 100%);
 }
 
 .vehicle-mode-card.full-telemetry {
-  border-left-color: #10b981;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, var(--bg-dark) 100%);
+  border-left-color: var(--success);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, var(--bg-card) 50%, var(--bg-tertiary) 100%);
 }
 
 .vehicle-mode-card.disconnected {
   border-left-color: #6b7280;
   opacity: 0.6;
+}
+
+.vehicle-mode-card:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 153, 51, 0.1);
 }
 
 .mode-header {

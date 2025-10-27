@@ -26,7 +26,6 @@ pub struct EmulatorState {
     
     // Combat
     pub ammo: i32,            // rounds
-    pub hp: f32,              // % health
     pub engine_running: bool,
     
     // Aircraft specific (for /state)
@@ -79,7 +78,6 @@ impl Default for EmulatorState {
             position: [0.5, 0.5],
             
             ammo: 300,
-            hp: 100.0,
             engine_running: true,
             
             tas: 0.0,
@@ -138,6 +136,10 @@ impl APIEmulator {
         self.state.lock().unwrap().clone()
     }
 
+    pub fn get_enabled(&self) -> bool {
+        self.state.lock().unwrap().enabled
+    }
+    
     pub fn set_enabled(&self, enabled: bool) {
         self.state.lock().unwrap().enabled = enabled;
     }
@@ -215,16 +217,20 @@ impl APIEmulator {
         self.state.lock().unwrap().ammo = ammo;
     }
 
-    pub fn set_hp(&self, hp: f32) {
-        self.state.lock().unwrap().hp = hp;
-    }
-
     pub fn set_engine_running(&self, running: bool) {
         self.state.lock().unwrap().engine_running = running;
     }
 
     pub fn set_in_battle(&self, in_battle: bool) {
         self.state.lock().unwrap().in_battle = in_battle;
+    }
+
+    pub fn set_g_load(&self, g_load: f32) {
+        self.state.lock().unwrap().g_load = g_load;
+    }
+
+    pub fn set_fuel(&self, fuel_kg: f32) {
+        self.state.lock().unwrap().fuel_kg = fuel_kg;
     }
 
     pub fn trigger_event(&self, event_type: String, data: HashMap<String, String>) {
@@ -261,10 +267,14 @@ impl APIEmulator {
         }
 
         match state.vehicle_type {
-            VehicleType::Tank => serde_json::json!({
-                "valid": true,
-                "army": "ground",
-                "type": "tank",
+            VehicleType::Tank => {
+                // Replace spaces with underscores for WT API format
+                let vehicle_name_formatted = state.vehicle_name.replace(' ', "_");
+                
+                serde_json::json!({
+                    "valid": true,
+                    "army": "ground",
+                    "type": format!("tankModels/{}", &vehicle_name_formatted),
                 "speed": state.speed,
                 "rpm": state.rpm,
                 "gear": if state.gear > 0.5 { 1 } else { 0 },
@@ -272,17 +282,21 @@ impl APIEmulator {
                 "oil_temperature": state.oil_temp,
                 "water_temperature": state.water_temp,
                 "ammo_count": state.ammo,
-            }),
+                })
+            },
             VehicleType::Aircraft => {
                 // Calculate realistic altimeter digits
                 let alt_m = state.altitude;
                 let alt_hour = (alt_m / 1000.0).floor();
                 let alt_min = ((alt_m % 1000.0) / 100.0).floor();
                 
+                // Replace spaces with underscores for WT API format
+                let vehicle_name_formatted = state.vehicle_name.replace(' ', "_");
+                
                 serde_json::json!({
                     "valid": true,
                     "army": "air",
-                    "type": &state.vehicle_name,
+                    "type": &vehicle_name_formatted,
                     "speed": state.ias,
                     "pedals": state.pedals,
                     "pedals1": state.pedals,
@@ -313,16 +327,21 @@ impl APIEmulator {
                     "blister11": 0.0,
                 })
             },
-            VehicleType::Ship => serde_json::json!({
-                "valid": true,
-                "army": "sea",
-                "type": "ship",
+            VehicleType::Ship => {
+                // Replace spaces with underscores for WT API format
+                let vehicle_name_formatted = state.vehicle_name.replace(' ', "_");
+                
+                serde_json::json!({
+                    "valid": true,
+                    "army": "sea",
+                    "type": &vehicle_name_formatted,
                 "speed": state.speed,
                 "rpm": state.rpm,
                 "throttle": state.throttle,
                 "compass": state.compass,
                 "ammo_count": state.ammo,
-            }),
+                })
+            },
         }
     }
 
@@ -372,6 +391,28 @@ impl APIEmulator {
                 "flaps, %": state.flaps * 100.0,
                 "gear, %": state.gear * 100.0,
                 "airbrake, %": 0.0,
+            }),
+            VehicleType::Tank => serde_json::json!({
+                "valid": true,
+                // Speed
+                "TAS, km/h": state.speed,
+                "IAS, km/h": state.speed,
+                
+                // G-load
+                "Ny": state.g_load,
+                
+                // Fuel
+                "Mfuel, kg": state.fuel_kg,
+                "Mfuel0, kg": state.fuel_max_kg,
+                
+                // Engine
+                "throttle 1, %": state.throttle,
+                "RPM 1": state.rpm,
+                "oil temp 1, C": state.oil_temp,
+                "water temp 1, C": state.water_temp,
+                
+                // Controls
+                "gear, %": state.gear * 100.0,
             }),
             _ => serde_json::json!({ "valid": false }),
         }
@@ -454,6 +495,121 @@ impl APIEmulator {
                 "icon_bg": "none",
                 "x": state.position[0] + angle.cos() * distance,
                 "y": state.position[1] + angle.sin() * distance,
+            }));
+        }
+
+        // Add airfields (for aircraft)
+        if matches!(state.vehicle_type, VehicleType::Aircraft) {
+            // Friendly airfield
+            objects.push(serde_json::json!({
+                "type": "airfield",
+                "color": "#174DFF",
+                "color[]": [23, 77, 255],
+                "blink": 0,
+                "icon": "none",
+                "icon_bg": "none",
+                "sx": 0.85,
+                "sy": 0.45,
+                "ex": 0.79,
+                "ey": 0.44
+            }));
+            
+            // Enemy airfield
+            objects.push(serde_json::json!({
+                "type": "airfield",
+                "color": "#fa0C00",
+                "color[]": [250, 12, 0],
+                "blink": 0,
+                "icon": "none",
+                "icon_bg": "none",
+                "sx": 0.14,
+                "sy": 0.48,
+                "ex": 0.19,
+                "ey": 0.48
+            }));
+        }
+
+        // Add capture zones (for ground battles)
+        if matches!(state.vehicle_type, VehicleType::Tank) {
+            // Zone A (enemy)
+            objects.push(serde_json::json!({
+                "type": "capture_zone",
+                "color": "#fa0C00",
+                "color[]": [250, 12, 0],
+                "blink": 0,
+                "icon": "capture_zone",
+                "icon_bg": "none",
+                "x": 0.30,
+                "y": 0.50
+            }));
+            
+            // Zone B (neutral)
+            objects.push(serde_json::json!({
+                "type": "capture_zone",
+                "color": "#FFFFFF",
+                "color[]": [255, 255, 255],
+                "blink": 0,
+                "icon": "capture_zone",
+                "icon_bg": "none",
+                "x": 0.50,
+                "y": 0.50
+            }));
+            
+            // Zone C (friendly)
+            objects.push(serde_json::json!({
+                "type": "capture_zone",
+                "color": "#174DFF",
+                "color[]": [23, 77, 255],
+                "blink": 0,
+                "icon": "capture_zone",
+                "icon_bg": "none",
+                "x": 0.70,
+                "y": 0.50
+            }));
+        }
+
+        // Add respawn points (for aircraft)
+        if matches!(state.vehicle_type, VehicleType::Aircraft) {
+            // Friendly fighter spawn
+            objects.push(serde_json::json!({
+                "type": "respawn_base_fighter",
+                "color": "#174DFF",
+                "color[]": [23, 77, 255],
+                "blink": 0,
+                "icon": "respawn_base_fighter",
+                "icon_bg": "none",
+                "x": 0.85,
+                "y": 0.45,
+                "dx": -399.0,
+                "dy": 17.0
+            }));
+            
+            // Friendly bomber spawn
+            objects.push(serde_json::json!({
+                "type": "respawn_base_bomber",
+                "color": "#174DFF",
+                "color[]": [23, 77, 255],
+                "blink": 0,
+                "icon": "respawn_base_bomber",
+                "icon_bg": "none",
+                "x": 0.85,
+                "y": 0.48,
+                "dx": -399.0,
+                "dy": 17.0
+            }));
+            
+            // Enemy fighter spawn
+            objects.push(serde_json::json!({
+                "type": "respawn_base_fighter",
+                "color": "#fa0C00",
+                "color[]": [250, 12, 0],
+                "blink": 0,
+                "icon": "respawn_base_fighter",
+                "icon_bg": "none",
+                "x": 0.15,
+                "y": 0.48,
+                "dx": 399.0,
+                "dy": -11.0
             }));
         }
 

@@ -32,6 +32,7 @@ pub struct AppState {
     engine: Arc<Mutex<HapticEngine>>,
     emulator: Arc<api_emulator::APIEmulator>,
     server_running: Arc<Mutex<bool>>,
+    server_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 // Tauri commands
@@ -732,6 +733,30 @@ async fn datamine_get_stats() -> Result<(usize, usize, usize), String> {
     db.get_stats().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn datamine_get_all_aircraft() -> Result<Vec<(String, String, f32)>, String> {
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    db.get_all_aircraft().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn datamine_get_all_ground() -> Result<Vec<(String, String, f32)>, String> {
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    db.get_all_ground().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn datamine_get_all_ships() -> Result<Vec<(String, String, f32)>, String> {
+    let db = datamine::database::VehicleDatabase::new()
+        .map_err(|e| e.to_string())?;
+    
+    db.get_all_ships().map_err(|e| e.to_string())
+}
+
 /// Auto-initialize datamine: find game, check database, build if needed
 #[tauri::command]
 async fn datamine_auto_init() -> Result<String, String> {
@@ -851,9 +876,16 @@ async fn get_map_data() -> Result<map_module::MapData, String> {
 
 /// Get game chat messages
 #[tauri::command]
-async fn get_game_chat(last_id: Option<u32>) -> Result<Value, String> {
+async fn get_game_chat(
+    state: tauri::State<'_, AppState>,
+    last_id: Option<u32>
+) -> Result<Value, String> {
+    // Check if emulator is enabled
+    let emulator_enabled = state.emulator.get_enabled();
+    let port = if emulator_enabled { 8112 } else { 8111 };
+    
     // Always use ?lastId parameter (API returns empty object without it)
-    let url = format!("http://127.0.0.1:8111/gamechat?lastId={}", last_id.unwrap_or(0));
+    let url = format!("http://127.0.0.1:{}/gamechat?lastId={}", port, last_id.unwrap_or(0));
     
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(2))
@@ -876,15 +908,24 @@ async fn get_game_chat(last_id: Option<u32>) -> Result<Value, String> {
 
 /// Get HUD messages (achievements, kills, etc)
 #[tauri::command]
-async fn get_hud_messages(last_evt_id: Option<u32>, last_dmg_id: Option<u32>) -> Result<Value, String> {
+async fn get_hud_messages(
+    state: tauri::State<'_, AppState>,
+    last_evt_id: Option<u32>,
+    last_dmg_id: Option<u32>
+) -> Result<Value, String> {
+    // Check if emulator is enabled
+    let emulator_enabled = state.emulator.get_enabled();
+    let port = if emulator_enabled { 8112 } else { 8111 };
+    
     let url = if last_evt_id.is_some() || last_dmg_id.is_some() {
         format!(
-            "http://127.0.0.1:8111/hudmsg?lastEvt={}&lastDmg={}",
+            "http://127.0.0.1:{}/hudmsg?lastEvt={}&lastDmg={}",
+            port,
             last_evt_id.unwrap_or(0),
             last_dmg_id.unwrap_or(0)
         )
     } else {
-        "http://127.0.0.1:8111/hudmsg?lastEvt=0&lastDmg=0".to_string()
+        format!("http://127.0.0.1:{}/hudmsg?lastEvt=0&lastDmg=0", port)
     };
     
     let client = reqwest::Client::builder()
@@ -908,8 +949,12 @@ async fn get_hud_messages(last_evt_id: Option<u32>, last_dmg_id: Option<u32>) ->
 
 /// Get mission info
 #[tauri::command]
-async fn get_mission_info() -> Result<Value, String> {
-    let url = "http://127.0.0.1:8111/mission.json";
+async fn get_mission_info(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    // Check if emulator is enabled
+    let emulator_enabled = state.emulator.get_enabled();
+    let port = if emulator_enabled { 8112 } else { 8111 };
+    
+    let url = format!("http://127.0.0.1:{}/mission.json", port);
     
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(2))
@@ -1031,23 +1076,48 @@ async fn emulator_set_enabled(state: tauri::State<'_, AppState>, enabled: bool) 
     state.emulator.set_enabled(enabled);
     
     let mut server_running = state.server_running.lock().await;
+    let mut server_handle = state.server_handle.lock().await;
     
     if enabled && !*server_running {
-        // Start API server
-        let emulator_clone = state.emulator.clone();
-        tokio::spawn(async move {
-            api_server::start_server(emulator_clone).await;
-        });
-        *server_running = true;
-        log::info!("[Emulator] 🧪 API server started on http://localhost:8112");
-        
-        // Switch telemetry to emulator mode
-        let engine = state.engine.lock().await;
-        let telemetry = engine.get_telemetry();
-        let mut telem = telemetry.write().await;
-        telem.set_emulator_mode(true);
+        // Check if port is available first
+        match tokio::net::TcpListener::bind("127.0.0.1:8112").await {
+            Ok(listener) => {
+                drop(listener); // Release the port
+                
+                // Start API server
+                let emulator_clone = state.emulator.clone();
+                let handle = tokio::spawn(async move {
+                    log::info!("[Emulator] 🧪 Starting API server on http://localhost:8112");
+                    api_server::start_server(emulator_clone).await;
+                });
+                
+                *server_handle = Some(handle);
+                *server_running = true;
+                log::info!("[Emulator] 🧪 API server task started");
+                
+                // Switch telemetry to emulator mode
+                let engine = state.engine.lock().await;
+                let telemetry = engine.get_telemetry();
+                let mut telem = telemetry.write().await;
+                telem.set_emulator_mode(true);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+                log::warn!("[Emulator] ⚠️ Port 8112 already in use. Please restart the application.");
+                return Err("Port 8112 already in use. Please restart the application.".to_string());
+            }
+            Err(e) => {
+                log::error!("[Emulator] ❌ Failed to bind port 8112: {}", e);
+                return Err(format!("Failed to bind port 8112: {}", e));
+            }
+        }
         
     } else if !enabled && *server_running {
+        // Stop API server
+        if let Some(handle) = server_handle.take() {
+            handle.abort();
+            log::info!("[Emulator] 🛑 API server task aborted");
+        }
+        
         *server_running = false;
         log::info!("[Emulator] 🎮 API server stopped");
         
@@ -1111,22 +1181,20 @@ async fn emulator_set_ammo(state: tauri::State<'_, AppState>, ammo: i32) -> Resu
 }
 
 #[tauri::command]
-async fn emulator_set_hp(state: tauri::State<'_, AppState>, hp: f32) -> Result<(), String> {
-    state.emulator.set_hp(hp);
-    Ok(())
-}
-
-#[tauri::command]
 async fn emulator_set_in_battle(state: tauri::State<'_, AppState>, in_battle: bool) -> Result<(), String> {
     state.emulator.set_in_battle(in_battle);
     Ok(())
 }
 
 #[tauri::command]
-async fn emulator_trigger_event(state: tauri::State<'_, AppState>, event_type: String) -> Result<(), String> {
-    use std::collections::HashMap;
-    log::info!("[Emulator] Triggered event: {}", event_type);
-    state.emulator.trigger_event(event_type, HashMap::new());
+async fn emulator_set_g_load(state: tauri::State<'_, AppState>, g_load: f32) -> Result<(), String> {
+    state.emulator.set_g_load(g_load);
+    Ok(())
+}
+
+#[tauri::command]
+async fn emulator_set_fuel(state: tauri::State<'_, AppState>, fuel_kg: f32) -> Result<(), String> {
+    state.emulator.set_fuel(fuel_kg);
     Ok(())
 }
 
@@ -1153,6 +1221,31 @@ async fn emulator_send_chat(message: String, mode: String, sender: String, enemy
         Err(e) => {
             log::error!("[Emulator] Failed to send chat: {}", e);
             Err(format!("Failed to send chat: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+async fn emulator_send_hudmsg(message: String, event_type: String) -> Result<(), String> {
+    // Send to emulator API server on port 8112
+    let client = reqwest::Client::new();
+    let response = client
+        .post("http://127.0.0.1:8112/hudmsg/send")
+        .json(&serde_json::json!({
+            "message": message,
+            "event_type": event_type
+        }))
+        .send()
+        .await;
+    
+    match response {
+        Ok(_) => {
+            log::info!("[Emulator] HUD message sent: {} ({})", message, event_type);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("[Emulator] Failed to send HUD message: {}", e);
+            Err(format!("Failed to send HUD message: {}", e))
         }
     }
 }
@@ -1196,12 +1289,13 @@ pub fn run() {
     let engine = Arc::new(Mutex::new(engine));
     let emulator = Arc::new(api_emulator::APIEmulator::new());
     let server_running = Arc::new(Mutex::new(false));
+    let server_handle = Arc::new(Mutex::new(None));
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .manage(AppState { engine, emulator, server_running })
+        .manage(AppState { engine, emulator, server_running, server_handle })
         .invoke_handler(tauri::generate_handler![
             init_devices,
             start_engine,
@@ -1243,6 +1337,9 @@ pub fn run() {
             datamine_parse,
             datamine_get_limits,
             datamine_get_stats,
+            datamine_get_all_aircraft,
+            datamine_get_all_ground,
+            datamine_get_all_ships,
             datamine_auto_init,
             datamine_rebuild,
             get_map_objects,
@@ -1262,10 +1359,11 @@ pub fn run() {
             emulator_set_heading,
             emulator_set_position,
             emulator_set_ammo,
-            emulator_set_hp,
             emulator_set_in_battle,
-            emulator_trigger_event,
+            emulator_set_g_load,
+            emulator_set_fuel,
             emulator_send_chat,
+            emulator_send_hudmsg,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

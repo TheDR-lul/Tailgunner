@@ -178,6 +178,18 @@ export const api = {
     return invoke('datamine_get_stats');
   },
 
+  async datamineGetAllAircraft(): Promise<Array<[string, string, number]>> {
+    return invoke('datamine_get_all_aircraft');
+  },
+
+  async datamineGetAllGround(): Promise<Array<[string, string, number]>> {
+    return invoke('datamine_get_all_ground');
+  },
+
+  async datamineGetAllShips(): Promise<Array<[string, string, number]>> {
+    return invoke('datamine_get_all_ships');
+  },
+
   // Map API
   async getMapObjects(): Promise<any[]> {
     return invoke('get_map_objects');
@@ -251,20 +263,25 @@ export const api = {
     return invoke('emulator_set_ammo', { ammo });
   },
 
-  async emulatorSetHp(hp: number): Promise<void> {
-    return invoke('emulator_set_hp', { hp });
-  },
-
   async emulatorSetInBattle(inBattle: boolean): Promise<void> {
     return invoke('emulator_set_in_battle', { inBattle });
   },
 
-  async emulatorTriggerEvent(eventType: string): Promise<void> {
-    return invoke('emulator_trigger_event', { eventType });
+  async emulatorSetGLoad(gLoad: number): Promise<void> {
+    return invoke('emulator_set_g_load', { gLoad });
+  },
+
+  async emulatorSetFuel(fuelKg: number): Promise<void> {
+    return invoke('emulator_set_fuel', { fuelKg });
   },
 
   async emulatorSendChat(message: string, mode: string, sender: string, enemy: boolean): Promise<void> {
     return invoke('emulator_send_chat', { message, mode, sender, enemy });
   },
+
+  async emulatorSendHudmsg(message: string, eventType: string): Promise<void> {
+    return invoke('emulator_send_hudmsg', { message, eventType });
+  },
 };
+
 
