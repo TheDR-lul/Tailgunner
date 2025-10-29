@@ -10,8 +10,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: 400px;
-  min-height: 300px;
+  height: auto;
+  max-height: 450px;
+  min-height: 250px;
+  flex: 1 1 auto;
   overflow: hidden;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
@@ -57,9 +59,12 @@
 .game-chat-messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 .game-chat-empty {

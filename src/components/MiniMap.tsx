@@ -1164,9 +1164,9 @@ export function MiniMap() {
       }} />
 
       {/* Content below header */}
-      <div style={{ display: 'flex', gap: '16px', width: '100%', alignItems: 'flex-start' }}>
+      <div className="minimap-layout">
         {/* Left side - Map Canvas */}
-        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+        <div className="minimap-canvas-container">
           <div 
             className="minimap-canvas-wrapper" 
             ref={canvasWrapperRef}
@@ -1192,31 +1192,14 @@ export function MiniMap() {
         </div>
 
         {/* Right side - Tools & Info */}
-        <div style={{
-          flex: '0 0 auto',
-          width: '280px',
-          minWidth: '250px',
-          maxWidth: '350px',
-          padding: '16px',
-          paddingLeft: '0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          overflowY: 'auto',
-          maxHeight: '100%',
-        }}>
+        <div className="minimap-sidebar">
           {/* Player Info */}
-          <div style={{ 
-            borderBottom: '1px solid var(--border)', 
-            paddingBottom: '12px' 
-          }}>
-            <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '8px' }}>
-              👤 Player Info
-            </h4>
+          <div className="minimap-sidebar-section">
+            <h4>👤 Player Info</h4>
             {isEnabled && mapData ? (
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+              <div className="minimap-sidebar-info">
                 {mapData.player_grid && (
-                  <div style={{ color: '#22c55e', fontWeight: 'bold' }}>
+                  <div className="minimap-grid-highlight">
                     🎯 Grid: {mapData.player_grid}
                   </div>
                 )}
@@ -1225,7 +1208,7 @@ export function MiniMap() {
                 )}
               </div>
             ) : (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              <div className="minimap-sidebar-info-empty">
                 —
               </div>
             )}
@@ -1233,14 +1216,9 @@ export function MiniMap() {
 
           {/* Tools */}
           {isEnabled && (
-            <div style={{ 
-              borderBottom: '1px solid var(--border)', 
-              paddingBottom: '12px' 
-            }}>
-              <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                🛠️ Tools
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="minimap-sidebar-section">
+              <h4>🛠️ Tools</h4>
+              <div className="minimap-tools">
                 <button
                   className={`btn btn-${activeTool === 'measure' ? 'primary' : 'secondary'}`}
                   onClick={() => {
@@ -1282,20 +1260,15 @@ export function MiniMap() {
 
           {/* Measurement Info */}
           {measurement && (
-            <div style={{
-              background: 'rgba(255, 153, 51, 0.1)',
-              border: '1px solid #ff9933',
-              borderRadius: '4px',
-              padding: '12px',
-            }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#ff9933', fontSize: '12px' }}>
+            <div className="minimap-measurement-box">
+              <div className="minimap-measurement-title">
                 📏 Measurement
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                <div>Distance: <span style={{ fontWeight: 'bold', color: '#ff9933' }}>{measurement.distance.toFixed(0)}m</span></div>
-                <div>Bearing: <span style={{ fontWeight: 'bold', color: '#ff9933' }}>{measurement.bearing.toFixed(0)}° {getCompassDirection(measurement.bearing)}</span></div>
+              <div className="minimap-measurement-data">
+                <div>Distance: <span className="minimap-measurement-value">{measurement.distance.toFixed(0)}m</span></div>
+                <div>Bearing: <span className="minimap-measurement-value">{measurement.bearing.toFixed(0)}° {getCompassDirection(measurement.bearing)}</span></div>
                 {measurement.gridRef !== '?' && (
-                  <div>Grid: <span style={{ fontWeight: 'bold', color: '#ff9933' }}>{measurement.gridRef}</span></div>
+                  <div>Grid: <span className="minimap-measurement-value">{measurement.gridRef}</span></div>
                 )}
               </div>
             </div>
@@ -1303,56 +1276,43 @@ export function MiniMap() {
 
           {/* Markers Count */}
           {markers.length > 0 && (
-            <div style={{
-              fontSize: '11px',
-              color: 'var(--text-secondary)',
-            }}>
+            <div className="minimap-marker-count">
               📍 {markers.length} marker{markers.length > 1 ? 's' : ''} placed
             </div>
           )}
 
           {/* Enemies & Allies in columns */}
           {isEnabled && mapData && (
-            <div style={{ 
-              borderTop: '1px solid var(--border)', 
-              paddingTop: '12px',
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px'
-            }}>
+            <div className="minimap-units-grid">
               {/* Enemies Column */}
-              <div>
-                <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#ff6666', fontSize: '12px' }}>
-                  🎯 Nearest Enemies
-                </div>
+              <div className="minimap-unit-column minimap-unit-enemy">
+                <h4>🎯 Nearest Enemies</h4>
                 {nearestEnemies.length > 0 ? (
                   nearestEnemies.map((enemy, idx) => (
-                    <div key={idx} style={{ fontSize: '10px', color: '#ff6666', marginBottom: '4px' }}>
+                    <div key={idx} className="minimap-unit-list">
                       {idx + 1}. {enemy.type}:<br/>
                       {enemy.distance.toFixed(0)}m @ {enemy.bearing.toFixed(0)}° {getCompassDirection(enemy.bearing)}
                     </div>
                   ))
                 ) : (
-                  <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
+                  <div className="minimap-unit-empty">
                     —
                   </div>
                 )}
               </div>
 
               {/* Allies Column */}
-              <div>
-                <div style={{ fontWeight: 'bold', marginBottom: '6px', color: '#64a8ff', fontSize: '12px' }}>
-                  🛡️ Nearest Allies
-                </div>
+              <div className="minimap-unit-column minimap-unit-ally">
+                <h4>🛡️ Nearest Allies</h4>
                 {nearestAllies.length > 0 ? (
                   nearestAllies.map((ally, idx) => (
-                    <div key={idx} style={{ fontSize: '10px', color: '#64a8ff', marginBottom: '4px' }}>
+                    <div key={idx} className="minimap-unit-list">
                       {idx + 1}. {ally.type}:<br/>
                       {ally.distance.toFixed(0)}m @ {ally.bearing.toFixed(0)}° {getCompassDirection(ally.bearing)}
                     </div>
                   ))
                 ) : (
-                  <div style={{ fontSize: '10px', color: '#666', fontStyle: 'italic' }}>
+                  <div className="minimap-unit-empty">
                     —
                   </div>
                 )}

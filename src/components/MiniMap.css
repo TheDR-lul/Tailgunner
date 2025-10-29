@@ -56,18 +56,13 @@
 
 .minimap-canvas-wrapper {
   position: relative;
-  flex: 1 1 auto;
-  width: 600px;
-  height: 600px;
-  min-width: 400px;
-  min-height: 400px;
-  max-width: 800px;
-  max-height: 800px;
-  aspect-ratio: 1 / 1;  /* Force square 1:1 ratio */
+  width: 100%;
+  max-width: 700px;
+  aspect-ratio: 1 / 1;
+  min-width: 350px;
   background: #1a1a1a;
   border-radius: 4px;
   overflow: hidden;
-  resize: both;
 }
 
 .minimap-canvas {
@@ -131,5 +126,179 @@
   padding: 6px 16px;
   font-size: 13px;
   min-width: 80px;
+}
+
+/* Layout for canvas + sidebar */
+.minimap-layout {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.minimap-canvas-container {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 700px;
+}
+
+.minimap-sidebar {
+  flex: 0 0 280px;
+  min-width: 250px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 600px;
+  scroll-behavior: smooth;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+  .minimap-canvas-wrapper {
+    max-width: 500px;
+    min-width: 300px;
+  }
+
+  .minimap-canvas-container {
+    max-width: 500px;
+    min-width: 300px;
+  }
+  
+  .minimap-sidebar {
+    flex: 0 0 240px;
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .minimap-layout {
+    flex-direction: column;
+  }
+  
+  .minimap-canvas-container {
+    max-width: 100%;
+  }
+  
+  .minimap-sidebar {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    max-height: 400px;
+  }
+}
+
+/* Sidebar sections */
+.minimap-sidebar-section {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.minimap-sidebar-section h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.minimap-sidebar-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.minimap-sidebar-info-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.minimap-grid-highlight {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+.minimap-heading {
+  /* compass styles handled inline due to dynamic content */
+}
+
+/* Tools section */
+.minimap-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Measurement info box */
+.minimap-measurement-box {
+  background: rgba(255, 153, 51, 0.1);
+  border: 1px solid #ff9933;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.minimap-measurement-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #ff9933;
+  font-size: 12px;
+}
+
+.minimap-measurement-data {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.minimap-measurement-value {
+  font-weight: bold;
+  color: #ff9933;
+}
+
+/* Marker count */
+.minimap-marker-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Nearby units grid */
+.minimap-units-grid {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.minimap-unit-column h4 {
+  font-weight: bold;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.minimap-unit-enemy h4 {
+  color: #ff6666;
+}
+
+.minimap-unit-ally h4 {
+  color: #64a8ff;
+}
+
+.minimap-unit-list {
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.minimap-unit-enemy .minimap-unit-list {
+  color: #ff6666;
+}
+
+.minimap-unit-ally .minimap-unit-list {
+  color: #64a8ff;
+}
+
+.minimap-unit-empty {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
 }
 
