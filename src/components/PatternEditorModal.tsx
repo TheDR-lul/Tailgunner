@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -13,7 +13,26 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useTranslation } from 'react-i18next';
-import { X, Save, Download, Upload } from 'lucide-react';
+import { 
+  X, 
+  Save, 
+  Download, 
+  Upload, 
+  Gauge, 
+  Zap, 
+  Filter, 
+  Vibrate, 
+  Radio,
+  Trash2,
+  Grid3x3,
+  GitBranch,
+  Cable,
+  CheckCircle,
+  AlertCircle,
+  RotateCcw,
+  Layout
+} from 'lucide-react';
+import './PatternEditorModal.css';
 
 import { InputNode } from './nodes/InputNode';
 import { ConditionNode } from './nodes/ConditionNode';
@@ -56,6 +75,7 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
   const [cooldownMs, setCooldownMs] = useState(initialData?.cooldownMs || 1000);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
+  const [snapToGrid, setSnapToGrid] = useState(true);
 
   // Update nodes and edges when initialData changes (e.g., when editing a pattern)
   // OR clear them when creating a new pattern (initialData === undefined)
@@ -76,10 +96,95 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
     }
   }, [initialData, isOpen, setNodes, setEdges]);
 
+  const handleSave = useCallback(() => {
+    if (!patternName.trim()) {
+      setNameError(true);
+      return;
+    }
+    setNameError(false);
+    onSave(patternName, nodes, edges, cooldownMs);
+    onClose();
+  }, [patternName, nodes, edges, cooldownMs, onSave, onClose]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + S = Save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleSave]);
+
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  // Statistics
+  const stats = useMemo(() => {
+    const inputNodes = nodes.filter(n => n.type === 'input' || n.type === 'event').length;
+    const conditionNodes = nodes.filter(n => n.type === 'condition' || n.type === 'multiCondition' || n.type === 'logic').length;
+    const outputNodes = nodes.filter(n => n.type === 'output' || n.type === 'vibration' || n.type === 'linear' || n.type === 'rotate').length;
+    
+    return {
+      totalNodes: nodes.length,
+      totalEdges: edges.length,
+      inputNodes,
+      conditionNodes,
+      outputNodes,
+      isValid: inputNodes > 0 && outputNodes > 0,
+    };
+  }, [nodes, edges]);
+
+  const clearAll = useCallback(() => {
+    if (confirm('Clear all nodes and connections?')) {
+      setNodes([]);
+      setEdges([]);
+    }
+  }, [setNodes, setEdges]);
+
+  const autoLayout = useCallback(() => {
+    // Simple auto-layout: arrange nodes in columns by type
+    const inputNodes = nodes.filter(n => n.type === 'input' || n.type === 'event');
+    const conditionNodes = nodes.filter(n => n.type === 'condition' || n.type === 'multiCondition' || n.type === 'logic');
+    const outputNodes = nodes.filter(n => n.type === 'vibration' || n.type === 'linear' || n.type === 'rotate' || n.type === 'output');
+    
+    const layoutNodes = [...inputNodes, ...conditionNodes, ...outputNodes];
+    const nodeSpacing = 120;
+    const columnSpacing = 300;
+    
+    const updatedNodes = layoutNodes.map((node, index) => {
+      let column = 0;
+      let row = index;
+      
+      if (conditionNodes.includes(node)) {
+        column = 1;
+        row = conditionNodes.indexOf(node);
+      } else if (outputNodes.includes(node)) {
+        column = 2;
+        row = outputNodes.indexOf(node);
+      } else {
+        row = inputNodes.indexOf(node);
+      }
+      
+      return {
+        ...node,
+        position: {
+          x: 100 + column * columnSpacing,
+          y: 100 + row * nodeSpacing,
+        },
+      };
+    });
+    
+    setNodes(updatedNodes);
+  }, [nodes, setNodes]);
 
   const addNode = (type: string) => {
     const newNode: Node = {
@@ -124,16 +229,6 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
       default:
         return {};
     }
-  };
-
-  const handleSave = () => {
-    if (!patternName.trim()) {
-      setNameError(true);
-      return;
-    }
-    setNameError(false);
-    onSave(patternName, nodes, edges, cooldownMs);
-    onClose();
   };
 
   const exportPattern = async () => {
@@ -213,198 +308,251 @@ export function PatternEditorModal({ isOpen, onClose, onSave, initialData }: Pat
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div style={{ flex: 1 }}>
-            <h2>{initialData ? t('pattern_editor.edit_title') : t('pattern_editor.create_title')}</h2>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '8px' }}>
-              <input
-                type="text"
-                value={patternName}
-                onChange={(e) => {
-                  setPatternName(e.target.value);
-                  setNameError(false);
-                }}
-                placeholder={t('pattern_editor.name_placeholder')}
-                className="pattern-name-input"
-                style={{ 
-                  flex: 1,
-                  borderColor: nameError ? '#ef4444' : undefined,
-                  outline: nameError ? '2px solid rgba(239, 68, 68, 0.3)' : undefined
-                }}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                <label style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>
-                  ⏱️ Cooldown:
-                </label>
+      <div className="modal-container pattern-editor-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="pattern-editor-container">
+          {/* Header */}
+          <div className="pattern-editor-header">
+            <div className="pattern-editor-title-row">
+              <div className="pattern-editor-title">
+                <div className="pattern-editor-title-icon">
+                  <GitBranch size={20} />
+                </div>
+                {initialData ? t('pattern_editor.edit_title') : t('pattern_editor.create_title')}
+              </div>
+              <button className="pattern-editor-close" onClick={onClose}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="pattern-editor-inputs">
+              <div className="pattern-name-wrapper">
+                <label className="pattern-name-label">Pattern Name</label>
                 <input
-                  type="number"
-                  value={cooldownMs}
-                  onChange={(e) => setCooldownMs(Math.max(0, parseInt(e.target.value) || 0))}
-                  min="0"
-                  step="100"
-                  style={{
-                    width: '90px',
-                    padding: '6px 8px',
-                    background: '#1e293b',
-                    border: '1px solid #334155',
-                    borderRadius: '6px',
-                    color: '#e2e8f0',
-                    fontSize: '13px',
-                    textAlign: 'right'
+                  type="text"
+                  value={patternName}
+                  onChange={(e) => {
+                    setPatternName(e.target.value);
+                    setNameError(false);
                   }}
+                  placeholder={t('pattern_editor.name_placeholder')}
+                  className={`pattern-name-input-field ${nameError ? 'error' : ''}`}
                 />
-                <span style={{ fontSize: '12px', color: '#64748b' }}>ms</span>
+              </div>
+
+              <div className="pattern-cooldown-wrapper">
+                <label className="pattern-name-label">Cooldown</label>
+                <div className="pattern-cooldown-input">
+                  <input
+                    type="number"
+                    value={cooldownMs}
+                    onChange={(e) => setCooldownMs(Math.max(0, parseInt(e.target.value) || 0))}
+                    min="0"
+                    step="100"
+                  />
+                  <span>ms</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Statistics */}
+            <div className="pattern-editor-stats">
+              <div className="pattern-stat">
+                <GitBranch size={14} className="pattern-stat-icon" />
+                <span>Nodes:</span>
+                <span className="pattern-stat-value">{stats.totalNodes}</span>
+              </div>
+              <div className="pattern-stat">
+                <Cable size={14} className="pattern-stat-icon" />
+                <span>Connections:</span>
+                <span className="pattern-stat-value">{stats.totalEdges}</span>
+              </div>
+              <div className="pattern-stat">
+                {stats.isValid ? (
+                  <CheckCircle size={14} style={{ color: '#10b981' }} />
+                ) : (
+                  <AlertCircle size={14} style={{ color: '#f59e0b' }} />
+                )}
+                <span>Status:</span>
+                <span className="pattern-stat-value" style={{ color: stats.isValid ? '#10b981' : '#f59e0b' }}>
+                  {stats.isValid ? 'Valid' : 'Incomplete'}
+                </span>
               </div>
             </div>
           </div>
-          <button className="btn-icon" onClick={onClose}>
-            <X size={24} />
-          </button>
-        </div>
 
-        <div className="modal-toolbar">
-          <div className="node-buttons">
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {/* Inputs */}
-              <button 
-                className="btn btn-sm node-btn-input" 
-                onClick={() => addNode('input')}
-                title="Add input sensor (Speed, G-Load, Fuel, etc.)"
+          {/* Content: Sidebar + Canvas */}
+          <div className="pattern-editor-content">
+            {/* Sidebar */}
+            <div className="pattern-editor-sidebar">
+              {/* Input Nodes */}
+              <div className="pattern-editor-sidebar-section">
+                <h3 className="pattern-editor-sidebar-title">Inputs</h3>
+                <div className="pattern-node-buttons">
+                  <button className="pattern-node-btn pattern-node-btn-input" onClick={() => addNode('input')}>
+                    <div className="pattern-node-btn-icon">
+                      <Gauge size={16} />
+                    </div>
+                    <span>Input Sensor</span>
+                  </button>
+                  <button className="pattern-node-btn pattern-node-btn-event" onClick={() => addNode('event')}>
+                    <div className="pattern-node-btn-icon">
+                      <Zap size={16} />
+                    </div>
+                    <span>Game Event</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Condition Nodes */}
+              <div className="pattern-editor-sidebar-section">
+                <h3 className="pattern-editor-sidebar-title">Logic</h3>
+                <div className="pattern-node-buttons">
+                  <button className="pattern-node-btn pattern-node-btn-condition" onClick={() => addNode('condition')}>
+                    <div className="pattern-node-btn-icon">
+                      <Filter size={16} />
+                    </div>
+                    <span>Condition</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Nodes */}
+              <div className="pattern-editor-sidebar-section">
+                <h3 className="pattern-editor-sidebar-title">Actions</h3>
+                <div className="pattern-node-buttons">
+                  <button className="pattern-node-btn pattern-node-btn-vibration" onClick={() => addNode('vibration')}>
+                    <div className="pattern-node-btn-icon">
+                      <Vibrate size={16} />
+                    </div>
+                    <span>Vibration</span>
+                  </button>
+                  <button className="pattern-node-btn" onClick={() => addNode('linear')}>
+                    <div className="pattern-node-btn-icon" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>
+                      <RotateCcw size={16} style={{ transform: 'rotate(90deg)' }} />
+                    </div>
+                    <span>Linear</span>
+                  </button>
+                  <button className="pattern-node-btn" onClick={() => addNode('rotate')}>
+                    <div className="pattern-node-btn-icon" style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#8b5cf6' }}>
+                      <RotateCcw size={16} />
+                    </div>
+                    <span>Rotate</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Output Nodes */}
+              <div className="pattern-editor-sidebar-section">
+                <h3 className="pattern-editor-sidebar-title">Output</h3>
+                <div className="pattern-node-buttons">
+                  <button className="pattern-node-btn pattern-node-btn-output" onClick={() => addNode('output')}>
+                    <div className="pattern-node-btn-icon">
+                      <Radio size={16} />
+                    </div>
+                    <span>Target Devices</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Editor Tools */}
+              <div className="pattern-editor-sidebar-section">
+                <h3 className="pattern-editor-sidebar-title">Tools</h3>
+                <div className="pattern-editor-actions">
+                  <button className="pattern-action-btn" onClick={autoLayout}>
+                    <Layout size={14} />
+                    Auto Layout
+                  </button>
+                  <button className="pattern-action-btn" onClick={() => setSnapToGrid(!snapToGrid)}>
+                    <Grid3x3 size={14} />
+                    Snap: {snapToGrid ? 'ON' : 'OFF'}
+                  </button>
+                  <button className="pattern-action-btn" onClick={importPattern}>
+                    <Upload size={14} />
+                    Import
+                  </button>
+                  <button className="pattern-action-btn" onClick={exportPattern}>
+                    <Download size={14} />
+                    Export
+                  </button>
+                  <button className="pattern-action-btn danger" onClick={clearAll}>
+                    <Trash2 size={14} />
+                    Clear All
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Canvas */}
+            <div className="pattern-editor-canvas">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                nodeTypes={nodeTypes}
+                snapToGrid={snapToGrid}
+                snapGrid={[15, 15]}
+                fitView
+                proOptions={{ hideAttribution: true }}
+                onContextMenu={(e) => e.preventDefault()}
               >
-                📊 Input
+                <Background 
+                  variant={BackgroundVariant.Dots} 
+                  gap={snapToGrid ? 15 : 16} 
+                  size={1} 
+                />
+                <Controls />
+                <MiniMap
+                  nodeColor={(node) => {
+                    switch (node.type) {
+                      case 'input': return '#3b82f6';
+                      case 'event': return '#f59e0b';
+                      case 'condition': return '#a855f7';
+                      case 'multiCondition': return '#f97316';
+                      case 'logic': return '#6366f1';
+                      case 'vibration': return '#ec4899';
+                      case 'linear': return '#10b981';
+                      case 'rotate': return '#8b5cf6';
+                      case 'output': return '#10b981';
+                      default: return '#6b7280';
+                    }
+                  }}
+                  maskColor="rgba(0, 0, 0, 0.3)"
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.4)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)'
+                  }}
+                />
+              </ReactFlow>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="pattern-editor-footer">
+            <div className="pattern-editor-shortcuts">
+              <div className="pattern-shortcut">
+                <span className="pattern-shortcut-key">Del</span>
+                <span>Delete</span>
+              </div>
+              <div className="pattern-shortcut">
+                <span className="pattern-shortcut-key">Ctrl+S</span>
+                <span>Save</span>
+              </div>
+              <div className="pattern-shortcut">
+                <span className="pattern-shortcut-key">Scroll</span>
+                <span>Zoom</span>
+              </div>
+            </div>
+            <div className="pattern-editor-footer-actions">
+              <button className="btn btn-secondary" onClick={onClose}>
+                {t('common.cancel')}
               </button>
-              <button 
-                className="btn btn-sm node-btn-event" 
-                onClick={() => addNode('event')}
-                title="Add game event trigger (Hit, Overspeed, etc.)"
-              >
-                ⚡ Event
-              </button>
-              
-              {/* Conditions */}
-              <button 
-                className="btn btn-sm node-btn-condition" 
-                onClick={() => addNode('condition')}
-                title="Add single condition (>, <, =, between)"
-              >
-                🔍 Condition
-              </button>
-              <button 
-                className="btn btn-sm" 
-                onClick={() => addNode('multiCondition')}
-                title="Add multiple conditions (AND/OR)"
-                style={{
-                  background: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 100%)',
-                  border: '1px solid #f97316',
-                  color: '#fff'
-                }}
-              >
-                🎯 Multi
-              </button>
-              <button 
-                className="btn btn-sm node-btn-logic" 
-                onClick={() => addNode('logic')}
-                title="Add logic gate (AND/OR/NOT/XOR)"
-              >
-                ⚙️ Logic
-              </button>
-              
-              {/* Outputs */}
-              <button 
-                className="btn btn-sm node-btn-vibration" 
-                onClick={() => addNode('vibration')}
-                title="Add vibration pattern"
-              >
-                💥 Vibro
-              </button>
-              <button 
-                className="btn btn-sm" 
-                onClick={() => addNode('linear')}
-                title="Add linear motion (strokers, thrusters)"
-                style={{
-                  background: 'linear-gradient(135deg, #065f46 0%, #059669 100%)',
-                  border: '1px solid #10b981',
-                  color: '#fff'
-                }}
-              >
-                📏 Linear
-              </button>
-              <button 
-                className="btn btn-sm" 
-                onClick={() => addNode('rotate')}
-                title="Add rotation (rotating toys)"
-                style={{
-                  background: 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)',
-                  border: '1px solid #8b5cf6',
-                  color: '#fff'
-                }}
-              >
-                🔄 Rotate
-              </button>
-              <button 
-                className="btn btn-sm node-btn-output" 
-                onClick={() => addNode('output')}
-                title="Add output to device"
-              >
-                📡 Output
+              <button className="btn btn-primary" onClick={handleSave}>
+                <Save size={16} /> {t('common.save')}
               </button>
             </div>
           </div>
-          
-          <div className="node-actions">
-            <button className="btn btn-secondary btn-sm" onClick={importPattern}>
-              <Upload size={16} /> {t('pattern_editor.import')}
-            </button>
-            <button className="btn btn-secondary btn-sm" onClick={exportPattern}>
-              <Download size={16} /> {t('pattern_editor.export')}
-            </button>
-          </div>
-        </div>
-
-        <div className="modal-body">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            nodeTypes={nodeTypes}
-            fitView
-          >
-            <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-            <Controls />
-            <MiniMap
-              nodeColor={(node) => {
-                switch (node.type) {
-                  case 'input': return '#3b82f6';
-                  case 'event': return '#f59e0b';
-                  case 'condition': return '#a855f7';
-                  case 'multiCondition': return '#f97316';
-                  case 'logic': return '#6366f1';
-                  case 'vibration': return '#ec4899';
-                  case 'linear': return '#10b981';
-                  case 'rotate': return '#8b5cf6';
-                  case 'output': return '#10b981';
-                  default: return '#6b7280';
-                }
-              }}
-              maskColor="rgba(0, 0, 0, 0.3)"
-              style={{
-                background: 'rgba(0, 0, 0, 0.4)',
-                border: '1px solid rgba(255, 153, 51, 0.3)'
-              }}
-            />
-          </ReactFlow>
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
-            {t('common.cancel')}
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            <Save size={16} /> {t('common.save')}
-          </button>
         </div>
       </div>
     </div>
