@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Toaster } from "react-hot-toast";
 import "./App.css";
 import "./styles/nodes.css";
 import "./styles/modal.css";
@@ -9,22 +10,33 @@ import { DeviceList } from "./components/DeviceList";
 import { PatternManager } from "./components/PatternManager";
 import { PatternEditorModal } from "./components/PatternEditorModal";
 import { DebugConsole } from "./components/DebugConsole";
-import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { GameStatus } from "./components/GameStatus";
 import { EventConfiguration } from "./components/EventConfiguration";
 import { VehicleInfoCard } from "./components/VehicleInfoCard";
 import { PlayerIdentityModal } from "./components/PlayerIdentityModal";
-import { User, Coffee } from "lucide-react";
+import { SettingsModal } from "./components/SettingsModal";
+import { MiniMap } from "./components/MiniMap";
+import { VehicleModeCard } from "./components/VehicleModeCard";
+import { GameChat } from "./components/GameChat";
+import { MissionInfo } from "./components/MissionInfo";
+import { APIEmulator } from "./components/APIEmulator";
+import { GamepadProxy } from "./components/GamepadProxy";
+import { AnalyticsDashboard } from "./components/AnalyticsDashboard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { User, Coffee, Settings } from "lucide-react";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
 function App() {
   const { t } = useTranslation();
   const [isRunning, setIsRunning] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [editingPattern, setEditingPattern] = useState<Pattern | undefined>();
   const [supportHighlight, setSupportHighlight] = useState(false);
+  const [testModeEnabled, setTestModeEnabled] = useState(false);
   
   const { addPattern, updatePattern } = usePatterns();
 
@@ -67,6 +79,29 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Check emulator status
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const state = await api.emulatorGetState();
+        setTestModeEnabled(state.enabled);
+      } catch (error) {
+        // Silently ignore
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleTestMode = async () => {
+    try {
+      await api.emulatorSetEnabled(!testModeEnabled);
+      setTestModeEnabled(!testModeEnabled);
+    } catch (error) {
+      console.error('[App] Failed to toggle test mode:', error);
+    }
+  };
+
   const handleEditPattern = (pattern?: Pattern) => {
     // Explicitly set to undefined when creating new pattern, or to the pattern when editing
     setEditingPattern(pattern || undefined);
@@ -92,8 +127,37 @@ function App() {
     }
   };
 
+  const toggleEngine = async () => {
+    try {
+      if (isRunning) {
+        await api.stopEngine();
+      } else {
+        await api.startEngine();
+      }
+    } catch (error) {
+      console.error('[App] Failed to toggle engine:', error);
+    }
+  };
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    toggleEngine,
+    createPattern: () => handleEditPattern(),
+    openTemplates: () => {}, // PatternManager handles this
+    togglePlayerModal: () => setIsPlayerModalOpen(!isPlayerModalOpen),
+    toggleSettingsModal: () => setIsSettingsModalOpen(!isSettingsModalOpen),
+    toggleTestMode,
+    closeModal: () => {
+      setIsEditorOpen(false);
+      setIsPlayerModalOpen(false);
+      setIsSettingsModalOpen(false);
+    },
+  });
+
   return (
-    <div className="app-container">
+    <ErrorBoundary>
+      <Toaster />
+      <div className="app-container">
       {/* Modern header */}
       <header className="app-header">
         <div className="header-content">
@@ -120,7 +184,20 @@ function App() {
             >
               <User size={18} />
             </button>
-            <LanguageSwitcher />
+            <button
+              onClick={toggleTestMode}
+              className={`test-mode-btn ${testModeEnabled ? 'active' : ''}`}
+              title={testModeEnabled ? 'Test Mode: ON' : 'Test Mode: OFF'}
+            >
+              🧪
+            </button>
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="settings-btn"
+              title={t('settings.title', 'Settings')}
+            >
+              <Settings size={18} />
+            </button>
             <div className={`status-chip ${isRunning ? 'running' : 'stopped'}`}>
               <span className="status-indicator"></span>
               <span className="status-text">
@@ -138,7 +215,10 @@ function App() {
           <aside className="sidebar-left">
             <Dashboard />
             <DeviceList />
+            <GamepadProxy />
+            <AnalyticsDashboard />
             <GameStatus />
+            <VehicleModeCard />
             <VehicleInfoCard />
           </aside>
 
@@ -146,6 +226,18 @@ function App() {
               <section className="main-area">
                 <PatternManager onEditPattern={handleEditPattern} />
                 <EventConfiguration />
+                
+                {/* Map takes full width */}
+                <MiniMap />
+                
+                {/* Bottom grid for mission and chat */}
+                <div className="bottom-grid">
+                  <MissionInfo />
+                  <GameChat />
+                </div>
+                
+                {/* API Emulator at the bottom */}
+                <APIEmulator />
               </section>
             </div>
           </main>
@@ -169,7 +261,14 @@ function App() {
         isOpen={isPlayerModalOpen}
         onClose={() => setIsPlayerModalOpen(false)}
       />
-    </div>
+
+      {/* Settings modal */}
+      <SettingsModal 
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+      />
+      </div>
+    </ErrorBoundary>
   );
 }
 

@@ -6,7 +6,8 @@ use anyhow::{Result, Context};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-const WT_TELEMETRY_URL: &str = "http://127.0.0.1:8111";
+const WT_TELEMETRY_URL_REAL: &str = "http://127.0.0.1:8111";
+const WT_TELEMETRY_URL_EMULATOR: &str = "http://127.0.0.1:8112";
 const POLL_INTERVAL_MS: u64 = 100; // 10 times per second
 
 #[allow(dead_code)]
@@ -18,6 +19,14 @@ pub struct HudMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatDetails {
+    pub message: String,
+    pub sender: Option<String>,
+    pub mode: Option<String>,  // "Team", "All", "Squad", "Private"
+    pub is_enemy: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HudEvent {
     Kill(String),              // Killed enemy vehicle name
     Crashed,
@@ -26,9 +35,11 @@ pub enum HudEvent {
     SetAfire(String),          // Set enemy on fire (enemy name)
     TakeDamage(String),        // Taking damage from attacker (attacker name)
     SeverelyDamaged(String),   // Severely damaged by attacker
+    CriticallyDamaged(String), // Critically damaged by attacker
     ShotDown(String),          // Shot down by attacker
     Achievement(String),       // Achievement unlocked (achievement name)
-    ChatMessage(String),       // Any chat message (full text)
+    FirstStrike,               // Player delivered first strike
+    ChatMessage(ChatDetails),  // Chat message with mode/enemy info       // Any chat message (full text)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,9 +50,13 @@ pub struct GameState {
     pub indicators: Indicators,
     pub state: Vec<String>,
     
-    // HUD events detected this frame
+    // HUD events detected this frame (kills, damage, achievements, etc.)
     #[serde(skip)]
     pub hud_events: Vec<HudEvent>,
+    
+    // Chat messages detected this frame (from /gamechat)
+    #[serde(skip)]
+    pub chat_events: Vec<HudEvent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -126,16 +141,19 @@ pub struct Indicators {
 
 pub struct WTTelemetryReader {
     client: reqwest::Client,
+    base_url: String,        // Base URL for API (8111 for real, 8112 for emulator)
     last_state: Option<GameState>,
     last_fetch_time: Option<std::time::Instant>,
     cache_duration_ms: u64,
     last_hud_evt_id: u32,
     last_hud_dmg_id: u32,
+    last_chat_id: u32,       // Last chat message ID
     player_names: Vec<String>,  // Player names for filtering own events
     clan_tags: Vec<String>,      // Player clan tags for filtering
     enemy_names: Vec<String>,    // Enemy player names to track
     enemy_clans: Vec<String>,    // Enemy clan tags to track
     hud_initialized: bool,  // Flag to skip old events on first connect
+    chat_initialized: bool, // Flag to skip old chat on first connect
     last_battle_time: u32,  // Last battle time (seconds) to detect old events
     processed_messages: std::collections::HashSet<String>, // Cache to prevent duplicates
     last_message: Option<String>, // Last processed message for immediate duplicate check
@@ -150,20 +168,44 @@ impl WTTelemetryReader {
         
         Self {
             client,
+            base_url: WT_TELEMETRY_URL_REAL.to_string(),
             last_state: None,
             last_fetch_time: None,
             cache_duration_ms: 50, // Cache for 50ms (20 Hz max poll rate)
             last_hud_evt_id: 0,
             last_hud_dmg_id: 0,
+            last_chat_id: 0,
             player_names: Vec::new(),
             clan_tags: Vec::new(),
             enemy_names: Vec::new(),
             enemy_clans: Vec::new(),
             hud_initialized: false,
+            chat_initialized: false,
             last_battle_time: 0,
             processed_messages: std::collections::HashSet::new(),
             last_message: None,
         }
+    }
+    
+    /// Switch to emulator mode (port 8112)
+    pub fn set_emulator_mode(&mut self, enabled: bool) {
+        if enabled {
+            self.base_url = WT_TELEMETRY_URL_EMULATOR.to_string();
+            log::info!("[Telemetry] 🧪 Switched to EMULATOR mode (port 8112)");
+        } else {
+            self.base_url = WT_TELEMETRY_URL_REAL.to_string();
+            log::info!("[Telemetry] 🎮 Switched to REAL mode (port 8111)");
+        }
+        
+        // Reset state when switching
+        self.last_state = None;
+        self.hud_initialized = false;
+        self.chat_initialized = false;
+    }
+    
+    /// Get current mode
+    pub fn is_emulator_mode(&self) -> bool {
+        self.base_url == WT_TELEMETRY_URL_EMULATOR
     }
     
     /// Get current player names
@@ -248,7 +290,7 @@ impl WTTelemetryReader {
     /// Check War Thunder availability
     #[allow(dead_code)]
     pub async fn is_game_running(&self) -> bool {
-        let url = format!("{}/state", WT_TELEMETRY_URL);
+        let url = format!("{}/state", &self.base_url);
         self.client
             .get(&url)
             .send()
@@ -271,7 +313,7 @@ impl WTTelemetryReader {
             }
         }
         // 1. Request /indicators for vehicle type
-        let indicators_url = format!("{}/indicators", WT_TELEMETRY_URL);
+        let indicators_url = format!("{}/indicators", &self.base_url);
         let indicators_response = self.client
             .get(&indicators_url)
             .send()
@@ -284,7 +326,7 @@ impl WTTelemetryReader {
             .context("Failed to parse WT /indicators")?;
 
         // 2. Request /state for flight indicators
-        let state_url = format!("{}/state", WT_TELEMETRY_URL);
+        let state_url = format!("{}/state", &self.base_url);
         let state_response = self.client
             .get(&state_url)
             .send()
@@ -310,6 +352,17 @@ impl WTTelemetryReader {
             }
         }
         
+        // 5. Get chat messages from /gamechat (separate stream)
+        match self.get_chat_messages().await {
+            Ok(chat_events) => {
+                state.chat_events = chat_events;
+            }
+            Err(e) => {
+                log::debug!("[WT API] Failed to get chat messages: {}", e);
+                state.chat_events = Vec::new();
+            }
+        }
+        
         self.last_state = Some(state.clone());
         self.last_fetch_time = Some(std::time::Instant::now());
         
@@ -319,7 +372,7 @@ impl WTTelemetryReader {
     /// Get indicators
     #[allow(dead_code)]
     pub async fn get_indicators(&self) -> Result<Indicators> {
-        let url = format!("{}/indicators", WT_TELEMETRY_URL);
+        let url = format!("{}/indicators", &self.base_url);
         
         let response = self.client
             .get(&url)
@@ -338,7 +391,9 @@ impl WTTelemetryReader {
     /// Get HUD messages (events and damage) and parse for player events
     pub async fn get_hud_events(&mut self) -> Result<Vec<HudEvent>> {
         let url = format!("{}/hudmsg?lastEvt={}&lastDmg={}", 
-            WT_TELEMETRY_URL, self.last_hud_evt_id, self.last_hud_dmg_id);
+            &self.base_url, self.last_hud_evt_id, self.last_hud_dmg_id);
+        
+        log::trace!("[HUD Fetch] 🌐 Requesting: {}", url);
         
         let response = self.client
             .get(&url)
@@ -350,6 +405,8 @@ impl WTTelemetryReader {
             .json()
             .await
             .context("Failed to parse HUD messages")?;
+        
+        log::trace!("[HUD Fetch] 📦 Response: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
         
         let mut events = Vec::new();
         
@@ -413,14 +470,41 @@ impl WTTelemetryReader {
                 
                 // Set baseline to max ID after processing recent events
                 self.last_hud_dmg_id = max_id;
+                self.last_battle_time = max_time; // ← SET last_battle_time to prevent old events!
                 self.hud_initialized = true;
-                log::info!("[HUD] ✅ Initialized with baseline ID={}", max_id);
+                log::info!("[HUD] ✅ Initialized with baseline ID={}, time={}s", max_id, max_time);
                 
                 // Return early - we've processed everything
                 return Ok(events);
             }
             
             // NORMAL PHASE: Only process NEW events (ID > baseline)
+            
+            // DETECT TIME RESET (new battle): if time went DOWN significantly
+            let max_time_in_batch = damage_array.iter()
+                .filter_map(|v| v.get("time").and_then(|t| t.as_u64()))
+                .max()
+                .unwrap_or(0) as u32;
+            
+            // If time DECREASED by >60 seconds → NEW BATTLE detected!
+            if max_time_in_batch > 0 && self.last_battle_time > 0 {
+                let time_diff = self.last_battle_time.saturating_sub(max_time_in_batch);
+                if time_diff > 60 {
+                    log::warn!("[HUD] 🔄 NEW BATTLE DETECTED! Time reset: {}s → {}s (diff: -{}s)", 
+                        self.last_battle_time, max_time_in_batch, time_diff);
+                    log::warn!("[HUD] 🧹 Clearing old events cache ({} entries)", self.processed_messages.len());
+                    
+                    // Reset battle tracking
+                    self.last_battle_time = 0;
+                    self.processed_messages.clear();
+                    
+                    // Skip ALL events from this batch (they're from the new battle start, likely old)
+                    // We'll catch them on the next poll
+                    log::warn!("[HUD] ⏭️ Skipping batch of {} events (new battle initialization)", damage_array.len());
+                    return Ok(events);
+                }
+            }
+            
             for msg_value in damage_array {
                 let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
@@ -486,7 +570,12 @@ impl WTTelemetryReader {
                        !msg.contains("NET_PLAYER_") &&
                        !msg.contains("td! kd?") {
                         log::debug!("[HUD Event] 💬 CHAT at {}s: {}", time, msg);
-                        events.push(HudEvent::ChatMessage(msg.to_string()));
+                        events.push(HudEvent::ChatMessage(ChatDetails {
+                            message: msg.to_string(),
+                            sender: None,
+                            mode: None,
+                            is_enemy: false,
+                        }));
                     }
                 }
             }
@@ -502,8 +591,79 @@ impl WTTelemetryReader {
         Ok(events)
     }
     
+    /// Get chat messages from /gamechat and convert to HudEvent::ChatMessage
+    pub async fn get_chat_messages(&mut self) -> Result<Vec<HudEvent>> {
+        let url = format!("{}/gamechat?lastId={}", &self.base_url, self.last_chat_id);
+        
+        let response = self.client
+            .get(&url)
+            .send()
+            .await
+            .context("Failed to get chat messages")?;
+        
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .context("Failed to parse chat messages")?;
+        
+        let mut events = Vec::new();
+        
+        // Parse chat array
+        if let Some(chat_array) = json.as_array() {
+            if !chat_array.is_empty() && !self.chat_initialized {
+                // INIT PHASE: Find max ID and skip old messages
+                let max_id = chat_array.iter()
+                    .filter_map(|v| v.get("id").and_then(|i| i.as_u64()))
+                    .max()
+                    .unwrap_or(0) as u32;
+                
+                let message_count = chat_array.len();
+                
+                self.last_chat_id = max_id;
+                self.chat_initialized = true;
+                log::info!("[Chat] ✅ Initialized with baseline ID={}, skipping {} old messages", max_id, message_count);
+                
+                // Don't process old messages on first connect
+                return Ok(events);
+            }
+            
+            // NORMAL PHASE: Process new messages
+            for msg_value in chat_array {
+                let id = msg_value.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                let msg = msg_value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
+                let sender = msg_value.get("sender").and_then(|v| v.as_str()).map(String::from);
+                let enemy = msg_value.get("enemy").and_then(|v| v.as_bool()).unwrap_or(false);
+                let mode = msg_value.get("mode").and_then(|v| v.as_str()).map(String::from);
+                
+                // Skip old messages
+                if id <= self.last_chat_id {
+                    continue;
+                }
+                
+                // Update last ID
+                self.last_chat_id = id;
+                
+                // Create ChatMessage event
+                log::info!("[Chat] 💬 New message from {:?}: '{}'", sender, msg);
+                events.push(HudEvent::ChatMessage(ChatDetails {
+                    message: msg.to_string(),
+                    sender,
+                    mode,
+                    is_enemy: enemy,
+                }));
+            }
+        }
+        
+        Ok(events)
+    }
+    
     /// Check if message contains player identity
     fn is_player_message(&self, msg: &str) -> bool {
+        // In emulator mode, accept all events
+        if self.is_emulator_mode() {
+            return true;
+        }
+        
         // Check if any of our player names match
         for name in &self.player_names {
             if msg.contains(name) {
@@ -540,6 +700,15 @@ impl WTTelemetryReader {
             return None;
         }
         
+        // First Strike (special achievement)
+        if msg.contains("has delivered the first strike") {
+            if self.is_player_message(msg) {
+                log::info!("[HUD Event] ⚡ FIRST STRIKE!");
+                return Some(HudEvent::FirstStrike);
+            }
+            return None;
+        }
+        
         // Achievements: "has achieved" or "has delivered"
         if msg.contains("has achieved") || msg.contains("has delivered") {
             if self.is_player_message(msg) {
@@ -560,23 +729,37 @@ impl WTTelemetryReader {
         
         // Set enemy on fire
         if msg.contains("set afire") {
-            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-                let parts: Vec<&str> = msg.split("set afire").collect();
-                if parts.len() == 2 {
-                    let attacker = parts[0].trim();
-                    let victim = parts[1].trim();
-                    
-                    // Player set enemy on fire
-                    if self.is_player_message(attacker) {
-                        log::info!("[HUD Event] 🔥 SET AFIRE: {}", victim);
-                        return Some(HudEvent::SetAfire(victim.to_string()));
-                    }
-                    
-                    // Player was set on fire
-                    if self.is_player_message(victim) {
-                        log::info!("[HUD Event] 💥 TAKING FIRE from: {}", attacker);
-                        return Some(HudEvent::TakeDamage(attacker.to_string()));
-                    }
+            let parts: Vec<&str> = msg.split("set afire").collect();
+            if parts.len() == 2 {
+                let attacker = parts[0].trim();
+                let victim = parts[1].trim();
+                
+                // Player set enemy on fire
+                if self.is_player_message(attacker) {
+                    log::info!("[HUD Event] 🔥 SET AFIRE: {}", victim);
+                    return Some(HudEvent::SetAfire(victim.to_string()));
+                }
+                
+                // Player was set on fire
+                if self.is_player_message(victim) {
+                    log::info!("[HUD Event] 💥 TAKING FIRE from: {}", attacker);
+                    return Some(HudEvent::TakeDamage(attacker.to_string()));
+                }
+            }
+            return None;
+        }
+        
+        // Critically damaged
+        if msg.contains("critically damaged") {
+            let parts: Vec<&str> = msg.split("critically damaged").collect();
+            if parts.len() == 2 {
+                let attacker = parts[0].trim();
+                let victim = parts[1].trim();
+                
+                // Player was critically damaged
+                if self.is_player_message(victim) {
+                    log::info!("[HUD Event] 💥 CRITICALLY DAMAGED by: {}", attacker);
+                    return Some(HudEvent::CriticallyDamaged(attacker.to_string()));
                 }
             }
             return None;
@@ -584,17 +767,15 @@ impl WTTelemetryReader {
         
         // Severely damaged
         if msg.contains("severely damaged") {
-            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-                let parts: Vec<&str> = msg.split("severely damaged").collect();
-                if parts.len() == 2 {
-                    let attacker = parts[0].trim();
-                    let victim = parts[1].trim();
-                    
-                    // Player was severely damaged
-                    if self.is_player_message(victim) {
-                        log::info!("[HUD Event] 💔 SEVERELY DAMAGED by: {}", attacker);
-                        return Some(HudEvent::SeverelyDamaged(attacker.to_string()));
-                    }
+            let parts: Vec<&str> = msg.split("severely damaged").collect();
+            if parts.len() == 2 {
+                let attacker = parts[0].trim();
+                let victim = parts[1].trim();
+                
+                // Player was severely damaged
+                if self.is_player_message(victim) {
+                    log::info!("[HUD Event] 💔 SEVERELY DAMAGED by: {}", attacker);
+                    return Some(HudEvent::SeverelyDamaged(attacker.to_string()));
                 }
             }
             return None;
@@ -602,17 +783,15 @@ impl WTTelemetryReader {
         
         // Shot down
         if msg.contains("shot down") {
-            if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-                let parts: Vec<&str> = msg.split("shot down").collect();
-                if parts.len() == 2 {
-                    let attacker = parts[0].trim();
-                    let victim = parts[1].trim();
-                    
-                    // Player was shot down
-                    if self.is_player_message(victim) {
-                        log::info!("[HUD Event] ✈️💥 SHOT DOWN by: {}", attacker);
-                        return Some(HudEvent::ShotDown(attacker.to_string()));
-                    }
+            let parts: Vec<&str> = msg.split("shot down").collect();
+            if parts.len() == 2 {
+                let attacker = parts[0].trim();
+                let victim = parts[1].trim();
+                
+                // Player was shot down
+                if self.is_player_message(victim) {
+                    log::info!("[HUD Event] ✈️💥 SHOT DOWN by: {}", attacker);
+                    return Some(HudEvent::ShotDown(attacker.to_string()));
                 }
             }
             return None;
@@ -620,62 +799,62 @@ impl WTTelemetryReader {
         
     // Destroyed (kill)
     if msg.contains("destroyed") {
-        // Check if player identity is set
-        if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-            // ONLY count kills if our player identity is the attacker
-            if let Some(before_destroyed) = msg.split("destroyed").next() {
-                if self.is_player_message(before_destroyed) {
-                    // Extract victim name (after "destroyed")
-                    if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
-                        let victim = destroyed_part.trim().to_string();
-                        
-                        // Check if victim is in our enemy tracking list
-                        let is_priority = self.is_enemy_message(&victim);
-                        
-                        if is_priority {
-                            log::info!("[HUD Event] 🎯💀 PRIORITY KILL (tracked enemy player): {}", victim);
-                        } else {
-                            log::info!("[HUD Event] 🎯 KILL (bot/random): {}", victim);
-                        }
-                        
-                        // Return kill event with victim name
-                        // Frontend can filter by enemy list if needed
-                        return Some(HudEvent::Kill(victim));
+        log::debug!("[HUD Parse] 🔍 Parsing destroyed message: '{}'", msg);
+        
+        if let Some(before_destroyed) = msg.split("destroyed").next() {
+            let attacker = before_destroyed.trim();
+            log::debug!("[HUD Parse] 📊 Attacker: '{}', is_player: {}", 
+                attacker, self.is_player_message(attacker));
+            
+            if let Some(destroyed_part) = msg.split("destroyed").nth(1) {
+                let victim = destroyed_part.trim().to_string();
+                log::debug!("[HUD Parse] 🎯 Victim: '{}'", victim);
+                
+                // Case 1: YOU are the attacker (your kill)
+                if self.is_player_message(attacker) {
+                    let is_priority = self.is_enemy_message(&victim);
+                    if is_priority {
+                        log::info!("[HUD Event] 🎯💀 YOU KILLED tracked enemy: {}", victim);
+                    } else {
+                        log::info!("[HUD Event] 🎯 YOU KILLED: {}", victim);
                     }
+                    return Some(HudEvent::Kill(victim));
+                }
+                
+                // Case 2: YOU or YOUR ALLY is the victim (someone killed you/ally)
+                // This enables filters like "i_was_killed" and "my_clan_was_killed"
+                if self.is_player_message(&victim) || 
+                   self.clan_tags.iter().any(|tag| victim.contains(tag)) ||
+                   self.enemy_names.iter().any(|name| victim.contains(name)) {
+                    log::info!("[HUD Event] 💀 KILL FEED: {} killed {}", attacker, victim);
+                    // Return as Kill event, but entity_name is the VICTIM
+                    // Filters will check if victim matches player/clan
+                    return Some(HudEvent::Kill(victim));
                 }
             }
-            // If player identity doesn't match, this is someone else's kill - ignore
-            return None;
-        } else {
-            // Without player identity, we can't reliably filter
-            // Skip to avoid false positives from other players' kills
-            return None;
         }
+        return None;
     }
     
     // "has been wrecked" (alternative kill message)
     if msg.contains("has been wrecked") {
-        if !self.player_names.is_empty() || !self.clan_tags.is_empty() {
-            if let Some(before_wrecked) = msg.split("has been wrecked").next() {
-                if self.is_player_message(before_wrecked) {
-                    if let Some(victim_part) = msg.split("has been wrecked").nth(1) {
-                        let victim = victim_part.trim().to_string();
-                        
-                        let is_priority = self.is_enemy_message(&victim);
-                        if is_priority {
-                            log::info!("[HUD Event] 🎯💀 PRIORITY KILL (wrecked, tracked enemy): {}", victim);
-                        } else {
-                            log::info!("[HUD Event] 🎯 KILL (wrecked): {}", victim);
-                        }
-                        
-                        return Some(HudEvent::Kill(victim));
+        if let Some(before_wrecked) = msg.split("has been wrecked").next() {
+            if self.is_player_message(before_wrecked) {
+                if let Some(victim_part) = msg.split("has been wrecked").nth(1) {
+                    let victim = victim_part.trim().to_string();
+                    
+                    let is_priority = self.is_enemy_message(&victim);
+                    if is_priority {
+                        log::info!("[HUD Event] 🎯💀 PRIORITY KILL (wrecked, tracked enemy): {}", victim);
+                    } else {
+                        log::info!("[HUD Event] 🎯 KILL (wrecked): {}", victim);
                     }
+                    
+                    return Some(HudEvent::Kill(victim));
                 }
             }
-            return None;
-        } else {
-            return None;
         }
+        return None;
     }
         
         None
@@ -773,13 +952,23 @@ impl WTTelemetryReader {
             *last = vehicle_name.clone();
         }
 
+        // SHIPS: indicators/state not available, but we can still get HUD events
+        // Mark as valid if we detected it's a ship, even if indicators say valid=false
+        let final_valid = if matches!(type_, VehicleType::Ship) && !valid {
+            log::info!("[WT Parser] 🚢 Ship detected but indicators invalid - using HUD-only mode");
+            !vehicle_name.is_empty() && vehicle_name != "unknown"
+        } else {
+            valid
+        };
+
         Ok(GameState {
-            valid,
+            valid: final_valid,
             type_,
             vehicle_name,
             indicators,
             state,
             hud_events: Vec::new(),
+            chat_events: Vec::new(),
         })
     }
 
@@ -840,6 +1029,7 @@ impl WTTelemetryReader {
             indicators,
             state,
             hud_events: Vec::new(),
+            chat_events: Vec::new(),
         })
     }
 
@@ -851,17 +1041,17 @@ impl WTTelemetryReader {
         let get_i32 = |key: &str| json.get(key).and_then(|v| v.as_i64()).unwrap_or(0) as i32;
         let get_bool = |key: &str| json.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
 
-        // AIRCRAFT vs TANK detection: 
-        // - Tanks have "speed" field (no commas, no units)
-        // - Aircraft have "IAS, km/h" field (with commas and units)
-        // - Tanks have "army": "tank" or "army": "ground"
-        let is_tank = json.get("speed").is_some() || 
-                      json.get("army").and_then(|v| v.as_str())
-                          .map(|s| s == "tank" || s == "ground")
-                          .unwrap_or(false);
+        // Detect vehicle type
+        let army_str = json.get("army").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let type_str = json.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
         
-        let (speed, ias, tas) = if is_tank {
-            // TANK: direct "speed" field
+        let is_tank = json.get("speed").is_some() || 
+                      (army_str == "tank" || army_str == "ground");
+        let is_ship = army_str == "ship" || type_str.contains("ship") || type_str.contains("boat");
+        
+        
+        let (speed, ias, tas) = if is_tank || is_ship {
+            // TANK/SHIP: direct "speed" field
             let spd = get_f32("speed");
             (spd, spd, spd)
         } else {
@@ -875,8 +1065,8 @@ impl WTTelemetryReader {
         let fuel = get_f32("Mfuel, kg");
         let fuel_max = get_f32("Mfuel0, kg");
         
-        // ENGINE RPM: tanks use "rpm", aircraft use "RPM 1"/"RPM 2"
-        let engine_rpm = if is_tank {
+        // ENGINE RPM: tanks/ships use "rpm", aircraft use "RPM 1"/"RPM 2"
+        let engine_rpm = if is_tank || is_ship {
             get_f32("rpm")
         } else {
             get_f32("RPM 1").max(get_f32("RPM 2"))
@@ -890,7 +1080,7 @@ impl WTTelemetryReader {
         };
         
         // Only log if in battle (crew > 0 or speed > 0)
-        let in_battle = (is_tank && get_i32("crew_total") > 0) || (!is_tank && speed > 1.0);
+        let in_battle = ((is_tank || is_ship) && get_i32("crew_total") > 0) || (!is_tank && !is_ship && speed > 1.0);
         
         if in_battle {
             // Reduced logging spam
@@ -947,9 +1137,9 @@ impl WTTelemetryReader {
             bombs_ready: get_i32("bombs_ready"),
             torpedoes_ready: get_i32("torpedoes_ready"),
             
-            // Ammo (different fields for tanks vs aircraft)
-            ammo_count: if is_tank {
-                get_i32("first_stage_ammo")  // Tank ammo in ready rack
+            // Ammo (different fields for tanks/ships vs aircraft)
+            ammo_count: if is_tank || is_ship {
+                get_i32("first_stage_ammo")  // Tank/ship ammo in ready rack
             } else {
                 get_i32("cannon ammo 1").max(get_i32("cannon ammo 2"))  // Aircraft cannon ammo
             },

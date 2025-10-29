@@ -108,6 +108,27 @@ export function EventConfiguration() {
     }
   };
 
+  const toggleProfile = async (id: string, enabled: boolean) => {
+    try {
+      await invoke('toggle_profile', { id, enabled });
+      
+      // Update local state immediately
+      setProfiles(prev => prev.map(p =>
+        p.id === id ? { ...p, enabled } : p
+      ));
+      
+      if ((window as any).debugLog) {
+        const profile = profiles.find(p => p.id === id);
+        (window as any).debugLog(
+          enabled ? 'success' : 'warn', 
+          `Profile "${profile?.name}": ${enabled ? 'enabled' : 'disabled'}`
+        );
+      }
+    } catch (error) {
+      console.error('Failed to toggle profile:', error);
+    }
+  };
+
   // Get triggers for a specific event (ONLY system triggers, NO user patterns)
   const getTriggersForEvent = (eventName: string): EventTrigger[] => {
     return triggers.filter(trigger => {
@@ -162,187 +183,6 @@ export function EventConfiguration() {
       </div>
 
       <div className="card-content">
-        {/* All Triggers Section - ONLY Built-in + Vehicle-specific Dynamic (NO user patterns!) */}
-        <div style={{ marginBottom: '32px' }}>
-          {(() => {
-            // Filter: show ONLY built-in triggers that are NOT assigned to any profile
-            // If a trigger's event is in a profile, it should appear ONLY there (no duplicates!)
-            const systemTriggers = triggers.filter(t => {
-              // ❌ EXCLUDE user-created patterns from Pattern Manager
-              // User patterns have is_builtin=false and are managed in Pattern Manager tab
-              const isUserPattern = (t.is_builtin === false && !t.id.startsWith('dynamic_'));
-              if (isUserPattern) {
-                return false; // Hide from "All Triggers"
-              }
-              
-              // ✅ At this point: built-in triggers OR dynamic vehicle-specific triggers
-              
-              // Check if this trigger's event is already handled by ANY active profile
-              const isInProfile = profiles.some(profile => 
-                profile.event_mappings && Object.keys(profile.event_mappings).includes(t.event)
-              );
-              
-              // Show ONLY if NOT in any profile (avoid duplicates)
-              return !isInProfile;
-            });
-            
-            // Don't show "All Triggers" section if empty (all triggers are in profiles)
-            if (systemTriggers.length === 0) {
-              return null;
-            }
-            
-            return (
-              <>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  <Zap size={16} style={{ display: 'inline', marginRight: '6px' }} />
-                  All Triggers ({systemTriggers.length})
-                </h3>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' }}>
-                  {systemTriggers.map((trigger) => {
-              const isExpanded = expandedTrigger === trigger.id;
-              return (
-                <div
-                  key={trigger.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    padding: '10px 12px',
-                    background: trigger.enabled ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-secondary)',
-                    border: `1px solid ${trigger.enabled ? 'var(--primary)' : 'var(--border)'}`,
-                    borderRadius: 'var(--radius-sm)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {/* All system triggers (built-in + dynamic) shown as "Built-in" */}
-                        <span style={{ fontSize: '10px', padding: '2px 4px', background: 'rgba(99, 102, 241, 0.2)', borderRadius: '4px', color: 'var(--primary)' }}>
-                          Built-in
-                        </span>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {trigger.name}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {trigger.description}
-                      </div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Event: {t(`game_events.${trigger.event}`, trigger.event)}
-                      </div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Cooldown: {(trigger.cooldown_ms / 1000).toFixed(1)}s | 
-                        Duration: {((trigger.pattern?.duration_ms || 500) / 1000).toFixed(1)}s | 
-                        Points: {trigger.curve_points?.length || 2}
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '4px', marginLeft: '8px', flexShrink: 0 }}>
-                      <button
-                        onClick={() => setExpandedTrigger(isExpanded ? null : trigger.id)}
-                        style={{
-                          padding: '4px 6px',
-                          fontSize: '10px',
-                          background: 'var(--bg-secondary)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--radius-sm)',
-                          cursor: 'pointer',
-                          color: 'var(--text-secondary)'
-                        }}
-                        title={t('common.settings', 'Settings')}
-                      >
-                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                      </button>
-                      <button
-                        className={`btn-toggle ${trigger.enabled ? 'active' : ''}`}
-                        onClick={() => toggleTrigger(trigger.id, !trigger.enabled)}
-                        title={trigger.enabled ? t('common.disable') : t('common.enable')}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '10px',
-                          minWidth: '55px',
-                        }}
-                      >
-                        <Power size={12} />
-                        {trigger.enabled ? t('common.on') : t('common.off')}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Expanded Settings */}
-                  {isExpanded && (
-                    <div style={{ 
-                      marginTop: '12px', 
-                      paddingTop: '12px', 
-                      borderTop: '1px solid var(--border)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px'
-                    }}>
-                      {/* Cooldown */}
-                      <div>
-                        <label style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                          {t('trigger_settings.cooldown', 'Cooldown (seconds)')}
-                        </label>
-                        <EditableNumberInput
-                          value={trigger.cooldown_ms / 1000}
-                          onChange={(newValue) => {
-                            updateTrigger(trigger.id, newValue * 1000, null);
-                          }}
-                          min={0.1}
-                          max={300}
-                          step={0.1}
-                          decimals={1}
-                          suffix="s"
-                          style={{
-                            width: '100%',
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            background: 'var(--bg-tertiary)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius-sm)',
-                            color: 'var(--text-primary)'
-                          }}
-                        />
-                      </div>
-
-                      {/* Vibration Curve Editor */}
-                      <VibrationCurveEditor
-                        duration={(trigger.pattern?.duration_ms || 500) / 1000}
-                        curve={trigger.curve_points || [
-                          { x: 0.0, y: 1.0 },
-                          { x: 1.0, y: 0.0 }
-                        ]}
-                        onDurationChange={(newDuration) => {
-                          updateTrigger(trigger.id, null, {
-                            intensity: trigger.pattern?.intensity || 1.0,
-                            duration_ms: Math.round(newDuration * 1000),
-                            curve: trigger.curve_points
-                          });
-                        }}
-                        onCurveChange={(newCurve) => {
-                          updateTrigger(trigger.id, null, {
-                            intensity: trigger.pattern?.intensity || 1.0,
-                            duration_ms: trigger.pattern?.duration_ms || 500,
-                            curve: newCurve
-                          });
-                        }}
-                      />
-
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        {t('trigger_settings.hint', 'These settings will be saved automatically')}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-                  })}
-                </div>
-              </>
-            );
-          })()}
-        </div>
-        
         {/* Profiles Section */}
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -353,14 +193,12 @@ export function EventConfiguration() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {profiles.map((profile) => {
               const isExpanded = expandedProfile === profile.id;
-              // Only show events that have at least one trigger
+              // Show all events (triggers not required for HUD/API events)
               const patterns = profile.event_mappings 
-                ? Object.entries(profile.event_mappings).filter(([eventName]) => 
-                    getTriggersForEvent(eventName).length > 0
-                  )
+                ? Object.entries(profile.event_mappings)
                 : [];
               
-              // Skip profiles with no events that have triggers
+              // Skip empty profiles
               if (patterns.length === 0) return null;
               
               return (
@@ -378,13 +216,30 @@ export function EventConfiguration() {
                       <span>{t(`profiles.${profile.id}`)}</span>
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <span className="profile-badge">
                         {getModeLabel(profile.game_mode || 'any')}
                       </span>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         {patterns.length} {t('profiles.patterns_count')}
                       </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleProfile(profile.id, !profile.enabled);
+                        }}
+                        className={`btn btn-${profile.enabled ? 'primary' : 'secondary'}`}
+                        style={{ 
+                          fontSize: '11px', 
+                          padding: '4px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Power size={12} />
+                        {profile.enabled ? t('common.on') : t('common.off')}
+                      </button>
                     </div>
                   </div>
                   
@@ -429,15 +284,27 @@ export function EventConfiguration() {
                                   <span style={{ fontSize: '12px', fontWeight: 600 }}>
                                     {t(`game_events.${eventName}`, eventName)}
                                   </span>
-                                  <span style={{
-                                    fontSize: '10px',
-                                    padding: '2px 6px',
-                                    background: 'var(--primary)',
-                                    color: 'white',
-                                    borderRadius: '10px'
-                                  }}>
-                                    {eventTriggers.length} {eventTriggers.length === 1 ? 'trigger' : 'triggers'}
-                                  </span>
+                                  {eventTriggers.length > 0 ? (
+                                    <span style={{
+                                      fontSize: '10px',
+                                      padding: '2px 6px',
+                                      background: 'var(--primary)',
+                                      color: 'white',
+                                      borderRadius: '10px'
+                                    }}>
+                                      {eventTriggers.length} {eventTriggers.length === 1 ? 'trigger' : 'triggers'}
+                                    </span>
+                                  ) : (
+                                    <span style={{
+                                      fontSize: '10px',
+                                      padding: '2px 6px',
+                                      background: 'rgba(34, 197, 94, 0.2)',
+                                      color: '#22c55e',
+                                      borderRadius: '10px'
+                                    }}>
+                                      HUD/API
+                                    </span>
+                                  )}
                                 </div>
                                 {isEventExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                               </div>
@@ -445,16 +312,30 @@ export function EventConfiguration() {
                               {/* Triggers for this event */}
                               {isEventExpanded && (
                                 <div style={{ padding: '8px', borderTop: '1px solid var(--border)' }}>
-                                  {eventTriggers.map((trigger) => {
+                                  {eventTriggers.length === 0 ? (
+                                    <div style={{
+                                      padding: '8px',
+                                      fontSize: '11px',
+                                      color: '#22c55e',
+                                      textAlign: 'center',
+                                      fontStyle: 'italic'
+                                    }}>
+                                      ✅ This event is detected automatically from War Thunder HUD/API
+                                      <br/>
+                                      No custom triggers needed
+                                    </div>
+                                  ) : (
+                                    eventTriggers.map((trigger) => {
                                     const triggerExpanded = expandedTrigger === `${eventKey}_${trigger.id}`;
                                     return (
                                       <div
                                         key={trigger.id}
                                         style={{
                                           marginBottom: '8px',
-                                          background: trigger.enabled ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-primary)',
-                                          border: `1px solid ${trigger.enabled ? 'var(--primary)' : 'var(--border)'}`,
+                                          background: (profile.enabled && trigger.enabled) ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-primary)',
+                                          border: `1px solid ${(profile.enabled && trigger.enabled) ? 'var(--primary)' : 'var(--border)'}`,
                                           borderRadius: 'var(--radius-sm)',
+                                          opacity: profile.enabled ? 1 : 0.5,
                                         }}
                                         onClick={(e) => e.stopPropagation()}
                                       >
@@ -467,6 +348,11 @@ export function EventConfiguration() {
                                           <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
                                               {trigger.name}
+                                              {!profile.enabled && (
+                                                <span style={{ marginLeft: '6px', fontSize: '9px', color: '#888', fontStyle: 'italic' }}>
+                                                  (profile disabled)
+                                                </span>
+                                              )}
                                             </div>
                                             <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                                               {trigger.description}
@@ -481,14 +367,16 @@ export function EventConfiguration() {
                                           <div style={{ display: 'flex', gap: '4px', marginLeft: '8px', flexShrink: 0 }}>
                                             <button
                                               onClick={() => setExpandedTrigger(triggerExpanded ? null : `${eventKey}_${trigger.id}`)}
+                                              disabled={!profile.enabled}
                                               style={{
                                                 padding: '4px 6px',
                                                 fontSize: '10px',
                                                 background: 'var(--bg-secondary)',
                                                 border: '1px solid var(--border)',
                                                 borderRadius: 'var(--radius-sm)',
-                                                cursor: 'pointer',
-                                                color: 'var(--text-secondary)'
+                                                cursor: profile.enabled ? 'pointer' : 'not-allowed',
+                                                color: 'var(--text-secondary)',
+                                                opacity: profile.enabled ? 1 : 0.5,
                                               }}
                                               title={t('common.settings', 'Settings')}
                                             >
@@ -497,11 +385,14 @@ export function EventConfiguration() {
                                             <button
                                               className={`btn-toggle ${trigger.enabled ? 'active' : ''}`}
                                               onClick={() => toggleTrigger(trigger.id, !trigger.enabled)}
-                                              title={trigger.enabled ? t('common.disable') : t('common.enable')}
+                                              disabled={!profile.enabled}
+                                              title={!profile.enabled ? t('profiles.enable_profile_first', 'Enable profile first') : (trigger.enabled ? t('common.disable') : t('common.enable'))}
                                               style={{
                                                 padding: '4px 8px',
                                                 fontSize: '10px',
-                                                minWidth: '50px'
+                                                minWidth: '50px',
+                                                cursor: profile.enabled ? 'pointer' : 'not-allowed',
+                                                opacity: profile.enabled ? 1 : 0.5,
                                               }}
                                             >
                                               <Power size={12} />
@@ -576,7 +467,8 @@ export function EventConfiguration() {
                                         )}
                                       </div>
                                     );
-                                  })}
+                                  })
+                                  )}
                                 </div>
                               )}
                             </div>

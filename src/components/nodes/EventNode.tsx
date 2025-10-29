@@ -22,56 +22,78 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
   }, [event, filterType, filterText, data]);
   
   const EVENTS = [
-    // === COMBAT EVENTS ===
+    // === COMBAT EVENTS (HUD-based detection) ===
     { id: 'Hit', icon: Target, color: '#f59e0b', category: 'Combat' },
     { id: 'CriticalHit', icon: Flame, color: '#ef4444', category: 'Combat' },
-    { id: 'PenetrationHit', icon: Zap, color: '#dc2626', category: 'Combat' },
+    { id: 'TargetHit', icon: Target, color: '#f97316', category: 'Combat' },
     { id: 'TargetDestroyed', icon: Skull, color: '#22c55e', category: 'Combat' },
-    { id: 'EnemySetAfire', icon: Flame, color: '#fb923c', category: 'Combat' },
-    { id: 'TakingDamage', icon: Heart, color: '#ef4444', category: 'Combat' },
-    { id: 'SeverelyDamaged', icon: AlertTriangle, color: '#dc2626', category: 'Combat' },
-    { id: 'ShotDown', icon: Target, color: '#991b1b', category: 'Combat' },
+    { id: 'TargetSetOnFire', icon: Flame, color: '#fb923c', category: 'Combat' },
+    { id: 'TargetSeverelyDamaged', icon: AlertTriangle, color: '#dc2626', category: 'Combat' },
+    { id: 'AircraftDestroyed', icon: Target, color: '#991b1b', category: 'Combat' },
+    { id: 'ShipDestroyed', icon: Skull, color: '#0891b2', category: 'Combat' },
+    { id: 'TankDestroyed', icon: Skull, color: '#65a30d', category: 'Combat' },
+    { id: 'VehicleDestroyed', icon: Skull, color: '#71717a', category: 'Combat' },
     
-    // === FLIGHT WARNINGS ===
-    { id: 'Overspeed', icon: Wind, color: '#8b5cf6', category: 'Flight' },
-    { id: 'OverG', icon: AlertTriangle, color: '#ef4444', category: 'Flight' },
-    { id: 'HighAOA', icon: Wind, color: '#f59e0b', category: 'Flight' },
-    { id: 'CriticalAOA', icon: AlertTriangle, color: '#dc2626', category: 'Flight' },
-    { id: 'Mach1', icon: Zap, color: '#6366f1', category: 'Flight' },
-    { id: 'LowAltitude', icon: Wind, color: '#dc2626', category: 'Flight' },
+    // === FLIGHT (HUD events) ===
     { id: 'Crashed', icon: AlertTriangle, color: '#991b1b', category: 'Flight' },
     
-    // === RESOURCES ===
-    { id: 'LowFuel', icon: Droplet, color: '#eab308', category: 'Resources' },
-    { id: 'CriticalFuel', icon: AlertTriangle, color: '#ef4444', category: 'Resources' },
-    { id: 'LowAmmo', icon: Target, color: '#f97316', category: 'Resources' },
-    
-    // === ENGINE ===
-    { id: 'EngineDamaged', icon: Flame, color: '#f59e0b', category: 'Engine' },
-    { id: 'EngineDestroyed', icon: AlertTriangle, color: '#dc2626', category: 'Engine' },
+    // === ENGINE (HUD + indicators) ===
+    { id: 'EngineRunning', icon: Zap, color: '#22c55e', category: 'Engine' },
     { id: 'EngineOverheat', icon: Flame, color: '#ef4444', category: 'Engine' },
     { id: 'OilOverheated', icon: Droplet, color: '#f97316', category: 'Engine' },
+    { id: 'Shooting', icon: Target, color: '#fbbf24', category: 'Engine' },
     
-    // === MULTIPLAYER ===
+    // === CREW (indicators) ===
+    { id: 'CrewKnocked', icon: Heart, color: '#dc2626', category: 'Crew' },
+    
+    // === MISSION (/mission.json) ===
+    { id: 'MissionObjectiveCompleted', icon: Award, color: '#22c55e', category: 'Mission' },
+    { id: 'MissionFailed', icon: AlertTriangle, color: '#dc2626', category: 'Mission' },
+    { id: 'MissionSuccess', icon: Award, color: '#10b981', category: 'Mission' },
+    
+    // === MULTIPLAYER (HUD + /gamechat) ===
     { id: 'Achievement', icon: Award, color: '#fbbf24', category: 'Multiplayer' },
     { id: 'ChatMessage', icon: MessageSquare, color: '#6366f1', category: 'Multiplayer' },
+    { id: 'FirstStrike', icon: Zap, color: '#8b5cf6', category: 'Multiplayer' },
+    { id: 'ShipRescuer', icon: Heart, color: '#0891b2', category: 'Multiplayer' },
+    { id: 'Assist', icon: Target, color: '#eab308', category: 'Multiplayer' },
+    { id: 'BaseCapture', icon: Flame, color: '#22c55e', category: 'Multiplayer' },
+    { id: 'TeamKill', icon: AlertTriangle, color: '#dc2626', category: 'Multiplayer' },
+    { id: 'PlayerDisconnected', icon: AlertTriangle, color: '#64748b', category: 'Multiplayer' },
   ];
   
   const selectedEvent = EVENTS.find(e => e.id === event) || EVENTS[0];
   const EventIcon = selectedEvent.icon;
   
   // Determine if this event needs filtering
-  const needsTextFilter = ['ChatMessage'].includes(event);
-  const needsPlayerFilter = ['TargetDestroyed', 'EnemySetAfire', 'TakingDamage', 'SeverelyDamaged', 'ShotDown', 'Achievement'].includes(event);
-  const showFilter = needsTextFilter || needsPlayerFilter;
+  const needsChatFilter = ['ChatMessage'].includes(event);
+  const needsPlayerFilter = [
+    'TargetDestroyed', 'TargetSetOnFire', 'TargetSeverelyDamaged', 'AircraftDestroyed',
+    'ShipDestroyed', 'TankDestroyed', 'VehicleDestroyed',
+    'Hit', 'CriticalHit', 'Achievement'
+  ].includes(event);
+  const showFilter = needsChatFilter || needsPlayerFilter;
   
   // Context-dependent filter labels
-  const isKillEvent = ['TargetDestroyed', 'EnemySetAfire'].includes(event);
-  const isDamageEvent = ['TakingDamage', 'SeverelyDamaged', 'ShotDown'].includes(event);
+  const isKillEvent = [
+    'TargetDestroyed', 'TargetSetOnFire', 'TargetSeverelyDamaged', 
+    'AircraftDestroyed', 'ShipDestroyed', 'TankDestroyed', 'VehicleDestroyed'
+  ].includes(event);
+  const isDamageEvent = ['Hit', 'CriticalHit'].includes(event);
   
   // Get filter description based on event type
   const getFilterLabel = (filterValue: string) => {
-    if (isKillEvent) {
+    if (needsChatFilter) {
+      // For chat events
+      switch (filterValue) {
+        case 'any': return '💬 Any chat';
+        case 'team': return '🟢 Team chat';
+        case 'all': return '🌍 All chat';
+        case 'squad': return '🟣 Squad chat';
+        case 'enemy': return '🔴 Enemy chat';
+        default: return filterValue;
+      }
+    } else if (isKillEvent) {
       // For kill events: YOU are the attacker, entity_name is victim
       switch (filterValue) {
         case 'any': return '🌍 Any kill (anyone)';
@@ -79,6 +101,10 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
         case 'my_clans': return '🏷️ My clan killed someone';
         case 'enemy_players': return '🎯 I killed tracked enemy';
         case 'enemy_clans': return '☠️ I killed enemy clan member';
+        // Reverse filters (when YOU or YOUR ALLIES are killed)
+        case 'i_was_killed': return '💀 Someone killed me';
+        case 'my_clan_was_killed': return '💔 Someone killed my clan member';
+        case 'tracked_was_killed': return '🎯 Tracked player was killed';
         default: return filterValue;
       }
     } else if (isDamageEvent) {
@@ -173,8 +199,13 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
           }}
         >
           <option value="any">{getFilterLabel('any')}</option>
-          {needsTextFilter && (
-            <option value="text_contains">💬 Contains text</option>
+          {needsChatFilter && (
+            <>
+              <option value="team">{getFilterLabel('team')}</option>
+              <option value="all">{getFilterLabel('all')}</option>
+              <option value="squad">{getFilterLabel('squad')}</option>
+              <option value="enemy">{getFilterLabel('enemy')}</option>
+            </>
           )}
           {needsPlayerFilter && (
             <>
@@ -182,31 +213,42 @@ export function EventNode({ data, id, selected }: { data: EventNodeData; id: str
               <option value="my_clans">{getFilterLabel('my_clans')}</option>
               <option value="enemy_players">{getFilterLabel('enemy_players')}</option>
               <option value="enemy_clans">{getFilterLabel('enemy_clans')}</option>
+              {isKillEvent && (
+                <>
+                  <option value="i_was_killed">{getFilterLabel('i_was_killed')}</option>
+                  <option value="my_clan_was_killed">{getFilterLabel('my_clan_was_killed')}</option>
+                  <option value="tracked_was_killed">{getFilterLabel('tracked_was_killed')}</option>
+                </>
+              )}
             </>
           )}
         </select>
               
-              {/* Text input for ChatMessage */}
-              {needsTextFilter && filterType === 'text_contains' && (
-                <input
-                  type="text"
-                  value={filterText}
-                  onChange={(e) => setFilterText(e.target.value)}
-                  placeholder="e.g. gg wp"
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    width: '100%',
-                    marginTop: '6px',
-                    padding: '5px 8px',
-                    background: 'rgba(0, 0, 0, 0.4)',
-                    border: '1px solid #6366f1',
-                    borderRadius: '4px',
-                    color: '#fff',
-                    fontSize: '11px',
-                    outline: 'none'
-                  }}
-                />
+              {/* Text input for ChatMessage - always visible */}
+              {needsChatFilter && (
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '4px' }}>
+                    🔍 Filter by text (optional):
+                  </div>
+                  <input
+                    type="text"
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
+                    placeholder="e.g. gg wp, gl hf"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      padding: '5px 8px',
+                      background: 'rgba(0, 0, 0, 0.4)',
+                      border: '1px solid #6366f1',
+                      borderRadius: '4px',
+                      color: '#fff',
+                      fontSize: '11px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
               )}
               
         {(filterType === 'my_players' || filterType === 'my_clans') && (

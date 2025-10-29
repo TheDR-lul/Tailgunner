@@ -1,6 +1,6 @@
 [package]
-name = "butt_thunder"
-version = "0.8.1"
+name = "tailgunner"
+version = "0.9.0"
 description = "Haptic feedback system for War Thunder via Buttplug.io"
 authors = ["Tailgunner Contributors"]
 license = "GPL-3.0-or-later"
@@ -12,22 +12,25 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "butt_thunder_lib"
+name = "tailgunner_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
+tauri = { version = "2.9.2", features = [] }
+tauri-plugin-opener = "2.5.2"
+tauri-plugin-dialog = "2.4.2"
+tauri-plugin-fs = "2.4.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
-scraper = "0.22"
+axum = "0.8.6"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+scraper = "0.24.0"
 buttplug = { version = "9.0", features = ["client", "websockets"] }
 anyhow = "1"
 log = "0.4"
@@ -38,6 +41,7 @@ rusqlite = { version = "0.37.0", features = ["bundled"] }
 dirs = "6.0.0"
 zstd = "0.13"
 flate2 = "1.1.5"
+base64 = "0.22"
 wt_blk = "0.3.1"
 
 [target.'cfg(windows)'.dependencies]

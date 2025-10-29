@@ -1,7 +1,14 @@
 // API for working with Tauri backend
 
 import { invoke } from '@tauri-apps/api/core';
-import type { DeviceInfo, Profile, VibrationPattern, GameStatusInfo } from './types';
+import type { 
+  DeviceInfo, 
+  Profile, 
+  VibrationPattern, 
+  GameStatusInfo,
+  GamepadProxyConfig,
+  RumbleState
+} from './types';
 
 export const api = {
   // Initialize devices
@@ -178,6 +185,39 @@ export const api = {
     return invoke('datamine_get_stats');
   },
 
+  async datamineGetAllAircraft(): Promise<Array<[string, string, number]>> {
+    return invoke('datamine_get_all_aircraft');
+  },
+
+  async datamineGetAllGround(): Promise<Array<[string, string, number]>> {
+    return invoke('datamine_get_all_ground');
+  },
+
+  async datamineGetAllShips(): Promise<Array<[string, string, number]>> {
+    return invoke('datamine_get_all_ships');
+  },
+
+  // Map API
+  async getMapObjects(): Promise<any[]> {
+    return invoke('get_map_objects');
+  },
+  
+  async getMapInfo(): Promise<any> {
+    return invoke('get_map_info');
+  },
+  
+  async getMapData(): Promise<any> {
+    return invoke('get_map_data');
+  },
+
+  async getMapImage(mapGeneration: number): Promise<string> {
+    return invoke('get_map_image', { mapGeneration });
+  },
+
+  async getVehicleMode(): Promise<any> {
+    return invoke('get_vehicle_mode');
+  },
+
   // File dialog
   async selectFolder(): Promise<string | null> {
     const { open } = await import('@tauri-apps/plugin-dialog');
@@ -192,5 +232,92 @@ export const api = {
     }
     return null;
   },
+
+  // === API Emulator ===
+  async emulatorGetState(): Promise<any> {
+    return invoke('emulator_get_state');
+  },
+
+  async emulatorSetEnabled(enabled: boolean): Promise<void> {
+    return invoke('emulator_set_enabled', { enabled });
+  },
+
+  async emulatorSetVehicleType(vehicleType: string): Promise<void> {
+    return invoke('emulator_set_vehicle_type', { vehicleType });
+  },
+
+  async emulatorSetVehicleName(name: string, displayName: string): Promise<void> {
+    return invoke('emulator_set_vehicle_name', { name, displayName });
+  },
+
+  async emulatorSetSpeed(speed: number): Promise<void> {
+    return invoke('emulator_set_speed', { speed });
+  },
+
+  async emulatorSetAltitude(altitude: number): Promise<void> {
+    return invoke('emulator_set_altitude', { altitude });
+  },
+
+  async emulatorSetHeading(heading: number): Promise<void> {
+    return invoke('emulator_set_heading', { heading });
+  },
+
+  async emulatorSetPosition(x: number, y: number): Promise<void> {
+    return invoke('emulator_set_position', { x, y });
+  },
+
+  async emulatorSetAmmo(ammo: number): Promise<void> {
+    return invoke('emulator_set_ammo', { ammo });
+  },
+
+  async emulatorSetInBattle(inBattle: boolean): Promise<void> {
+    return invoke('emulator_set_in_battle', { inBattle });
+  },
+
+  async emulatorSetGLoad(gLoad: number): Promise<void> {
+    return invoke('emulator_set_g_load', { gLoad });
+  },
+
+  async emulatorSetFuel(fuelKg: number): Promise<void> {
+    return invoke('emulator_set_fuel', { fuelKg });
+  },
+
+  async emulatorSendChat(message: string, mode: string, sender: string, enemy: boolean): Promise<void> {
+    return invoke('emulator_send_chat', { message, mode, sender, enemy });
+  },
+
+  async emulatorSendHudmsg(message: string, eventType: string): Promise<void> {
+    return invoke('emulator_send_hudmsg', { message, eventType });
+  },
+
+  // === Gamepad Proxy ===
+  async gamepadGetConfig(): Promise<GamepadProxyConfig> {
+    return invoke('gamepad_get_config');
+  },
+
+  async gamepadSetConfig(config: GamepadProxyConfig): Promise<void> {
+    return invoke('gamepad_set_config', { config });
+  },
+
+  async gamepadSetEnabled(enabled: boolean): Promise<void> {
+    return invoke('gamepad_set_enabled', { enabled });
+  },
+
+  async gamepadGetRumbleState(): Promise<RumbleState> {
+    return invoke('gamepad_get_rumble_state');
+  },
+
+  async gamepadGetIntensity(): Promise<number> {
+    return invoke('gamepad_get_intensity');
+  },
+
+  async gamepadSetRumble(leftMotor: number, rightMotor: number): Promise<void> {
+    return invoke('gamepad_set_rumble', { leftMotor, rightMotor });
+  },
+
+  async gamepadIsRunning(): Promise<boolean> {
+    return invoke('gamepad_is_running');
+  },
 };
+
 

@@ -11,6 +11,21 @@
   justify-content: center;
   z-index: 1000;
   backdrop-filter: blur(4px);
+  padding: 1rem;
+  overflow: auto;
+}
+
+.modal-container {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  width: 90vw;
+  max-width: 1400px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-content {
@@ -32,11 +47,62 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
 }
 
 .modal-header h2 {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 24px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Modal Close Button */
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ef4444;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.modal-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: scale(1.05);
+}
+
+/* Settings Modal Close Button (alias) */
+.settings-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ef4444;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.settings-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: scale(1.05);
 }
 
 .pattern-name-input {
@@ -110,6 +176,44 @@
 .pattern-item.disabled {
   opacity: 0.6;
   border-left: 3px solid var(--text-secondary);
+}
+
+.pattern-item.has-error {
+  border-left: 3px solid #ef4444;
+}
+
+.pattern-item.has-error:hover {
+  border-color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.pattern-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.pattern-status.error {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.pattern-status.error:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.pattern-status.warning {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.pattern-status.warning:hover {
+  background: rgba(245, 158, 11, 0.2);
 }
 
 .pattern-info h3 {
@@ -330,9 +434,17 @@
 }
 
 @media (max-width: 768px) {
+  .modal-overlay {
+    padding: 0;
+  }
+  
   .modal-content {
     width: 100vw;
     height: 100vh;
+    border-radius: 0;
+  }
+  
+  .modal-container {
     border-radius: 0;
   }
   

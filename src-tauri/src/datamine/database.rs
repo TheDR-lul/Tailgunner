@@ -477,5 +477,56 @@ impl VehicleDatabase {
         
         Ok((aircraft, ground, ships))
     }
+    
+    /// Get list of all aircraft (identifier + display_name only)
+    pub fn get_all_aircraft(&self) -> Result<Vec<(String, String, f32)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT identifier, display_name, max_speed_ground FROM aircraft ORDER BY display_name"
+        )?;
+        
+        let vehicles = stmt.query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+            ))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(vehicles)
+    }
+    
+    /// Get list of all ground vehicles
+    pub fn get_all_ground(&self) -> Result<Vec<(String, String, f32)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT identifier, display_name, COALESCE(max_speed_kmh, 60.0) FROM ground ORDER BY display_name"
+        )?;
+        
+        let vehicles = stmt.query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+            ))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(vehicles)
+    }
+    
+    /// Get list of all ships
+    pub fn get_all_ships(&self) -> Result<Vec<(String, String, f32)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT identifier, display_name, max_speed_knots FROM ships ORDER BY display_name"
+        )?;
+        
+        let vehicles = stmt.query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+            ))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(vehicles)
+    }
 }
 

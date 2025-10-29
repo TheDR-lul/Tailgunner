@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Terminal, Trash2, Download } from 'lucide-react';
+import { Terminal, Trash2, Download, Database } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 
 interface LogEntry {
   id: string;
@@ -15,6 +16,12 @@ export function DebugConsole() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [updateInterval, setUpdateInterval] = useState(() => 
     parseInt(localStorage.getItem('gameStatusUpdateInterval') || '200')
+  );
+  const [mapUpdateInterval, setMapUpdateInterval] = useState(() => 
+    parseInt(localStorage.getItem('mapUpdateInterval') || '200')
+  );
+  const [feedUpdateInterval, setFeedUpdateInterval] = useState(() => 
+    parseInt(localStorage.getItem('feedUpdateInterval') || '500')
   );
   const logsEndRef = useRef<HTMLDivElement>(null);
   const logTimeoutRef = useRef<number | null>(null);
@@ -33,14 +40,41 @@ export function DebugConsole() {
   const handleIntervalChange = (value: number) => {
     setUpdateInterval(value);
     localStorage.setItem('gameStatusUpdateInterval', value.toString());
+    window.dispatchEvent(new Event('localStorageChange'));
     
     // Debounce logging - only log after user stops dragging
     if (logTimeoutRef.current) {
       clearTimeout(logTimeoutRef.current);
     }
     logTimeoutRef.current = setTimeout(() => {
-      addLog('info', `⚙️ Update rate: ${value}ms (${(1000/value).toFixed(1)} Hz)`);
+      addLog('info', `⚙️ Game Status: ${value}ms (${(1000/value).toFixed(1)} Hz)`);
     }, 500); // Log only after 500ms of no changes
+  };
+
+  const handleMapIntervalChange = (value: number) => {
+    setMapUpdateInterval(value);
+    localStorage.setItem('mapUpdateInterval', value.toString());
+    window.dispatchEvent(new Event('localStorageChange'));
+    
+    if (logTimeoutRef.current) {
+      clearTimeout(logTimeoutRef.current);
+    }
+    logTimeoutRef.current = setTimeout(() => {
+      addLog('info', `🗺️ Map: ${value}ms (${(1000/value).toFixed(1)} Hz)`);
+    }, 500);
+  };
+
+  const handleFeedIntervalChange = (value: number) => {
+    setFeedUpdateInterval(value);
+    localStorage.setItem('feedUpdateInterval', value.toString());
+    window.dispatchEvent(new Event('localStorageChange'));
+    
+    if (logTimeoutRef.current) {
+      clearTimeout(logTimeoutRef.current);
+    }
+    logTimeoutRef.current = setTimeout(() => {
+      addLog('info', `💬 Feed/Mission: ${value}ms (${(1000/value).toFixed(1)} Hz)`);
+    }, 500);
   };
 
   const clearLogs = () => {
@@ -60,9 +94,41 @@ export function DebugConsole() {
     a.click();
   };
 
+  const dumpWtApi = async () => {
+    addLog('info', '🔄 Dumping War Thunder API...');
+    try {
+      const data = await invoke<string>('dump_wt_api');
+      
+      // Use Tauri save dialog
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      
+      const filePath = await save({
+        title: 'Save API Dump',
+        defaultPath: `wt-api-dump-${Date.now()}.json`,
+        filters: [{
+          name: 'JSON',
+          extensions: ['json']
+        }]
+      });
+      
+      if (filePath) {
+        await writeTextFile(filePath, data);
+        addLog('success', `✅ API dump saved: ${filePath}`);
+      } else {
+        addLog('warn', '⚠️ Save cancelled');
+      }
+    } catch (error) {
+      addLog('error', `❌ API dump failed: ${error}`);
+    }
+  };
+
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
+    // Only auto-scroll if Debug Console is expanded
+    if (isExpanded) {
+      logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs, isExpanded]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -132,6 +198,13 @@ export function DebugConsole() {
           <span className="log-count">({logs.length})</span>
         </div>
         <div className="debug-actions">
+          <button 
+            className="btn-icon" 
+            onClick={(e) => { e.stopPropagation(); dumpWtApi(); }}
+            title="Dump War Thunder API"
+          >
+            <Database size={16} />
+          </button>
           <button className="btn-icon" onClick={(e) => { e.stopPropagation(); exportLogs(); }}>
             <Download size={16} />
           </button>
@@ -156,36 +229,97 @@ export function DebugConsole() {
               fontSize: '11px', 
               color: '#ff9933', 
               fontWeight: 'bold', 
-              marginBottom: '8px',
+              marginBottom: '12px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'
             }}>
               ⚙️ Update Rate
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input
-                type="range"
-                min="50"
-                max="1000"
-                step="50"
-                value={updateInterval}
-                onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
-                style={{ flex: 1 }}
-              />
-              <span style={{ 
-                fontSize: '11px', 
-                color: 'var(--text-secondary)', 
-                minWidth: '100px',
-                textAlign: 'right'
-              }}>
-                {updateInterval}ms ({(1000/updateInterval).toFixed(1)} Hz)
-              </span>
+            
+            {/* Game Status */}
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                Game Status
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="range"
+                  min="50"
+                  max="1000"
+                  step="50"
+                  value={updateInterval}
+                  onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ 
+                  fontSize: '11px', 
+                  color: 'var(--text-secondary)', 
+                  minWidth: '100px',
+                  textAlign: 'right'
+                }}>
+                  {updateInterval}ms ({(1000/updateInterval).toFixed(1)} Hz)
+                </span>
+              </div>
             </div>
+
+            {/* Map */}
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                🗺️ Map
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="range"
+                  min="50"
+                  max="1000"
+                  step="50"
+                  value={mapUpdateInterval}
+                  onChange={(e) => handleMapIntervalChange(parseInt(e.target.value))}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ 
+                  fontSize: '11px', 
+                  color: 'var(--text-secondary)', 
+                  minWidth: '100px',
+                  textAlign: 'right'
+                }}>
+                  {mapUpdateInterval}ms ({(1000/mapUpdateInterval).toFixed(1)} Hz)
+                </span>
+              </div>
+            </div>
+
+            {/* Feed + Mission */}
+            <div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                💬 Feed / Mission
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="range"
+                  min="100"
+                  max="2000"
+                  step="100"
+                  value={feedUpdateInterval}
+                  onChange={(e) => handleFeedIntervalChange(parseInt(e.target.value))}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ 
+                  fontSize: '11px', 
+                  color: 'var(--text-secondary)', 
+                  minWidth: '100px',
+                  textAlign: 'right'
+                }}>
+                  {feedUpdateInterval}ms ({(1000/feedUpdateInterval).toFixed(1)} Hz)
+                </span>
+              </div>
+            </div>
+
             <div style={{ 
               fontSize: '10px', 
               color: 'var(--text-muted)', 
-              marginTop: '6px'
+              marginTop: '8px',
+              fontStyle: 'italic'
             }}>
               Lower = faster updates, Higher = less CPU usage
             </div>

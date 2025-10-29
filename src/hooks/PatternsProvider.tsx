@@ -15,6 +15,7 @@ interface PatternsContextType {
   patterns: Pattern[];
   loading: boolean;
   addPattern: (name: string, nodes: Node[], edges: Edge[]) => Promise<void>;
+  addFullPattern: (pattern: Pattern) => Promise<void>;
   updatePattern: (id: string, updates: Partial<Pattern>) => Promise<void>;
   deletePattern: (id: string) => void;
   togglePattern: (id: string) => Promise<void>;
@@ -34,11 +35,18 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
     if (savedPatterns) {
       try {
         const parsed = JSON.parse(savedPatterns);
-        // Convert date strings back to Date objects
-        const patternsWithDates = parsed.map((p: any) => ({
-          ...p,
-          createdAt: new Date(p.createdAt),
-        }));
+        // Convert date strings back to Date objects and validate structure
+        const patternsWithDates = parsed
+          .map((p: any) => ({
+            id: String(p.id || ''),
+            name: typeof p.name === 'string' ? p.name : String(p.name || 'Unnamed'),
+            // Ensure nodes and edges exist
+            nodes: Array.isArray(p.nodes) ? p.nodes : [],
+            edges: Array.isArray(p.edges) ? p.edges : [],
+            enabled: p.enabled ?? true,
+            createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+          }))
+          .filter((p: Pattern) => p.id && typeof p.name === 'string'); // Filter out invalid patterns
         setPatterns(patternsWithDates);
         if ((window as any).debugLog) {
           (window as any).debugLog('info', `Loaded ${patternsWithDates.length} patterns from localStorage`);
@@ -59,6 +67,11 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
         
       } catch (error) {
         console.error('Failed to load patterns:', error);
+        // Clear corrupted data
+        localStorage.removeItem(STORAGE_KEY);
+        if ((window as any).debugLog) {
+          (window as any).debugLog('error', 'Failed to load patterns from localStorage. Data cleared.');
+        }
       }
     }
     setLoading(false);
@@ -115,6 +128,47 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
         } else {
           (window as any).debugLog('error', `❌ Failed to sync pattern: ${error}`);
         }
+      }
+    }
+  }, [savePatterns]);
+
+  const addFullPattern = useCallback(async (pattern: Pattern) => {
+    // Ensure the pattern has all required fields with strict validation
+    const newPattern: Pattern = {
+      id: pattern.id || Date.now().toString(),
+      name: typeof pattern.name === 'string' ? pattern.name : 'Unnamed Pattern',
+      nodes: Array.isArray(pattern.nodes) ? pattern.nodes : [],
+      edges: Array.isArray(pattern.edges) ? pattern.edges : [],
+      enabled: pattern.enabled ?? true,
+      createdAt: pattern.createdAt || new Date(),
+    };
+    
+    console.log('[PatternsProvider] Adding pattern:', newPattern.name, 'ID:', newPattern.id);
+    
+    // Save to localStorage
+    setPatterns(prev => {
+      const updated = [...prev, newPattern];
+      savePatterns(updated);
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('success', `Pattern added: ${newPattern.name} (total: ${updated.length})`);
+      }
+      
+      return updated;
+    });
+    
+    // Sync with Rust engine
+    try {
+      await invoke('add_pattern', { pattern: newPattern });
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('success', `✅ Pattern '${newPattern.name}' synced to Rust engine`);
+      }
+    } catch (error) {
+      console.error('Failed to sync pattern with Rust:', error);
+      
+      if ((window as any).debugLog) {
+        (window as any).debugLog('warn', `⚠️ Pattern '${newPattern.name}' saved locally but not synced to engine`);
       }
     }
   }, [savePatterns]);
@@ -214,6 +268,7 @@ export function PatternsProvider({ children }: { children: ReactNode }) {
       patterns,
       loading,
       addPattern,
+      addFullPattern,
       updatePattern,
       deletePattern,
       togglePattern,

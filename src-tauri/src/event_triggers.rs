@@ -313,197 +313,66 @@ impl TriggerManager {
     
     /// Load built-in triggers (common events for all vehicle types)
     fn load_default_triggers(&mut self) {
-        // === FUEL WARNINGS (COMMON FOR ALL) ===
+        use crate::pattern_engine::{GameEvent, VibrationPattern};
         
-        // Low fuel (<10%)
-        self.triggers.push(EventTrigger {
-            id: "low_fuel_10".to_string(),
-            name: "Low Fuel <10%".to_string(),
-            description: "Triggers when less than 10% fuel remains. Time to return to base!".to_string(),
-            condition: TriggerCondition::FuelBelow(10.0),
-            event: GameEvent::LowFuel,
-            cooldown_ms: 30000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
+        // Create standard triggers for HUD/API events
+        // These are "AlwaysTrue" triggers - they fire whenever the event is detected
         
-        // Critical fuel (<5%)
-        self.triggers.push(EventTrigger {
-            id: "critical_fuel_5".to_string(),
-            name: "Critical Fuel <5%".to_string(),
-            description: "Triggers when less than 5% fuel remains. CRITICALLY LOW!".to_string(),
-            condition: TriggerCondition::FuelBelow(5.0),
-            event: GameEvent::CriticalFuel,
-            cooldown_ms: 15000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
+        let hud_events = vec![
+            (GameEvent::Hit, "Standard Hit Detection"),
+            (GameEvent::CriticalHit, "Standard Critical Hit Detection"),
+            (GameEvent::TargetHit, "Standard Target Hit Detection"),
+            (GameEvent::TargetDestroyed, "Standard Target Destroyed Detection"),
+            (GameEvent::TargetSetOnFire, "Standard Enemy Set on Fire Detection"),
+            (GameEvent::TargetSeverelyDamaged, "Standard Severely Damaged Detection"),
+            (GameEvent::AircraftDestroyed, "Standard Aircraft Destroyed Detection"),
+            (GameEvent::ShipDestroyed, "Standard Ship Destroyed Detection"),
+            (GameEvent::TankDestroyed, "Standard Tank Destroyed Detection"),
+            (GameEvent::VehicleDestroyed, "Standard Vehicle Destroyed Detection"),
+            (GameEvent::Crashed, "Standard Crashed Detection"),
+            (GameEvent::EngineRunning, "Standard Engine Running Detection"),
+            (GameEvent::EngineOverheat, "Standard Engine Overheat Detection"),
+            (GameEvent::OilOverheated, "Standard Oil Overheated Detection"),
+            (GameEvent::Shooting, "Standard Shooting Detection"),
+            (GameEvent::CrewKnocked, "Standard Crew Knocked Out Detection"),
+            (GameEvent::MissionObjectiveCompleted, "Standard Objective Completed Detection"),
+            (GameEvent::MissionFailed, "Standard Mission Failed Detection"),
+            (GameEvent::MissionSuccess, "Standard Mission Success Detection"),
+            (GameEvent::Achievement, "Standard Achievement Detection"),
+            (GameEvent::ChatMessage, "Standard Chat Message Detection"),
+            (GameEvent::TeamChatMessage, "Standard Team Chat Detection"),
+            (GameEvent::AllChatMessage, "Standard All Chat Detection"),
+            (GameEvent::SquadChatMessage, "Standard Squad Chat Detection"),
+            (GameEvent::EnemyChatMessage, "Standard Enemy Chat Detection"),
+            (GameEvent::FirstStrike, "Standard First Strike Detection"),
+            (GameEvent::ShipRescuer, "Standard Ship Rescuer Detection"),
+            (GameEvent::Assist, "Standard Assist Detection"),
+            (GameEvent::BaseCapture, "Standard Base Capture Detection"),
+            (GameEvent::TeamKill, "Standard Team Kill Detection"),
+            (GameEvent::PlayerDisconnected, "Standard Player Disconnected Detection"),
+        ];
         
-        // === AMMO WARNINGS (COMMON FOR ALL) ===
+        for (event, name) in hud_events {
+            let trigger = EventTrigger {
+                id: format!("builtin_{:?}", event).to_lowercase(),
+                name: name.to_string(),
+                description: format!("Automatically fires when {:?} event is detected from War Thunder HUD/API", event),
+                condition: TriggerCondition::AlwaysTrue,
+                event,
+                cooldown_ms: 200, // 200ms default cooldown
+                enabled: false, // Disabled by default - user must enable them in profiles
+                is_builtin: true,
+                pattern: Some(VibrationPattern::preset_simple_hit()),
+                curve_points: None,
+                continuous: false,
+                is_event_based: true, // These are event-based, not condition-based
+                filter_type: None,
+                filter_text: None,
+            };
+            self.triggers.push(trigger);
+        }
         
-        // Low ammo (<20%)
-        self.triggers.push(EventTrigger {
-            id: "low_ammo_20".to_string(),
-            name: "Low Ammo <20%".to_string(),
-            description: "Triggers when less than 20% ammo remains. Conserve ammunition!".to_string(),
-            condition: TriggerCondition::AmmoBelow(20.0),
-            event: GameEvent::LowAmmo,
-            cooldown_ms: 30000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
-        
-        // === ENGINE WARNINGS (COMMON FOR ALL) ===
-        
-        // Engine damaged
-        self.triggers.push(EventTrigger {
-            id: "engine_damaged".to_string(),
-            name: "Engine Damaged".to_string(),
-            description: "Triggers when engine is damaged. Reduced performance.".to_string(),
-            condition: TriggerCondition::EngineDamageAbove(0.5),
-            event: GameEvent::EngineDamaged,
-            cooldown_ms: 10000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
-        
-        // Engine fire
-        self.triggers.push(EventTrigger {
-            id: "engine_fire".to_string(),
-            name: "Engine Fire".to_string(),
-            description: "Triggers when engine is on fire. CRITICAL EMERGENCY!".to_string(),
-            condition: TriggerCondition::EngineDamageAbove(0.9),
-            event: GameEvent::EngineFire,
-            cooldown_ms: 5000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
-        
-        // === AIRCRAFT G-LOAD WARNINGS (VEHICLE-SPECIFIC, UPDATED ON VEHICLE CHANGE) ===
-        
-        // High +G Warning (default 8G, updated from datamine to 80% of vehicle max)
-        self.triggers.push(EventTrigger {
-            id: "dynamic_high_g".to_string(),
-            name: "High G Warning (8.0+ G)".to_string(),
-            description: "Approaching positive G-load limit (default 8G, updates per vehicle)".to_string(),
-            condition: TriggerCondition::GLoadAbove(8.0),
-            event: GameEvent::OverG,
-            cooldown_ms: 3000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
-        
-        // Negative G Warning (default -4G, updated from datamine to 80% of vehicle max)
-        self.triggers.push(EventTrigger {
-            id: "dynamic_negative_g".to_string(),
-            name: "Negative G Warning (-4.0 G)".to_string(),
-            description: "Approaching negative G-load limit (default -4G, updates per vehicle)".to_string(),
-            condition: TriggerCondition::GLoadBelow(-4.0),
-            event: GameEvent::OverG,
-            cooldown_ms: 3000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
-        
-        // === AIRCRAFT SPEED WARNINGS (VEHICLE-SPECIFIC, UPDATED ON VEHICLE CHANGE) ===
-        
-        // Flutter Speed Warning (default 1400 km/h, updated from datamine to 95% of flutter)
-        self.triggers.push(EventTrigger {
-            id: "dynamic_flutter".to_string(),
-            name: "Flutter Warning (1400+ km/h)".to_string(),
-            description: "Approaching flutter speed (default 1400 km/h, updates per vehicle)".to_string(),
-            condition: TriggerCondition::SpeedAbove(1400.0),
-            event: GameEvent::Overspeed,
-            cooldown_ms: 3000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
-        
-        // Overspeed Warning (default 1550 km/h, updated from datamine to Vne)
-        self.triggers.push(EventTrigger {
-            id: "dynamic_overspeed".to_string(),
-            name: "Critical Overspeed (1550+ km/h)".to_string(),
-            description: "Exceeding maximum speed (default 1550 km/h, updates per vehicle)".to_string(),
-            condition: TriggerCondition::SpeedAbove(1550.0),
-            event: GameEvent::Overspeed,
-            cooldown_ms: 2000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
-        
-        // === GROUND SPEED WARNING (VEHICLE-SPECIFIC, UPDATED ON VEHICLE CHANGE) ===
-        
-        // Max Speed Warning for ground vehicles (default 60 km/h, updated from Wiki)
-        self.triggers.push(EventTrigger {
-            id: "dynamic_ground_maxspeed".to_string(),
-            name: "Max Speed (60+ km/h)".to_string(),
-            description: "Approaching maximum speed for ground vehicle (default 60 km/h, updates per vehicle)".to_string(),
-            condition: TriggerCondition::SpeedAbove(60.0),
-            event: GameEvent::Overspeed,
-            cooldown_ms: 5000,
-            enabled: false,
-            is_builtin: true,
-            pattern: None,
-            curve_points: None,
-            continuous: false,
-            is_event_based: false,
-            filter_type: None,
-            filter_text: None,
-        });
+        log::info!("[Triggers] Loaded {} standard HUD/API triggers", self.triggers.len());
     }
     
     /// Check all triggers
@@ -918,7 +787,7 @@ impl TriggerManager {
             // wt_telemetry.rs already filtered out other players' kills
             // So if we got this event, it's OUR kill - always pass
             Some("my_players") => {
-                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire) {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
                     // For kill/afire events, entity_name is the VICTIM
                     // If we got this event, WE are the attacker (wt_telemetry filtered it)
                     // So always return true for "my_players" filter
@@ -932,7 +801,7 @@ impl TriggerManager {
             },
             
             Some("my_clans") => {
-                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire) {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
                     // Same logic for clan filter
                     log::info!("[HUD] ✅ KILL event - 'my_clans' filter passed (you are attacker)");
                     true
@@ -942,7 +811,7 @@ impl TriggerManager {
             },
             
             Some("enemy_players") => {
-                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire) {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
                     // For kills, check if VICTIM is in enemy list
                     enemy_names.iter().any(|name| entity_name.contains(name))
                 } else {
@@ -952,7 +821,7 @@ impl TriggerManager {
             },
             
             Some("enemy_clans") => {
-                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::EnemySetAfire) {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
                     // For kills, check if VICTIM is in enemy clan list
                     enemy_clans.iter().any(|tag| entity_name.contains(tag))
                 } else {
@@ -961,10 +830,52 @@ impl TriggerManager {
                 }
             },
             
+            // Reverse filters (when YOU or YOUR ALLIES were killed)
+            Some("i_was_killed") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
+                    // For kill events, entity_name is the VICTIM
+                    // Check if victim is YOU
+                    let is_me = player_names.iter().any(|name| entity_name.contains(name));
+                    log::info!("[Filter] {} 'i_was_killed': victim '{}' is_me={}", 
+                        if is_me { "✅" } else { "❌" }, entity_name, is_me);
+                    is_me
+                } else {
+                    false
+                }
+            },
+            
+            Some("my_clan_was_killed") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
+                    // Check if victim is from your clan
+                    let is_clan = clan_tags.iter().any(|tag| entity_name.contains(tag));
+                    log::info!("[Filter] {} 'my_clan_was_killed': victim '{}' is_clan={}", 
+                        if is_clan { "✅" } else { "❌" }, entity_name, is_clan);
+                    is_clan
+                } else {
+                    false
+                }
+            },
+            
+            Some("tracked_was_killed") => {
+                if matches!(trigger.event, GameEvent::TargetDestroyed | GameEvent::TargetSetOnFire) {
+                    // Check if victim is a tracked enemy player
+                    let is_tracked = enemy_names.iter().any(|name| entity_name.contains(name));
+                    log::info!("[Filter] {} 'tracked_was_killed': victim '{}' is_tracked={}", 
+                        if is_tracked { "✅" } else { "❌" }, entity_name, is_tracked);
+                    is_tracked
+                } else {
+                    false
+                }
+            },
+            
             Some("text_contains") => {
                 if let Some(filter_text) = &trigger.filter_text {
-                    entity_name.to_lowercase().contains(&filter_text.to_lowercase())
+                    let matches = entity_name.to_lowercase().contains(&filter_text.to_lowercase());
+                    log::info!("[Filter] 🔍 text_contains filter: '{}' in '{}' = {}", 
+                        filter_text, entity_name, matches);
+                    matches
                 } else {
+                    log::warn!("[Filter] ❌ text_contains filter has no filter_text!");
                     false
                 }
             },

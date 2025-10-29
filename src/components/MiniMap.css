@@ -1,0 +1,304 @@
+.minimap-container {
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.minimap-container:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 153, 51, 0.1);
+}
+
+.minimap-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
+  opacity: 0.5;
+}
+
+.minimap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.minimap-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.minimap-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.minimap-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.minimap-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 700px;
+  aspect-ratio: 1 / 1;
+  min-width: 350px;
+  background: #1a1a1a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.minimap-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: auto;
+  object-fit: contain;
+}
+
+/* Ensure square resize */
+.minimap-canvas-wrapper::-webkit-resizer {
+  background: linear-gradient(135deg, transparent 0%, var(--primary) 50%, transparent 100%);
+}
+
+.minimap-info,
+.minimap-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none;
+}
+
+.minimap-info {
+  background: rgba(0, 0, 0, 0.7);
+  color: #888;
+}
+
+.minimap-error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.minimap-stats {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.6;
+  backdrop-filter: blur(4px);
+}
+
+.minimap-stats > div {
+  margin: 0;
+}
+
+
+/* Button styling */
+.minimap-header .btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  min-width: 80px;
+}
+
+/* Layout for canvas + sidebar */
+.minimap-layout {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.minimap-canvas-container {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 700px;
+}
+
+.minimap-sidebar {
+  flex: 0 0 280px;
+  min-width: 250px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 600px;
+  scroll-behavior: smooth;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+  .minimap-canvas-wrapper {
+    max-width: 500px;
+    min-width: 300px;
+  }
+
+  .minimap-canvas-container {
+    max-width: 500px;
+    min-width: 300px;
+  }
+  
+  .minimap-sidebar {
+    flex: 0 0 240px;
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .minimap-layout {
+    flex-direction: column;
+  }
+  
+  .minimap-canvas-container {
+    max-width: 100%;
+  }
+  
+  .minimap-sidebar {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    max-height: 400px;
+  }
+}
+
+/* Sidebar sections */
+.minimap-sidebar-section {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.minimap-sidebar-section h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.minimap-sidebar-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.minimap-sidebar-info-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.minimap-grid-highlight {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+.minimap-heading {
+  /* compass styles handled inline due to dynamic content */
+}
+
+/* Tools section */
+.minimap-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Measurement info box */
+.minimap-measurement-box {
+  background: rgba(255, 153, 51, 0.1);
+  border: 1px solid #ff9933;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.minimap-measurement-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #ff9933;
+  font-size: 12px;
+}
+
+.minimap-measurement-data {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.minimap-measurement-value {
+  font-weight: bold;
+  color: #ff9933;
+}
+
+/* Marker count */
+.minimap-marker-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Nearby units grid */
+.minimap-units-grid {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.minimap-unit-column h4 {
+  font-weight: bold;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.minimap-unit-enemy h4 {
+  color: #ff6666;
+}
+
+.minimap-unit-ally h4 {
+  color: #64a8ff;
+}
+
+.minimap-unit-list {
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.minimap-unit-enemy .minimap-unit-list {
+  color: #ff6666;
+}
+
+.minimap-unit-ally .minimap-unit-list {
+  color: #64a8ff;
+}
+
+.minimap-unit-empty {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
+}
+

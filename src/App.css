@@ -81,6 +81,7 @@ body {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  min-width: 1024px;
 }
 
 /* Header */
@@ -225,6 +226,87 @@ body {
   transform: translateY(-1px);
 }
 
+/* Settings Button */
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  color: #94a3b8;
+  transition: all 0.2s ease;
+}
+
+.settings-btn:hover {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Test Mode Button */
+.test-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 153, 51, 0.1);
+  border: 1px solid rgba(255, 153, 51, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.test-mode-btn:hover {
+  background: rgba(255, 153, 51, 0.2);
+  border-color: rgba(255, 153, 51, 0.5);
+  transform: translateY(-1px);
+}
+
+.test-mode-btn.active {
+  background: rgba(255, 153, 51, 0.25);
+  border-color: rgba(255, 153, 51, 0.6);
+  box-shadow: 0 0 15px rgba(255, 153, 51, 0.4), inset 0 0 10px rgba(255, 153, 51, 0.2);
+  animation: testModePulse 2s ease-in-out infinite;
+}
+
+.test-mode-btn.active::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: #ff9933;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #ff9933;
+  animation: testModeBlink 1s ease-in-out infinite;
+}
+
+@keyframes testModePulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(255, 153, 51, 0.4), inset 0 0 10px rgba(255, 153, 51, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 153, 51, 0.6), inset 0 0 15px rgba(255, 153, 51, 0.3);
+  }
+}
+
+@keyframes testModeBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
 /* Status Chip */
 .status-chip {
   display: flex;
@@ -279,7 +361,7 @@ body {
 
 .content-grid {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: minmax(340px, 420px) 1fr;
   gap: 1.5rem;
   height: 100%;
   max-width: 1920px;
@@ -291,7 +373,10 @@ body {
   flex-direction: column;
   gap: 1.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.5rem;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
 }
 
 .main-area {
@@ -299,7 +384,11 @@ body {
   flex-direction: column;
   gap: 1.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.5rem;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+  min-height: 0;
 }
 
 /* ============================================
@@ -481,12 +570,38 @@ textarea:focus {
 }
 
 /* ============================================
+   Bottom Grid Layout
+============================================ */
+
+.bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+/* ============================================
+   Z-Index Hierarchy
+============================================ */
+
+.app-header {
+  z-index: 100;
+}
+
+.modal-overlay {
+  z-index: 200;
+}
+
+.debug-console {
+  z-index: 90;
+}
+
+/* ============================================
    Responsive Design
 ============================================ */
 
 @media (max-width: 1440px) {
   .content-grid {
-    grid-template-columns: 340px 1fr;
+    grid-template-columns: minmax(320px, 380px) 1fr;
     gap: 1.25rem;
   }
 }
@@ -494,6 +609,8 @@ textarea:focus {
 @media (max-width: 1024px) {
   .content-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 1rem;
   }
   
   .sidebar-left {
@@ -501,9 +618,23 @@ textarea:focus {
   }
 }
 
+@media (max-width: 1200px) {
+  .bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
+  .app-container {
+    min-width: 768px;
+  }
+
   .app-main {
     padding: 1rem;
+  }
+  
+  .content-grid {
+    gap: 0.75rem;
   }
   
   .header-content {
@@ -515,6 +646,14 @@ textarea:focus {
   .header-actions {
     width: 100%;
     justify-content: space-between;
+  }
+}
+
+@media (max-height: 900px) {
+  .game-chat-container,
+  .game-feed-container,
+  .mission-info-container {
+    max-height: 350px;
   }
 }
 
@@ -538,7 +677,8 @@ textarea:focus {
   to { transform: rotate(360deg); }
 }
 
-.spin {
+.spin,
+.spinning {
   animation: spin 1s linear infinite;
 }
 

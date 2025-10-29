@@ -1,0 +1,164 @@
+.mission-info-container {
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: auto;
+  max-height: 450px;
+  min-height: 250px;
+  flex: 1 1 auto;
+  overflow: hidden;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.mission-info-container:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 153, 51, 0.1);
+}
+
+.mission-info-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
+  opacity: 0.5;
+}
+
+.mission-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mission-info-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mission-info-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mission-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+/* Scrollbar styling (same as Game Feed) */
+.mission-info-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mission-info-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.mission-info-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.mission-info-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.objectives-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.objectives-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.objective {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  font-size: 14px;
+  line-height: 1.4;
+  transition: all 0.2s;
+}
+
+.objective.in_progress {
+  border-left-color: #faC81E;
+  background: rgba(250, 200, 30, 0.1);
+}
+
+.objective.completed {
+  border-left-color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+  opacity: 0.7;
+}
+
+.objective.failed {
+  border-left-color: #f44336;
+  background: rgba(244, 67, 54, 0.1);
+  opacity: 0.7;
+  text-decoration: line-through;
+}
+
+.status-icon {
+  flex-shrink: 0;
+}
+
+.status-icon.in-progress {
+  color: #faC81E;
+  animation: pulse 2s infinite;
+}
+
+.status-icon.completed {
+  color: #4CAF50;
+}
+
+.status-icon.failed {
+  color: #f44336;
+}
+
+.no-objectives,
+.mission-info-empty {
+  color: #888;
+  text-align: center;
+  padding: 20px;
+  font-size: 14px;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    butt_thunder_lib::run()
+    tailgunner_lib::run()
 }

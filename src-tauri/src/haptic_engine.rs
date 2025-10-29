@@ -289,39 +289,83 @@ impl HapticEngine {
                         }
                         HudEvent::SetAfire(victim) => {
                             log::info!("[HUD] 🔥 Set enemy on fire: {}", victim);
-                            (victim.as_str(), GameEvent::EnemySetAfire)
+                            (victim.as_str(), GameEvent::TargetSetOnFire)
                         }
                         HudEvent::TakeDamage(attacker) => {
                             log::warn!("[HUD] 💥 Taking damage from: {}", attacker);
-                            (attacker.as_str(), GameEvent::TakingDamage)
+                            (attacker.as_str(), GameEvent::Hit)
                         }
                         HudEvent::SeverelyDamaged(attacker) => {
                             log::warn!("[HUD] 💔 Severely damaged by: {}", attacker);
-                            (attacker.as_str(), GameEvent::SeverelyDamaged)
+                            (attacker.as_str(), GameEvent::TargetSeverelyDamaged)
+                        }
+                        HudEvent::CriticallyDamaged(attacker) => {
+                            log::warn!("[HUD] 💥 Critically damaged by: {}", attacker);
+                            (attacker.as_str(), GameEvent::CriticalHit)
                         }
                         HudEvent::ShotDown(attacker) => {
                             log::warn!("[HUD] ✈️💥 Shot down by: {}", attacker);
-                            (attacker.as_str(), GameEvent::ShotDown)
+                            (attacker.as_str(), GameEvent::AircraftDestroyed)
+                        }
+                        HudEvent::FirstStrike => {
+                            log::info!("[HUD] ⚡ FIRST STRIKE!");
+                            ("", GameEvent::FirstStrike)
                         }
                         HudEvent::Achievement(name) => {
                             log::info!("[HUD] 🏆 Achievement: {}", name);
                             (name.as_str(), GameEvent::Achievement)
                         }
-                        HudEvent::ChatMessage(text) => {
-                            log::debug!("[HUD] 💬 Chat message: {}", text);
-                            (text.as_str(), GameEvent::ChatMessage)
+                        HudEvent::ChatMessage(details) => {
+                            log::info!("[HUD] 💬 Chat message received: '{}'", details.message);
+                            // Determine event type based on chat details
+                            let event = if details.is_enemy {
+                                log::info!("[HUD] 💬 Chat type: EnemyChatMessage");
+                                GameEvent::EnemyChatMessage
+                            } else if let Some(mode) = &details.mode {
+                                match mode.to_lowercase().as_str() {
+                                    "team" => {
+                                        log::info!("[HUD] 💬 Chat type: TeamChatMessage");
+                                        GameEvent::TeamChatMessage
+                                    },
+                                    "all" => {
+                                        log::info!("[HUD] 💬 Chat type: AllChatMessage");
+                                        GameEvent::AllChatMessage
+                                    },
+                                    "squad" => {
+                                        log::info!("[HUD] 💬 Chat type: SquadChatMessage");
+                                        GameEvent::SquadChatMessage
+                                    },
+                                    _ => {
+                                        log::info!("[HUD] 💬 Chat type: ChatMessage (generic)");
+                                        GameEvent::ChatMessage
+                                    }
+                                }
+                            } else {
+                                log::info!("[HUD] 💬 Chat type: ChatMessage (no mode)");
+                                GameEvent::ChatMessage
+                            };
+                            (details.message.as_str(), event)
                         }
                     };
                     
                     // Find matching event-based triggers
+                    log::info!("[HUD] 🔍 Checking {} triggers for event {:?}", all_triggers.len(), game_event);
+                    let mut matched_count = 0;
                     for trigger in &all_triggers {
                         if !trigger.enabled || !trigger.is_event_based {
+                            log::debug!("[HUD] ⏭️ Skipping trigger '{}' (enabled={}, is_event_based={})", 
+                                trigger.name, trigger.enabled, trigger.is_event_based);
                             continue;
                         }
                         
                         if trigger.event != game_event {
+                            log::debug!("[HUD] ⏭️ Skipping trigger '{}' (event mismatch: {:?} != {:?})", 
+                                trigger.name, trigger.event, game_event);
                             continue;
                         }
+                        
+                        log::info!("[HUD] 🎯 Trigger '{}' event matched! Checking filter (type={:?}, text={:?})...", 
+                            trigger.name, trigger.filter_type, trigger.filter_text);
                         
                         // Apply filter
                         if !crate::event_triggers::TriggerManager::should_fire_event_trigger(
@@ -332,11 +376,12 @@ impl HapticEngine {
                             &enemy_names,
                             &enemy_clans,
                         ) {
-                            log::debug!("[HUD] ❌ Trigger '{}' filtered out for entity '{}'", trigger.name, entity_name);
+                            log::warn!("[HUD] ❌ Trigger '{}' FILTERED OUT for text: '{}'", trigger.name, entity_name);
                             continue;
                         }
                         
-                        log::info!("[HUD] ✅ Trigger '{}' matched for entity '{}'", trigger.name, entity_name);
+                        matched_count += 1;
+                        log::info!("[HUD] ✅ Trigger '{}' MATCHED for text: '{}'", trigger.name, entity_name);
                         
                         // Record trigger event for debug console
                         {
@@ -354,12 +399,172 @@ impl HapticEngine {
                         
                         hud_events_with_patterns.push((game_event.clone(), trigger.pattern.clone()));
                     }
+                    
+                    log::info!("[HUD] 📊 Trigger check result: {} triggers matched for event {:?}", 
+                        matched_count, game_event);
                 }
                 
-                // Combine events: basic, triggers (including dynamic), and HUD events
+                // Process chat events separately (from /gamechat)
+                let mut chat_events_with_patterns: Vec<(GameEvent, Option<VibrationPattern>)> = Vec::new();
+                
+                for chat_evt in &game_state.chat_events {
+                    use crate::wt_telemetry::HudEvent;
+                    
+                    if let HudEvent::ChatMessage(details) = chat_evt {
+                        log::info!("[Chat] 💬 Chat message received: '{}'", details.message);
+                        
+                        // Determine event type based on chat details
+                        let game_event = if details.is_enemy {
+                            log::info!("[Chat] 💬 Chat type: EnemyChatMessage");
+                            GameEvent::EnemyChatMessage
+                        } else if let Some(mode) = &details.mode {
+                            match mode.to_lowercase().as_str() {
+                                "team" => {
+                                    log::info!("[Chat] 💬 Chat type: TeamChatMessage");
+                                    GameEvent::TeamChatMessage
+                                },
+                                "all" => {
+                                    log::info!("[Chat] 💬 Chat type: AllChatMessage");
+                                    GameEvent::AllChatMessage
+                                },
+                                "squad" => {
+                                    log::info!("[Chat] 💬 Chat type: SquadChatMessage");
+                                    GameEvent::SquadChatMessage
+                                },
+                                _ => {
+                                    log::info!("[Chat] 💬 Chat type: ChatMessage (generic)");
+                                    GameEvent::ChatMessage
+                                }
+                            }
+                        } else {
+                            log::info!("[Chat] 💬 Chat type: ChatMessage (no mode)");
+                            GameEvent::ChatMessage
+                        };
+                        
+                        // Find matching event-based triggers
+                        log::info!("[Chat] 🔍 Checking {} triggers for event {:?}", all_triggers.len(), game_event);
+                        let mut matched_count = 0;
+                        for trigger in &all_triggers {
+                            if !trigger.enabled || !trigger.is_event_based {
+                                log::debug!("[Chat] ⏭️ Skipping trigger '{}' (enabled={}, is_event_based={})", 
+                                    trigger.name, trigger.enabled, trigger.is_event_based);
+                                continue;
+                            }
+                            
+                            // Allow ChatMessage to match any chat type if filter is "any" or "text_contains"
+                            let event_matches = if trigger.event == GameEvent::ChatMessage {
+                                // ChatMessage with "any" or "text_contains" matches all chat types
+                                matches!(game_event, 
+                                    GameEvent::ChatMessage | 
+                                    GameEvent::TeamChatMessage | 
+                                    GameEvent::AllChatMessage | 
+                                    GameEvent::SquadChatMessage | 
+                                    GameEvent::EnemyChatMessage)
+                            } else {
+                                trigger.event == game_event
+                            };
+                            
+                            if !event_matches {
+                                log::debug!("[Chat] ⏭️ Skipping trigger '{}' (event mismatch: {:?} != {:?})", 
+                                    trigger.name, trigger.event, game_event);
+                                continue;
+                            }
+                            
+                            log::info!("[Chat] 🎯 Trigger '{}' event matched! Checking filter (type={:?}, text={:?})...", 
+                                trigger.name, trigger.filter_type, trigger.filter_text);
+                            
+                            // Check chat mode filter FIRST (team/all/squad/enemy)
+                            if let Some(filter_type) = &trigger.filter_type {
+                                match filter_type.as_str() {
+                                    "team" => {
+                                        if let Some(mode) = &details.mode {
+                                            if mode.to_lowercase() != "team" {
+                                                log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: not Team chat (mode='{}')", trigger.name, mode);
+                                                continue;
+                                            }
+                                        } else {
+                                            log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: no mode (expected Team)", trigger.name);
+                                            continue;
+                                        }
+                                    },
+                                    "all" => {
+                                        if let Some(mode) = &details.mode {
+                                            if mode.to_lowercase() != "all" {
+                                                log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: not All chat (mode='{}')", trigger.name, mode);
+                                                continue;
+                                            }
+                                        } else {
+                                            log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: no mode (expected All)", trigger.name);
+                                            continue;
+                                        }
+                                    },
+                                    "squad" => {
+                                        if let Some(mode) = &details.mode {
+                                            if mode.to_lowercase() != "squad" {
+                                                log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: not Squad chat (mode='{}')", trigger.name, mode);
+                                                continue;
+                                            }
+                                        } else {
+                                            log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: no mode (expected Squad)", trigger.name);
+                                            continue;
+                                        }
+                                    },
+                                    "enemy" => {
+                                        if !details.is_enemy {
+                                            log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: not Enemy chat", trigger.name);
+                                            continue;
+                                        }
+                                    },
+                                    "any" | "text_contains" => {
+                                        // These filters are handled below
+                                    },
+                                    _ => {}
+                                }
+                            }
+                            
+                            // Apply text filter (if specified)
+                            if let Some(filter_text) = &trigger.filter_text {
+                                if !filter_text.is_empty() {
+                                    let matches = details.message.to_lowercase().contains(&filter_text.to_lowercase());
+                                    if !matches {
+                                        log::warn!("[Chat] ❌ Trigger '{}' FILTERED OUT: text '{}' not in message '{}'", 
+                                            trigger.name, filter_text, details.message);
+                                        continue;
+                                    }
+                                    log::info!("[Chat] ✅ Text filter passed: '{}' found in '{}'", filter_text, details.message);
+                                }
+                            }
+                            
+                            matched_count += 1;
+                            log::info!("[Chat] ✅ Trigger '{}' MATCHED for text: '{}'", trigger.name, details.message);
+                            
+                            // Record trigger event for debug console
+                            {
+                                let mut events = recent_trigger_events.write().await;
+                                if events.len() >= 10 {
+                                    events.pop_front();
+                                }
+                                events.push_back(TriggerEvent {
+                                    trigger_name: trigger.name.clone(),
+                                    event_type: format!("{:?}", game_event),
+                                    entity: details.message.clone(),
+                                    timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                                });
+                            }
+                            
+                            chat_events_with_patterns.push((game_event.clone(), trigger.pattern.clone()));
+                        }
+                        
+                        log::info!("[Chat] 📊 Trigger check result: {} triggers matched for event {:?}", 
+                            matched_count, game_event);
+                    }
+                }
+                
+                // Combine events: basic, triggers (including dynamic), HUD events, and chat events
                 let mut all_events: Vec<(GameEvent, Option<VibrationPattern>)> = trigger_events;
                 all_events.extend(basic_events.into_iter().map(|e| (e, None)));
                 all_events.extend(hud_events_with_patterns);
+                all_events.extend(chat_events_with_patterns);
                 
                 // Process each event
                 if !all_events.is_empty() {
@@ -595,6 +800,12 @@ impl HapticEngine {
         tokio::time::sleep(Duration::from_millis(duration_ms)).await;
         self.device_manager.send_vibration(0.0).await?;
         Ok(())
+    }
+
+    /// Toggle profile on/off
+    pub async fn toggle_profile(&self, id: &str, enabled: bool) {
+        let mut manager = self.profile_manager.write().await;
+        manager.toggle_profile(id, enabled);
     }
 }
 

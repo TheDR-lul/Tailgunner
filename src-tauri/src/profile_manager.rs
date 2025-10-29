@@ -46,22 +46,19 @@ impl ProfileManager {
         // Tank Profile (Universal)
         let mut tank_mappings = HashMap::new();
         
-        // Common events (controlled by built-in triggers)
+        // Common events
         tank_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         tank_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
-        // NOTE: Tanks don't use fuel in War Thunder, so LowFuel/CriticalFuel are omitted
-        tank_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_critical_hit());
-        tank_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_critical_hit());
-        tank_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
+        tank_mappings.insert(GameEvent::CrewKnocked, VibrationPattern::preset_critical_hit());
         
-        // Tank-specific events
+        // Engine
         tank_mappings.insert(GameEvent::EngineRunning, VibrationPattern::preset_engine_rumble());
-        tank_mappings.insert(GameEvent::TrackBroken, VibrationPattern::preset_simple_hit());
-        tank_mappings.insert(GameEvent::AmmunitionExploded, VibrationPattern::preset_critical_hit());
-        tank_mappings.insert(GameEvent::PenetrationHit, VibrationPattern::preset_critical_hit());
+        tank_mappings.insert(GameEvent::EngineOverheat, VibrationPattern::preset_fire());
         
         // Combat events from HUD
-        tank_mappings.insert(GameEvent::TargetDestroyed, VibrationPattern::preset_simple_hit());
+        tank_mappings.insert(GameEvent::TargetHit, VibrationPattern::preset_simple_hit());
+        tank_mappings.insert(GameEvent::TargetDestroyed, VibrationPattern::preset_critical_hit());
+        tank_mappings.insert(GameEvent::TargetSetOnFire, VibrationPattern::preset_fire());
 
         self.profiles.push(Profile {
             id: "tank_universal".to_string(),
@@ -75,36 +72,22 @@ impl ProfileManager {
         // Aircraft Profile (Universal)
         let mut aircraft_mappings = HashMap::new();
         
-        // Common events (controlled by built-in triggers)
+        // Common events
         aircraft_mappings.insert(GameEvent::Hit, VibrationPattern::preset_simple_hit());
         aircraft_mappings.insert(GameEvent::CriticalHit, VibrationPattern::preset_critical_hit());
+        aircraft_mappings.insert(GameEvent::CrewKnocked, VibrationPattern::preset_critical_hit());
         
-        // Fuel warnings (aircraft-specific)
-        aircraft_mappings.insert(GameEvent::LowFuel, VibrationPattern::preset_simple_hit());
-        aircraft_mappings.insert(GameEvent::CriticalFuel, VibrationPattern::preset_fire());
-        
-        // Ammo and engine
-        aircraft_mappings.insert(GameEvent::LowAmmo, VibrationPattern::preset_simple_hit());
-        aircraft_mappings.insert(GameEvent::EngineDamaged, VibrationPattern::preset_critical_hit());
-        aircraft_mappings.insert(GameEvent::EngineFire, VibrationPattern::preset_fire());
-        
-        // Aircraft-specific flight dynamics (different patterns for variety)
-        aircraft_mappings.insert(GameEvent::Stall, VibrationPattern::preset_fire());
-        aircraft_mappings.insert(GameEvent::Spin, VibrationPattern::preset_fire());
-        
-        // Overspeed & OverG - stronger patterns for critical warnings
-        aircraft_mappings.insert(GameEvent::Overspeed, VibrationPattern::preset_critical_hit());
-        aircraft_mappings.insert(GameEvent::OverG, VibrationPattern::preset_critical_hit());
-        aircraft_mappings.insert(GameEvent::HighAOA, VibrationPattern::preset_simple_hit());
-        aircraft_mappings.insert(GameEvent::CriticalAOA, VibrationPattern::preset_fire());
-        aircraft_mappings.insert(GameEvent::Mach1, VibrationPattern::preset_critical_hit());
-        aircraft_mappings.insert(GameEvent::LowAltitude, VibrationPattern::preset_simple_hit());
+        // Engine
+        aircraft_mappings.insert(GameEvent::EngineRunning, VibrationPattern::preset_engine_rumble());
         aircraft_mappings.insert(GameEvent::EngineOverheat, VibrationPattern::preset_fire());
         aircraft_mappings.insert(GameEvent::OilOverheated, VibrationPattern::preset_fire());
         aircraft_mappings.insert(GameEvent::Crashed, VibrationPattern::preset_critical_hit());
         
         // Combat events from HUD
-        aircraft_mappings.insert(GameEvent::TargetDestroyed, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::TargetHit, VibrationPattern::preset_simple_hit());
+        aircraft_mappings.insert(GameEvent::TargetDestroyed, VibrationPattern::preset_critical_hit());
+        aircraft_mappings.insert(GameEvent::TargetSetOnFire, VibrationPattern::preset_fire());
+        aircraft_mappings.insert(GameEvent::AircraftDestroyed, VibrationPattern::preset_critical_hit());
 
         self.profiles.push(Profile {
             id: "aircraft_universal".to_string(),
@@ -146,9 +129,7 @@ impl ProfileManager {
         
         // Only override most common events with light version
         light_mappings.insert(GameEvent::Hit, light_hit.clone());
-        light_mappings.insert(GameEvent::CriticalHit, light_hit.clone());
-        light_mappings.insert(GameEvent::OverG, light_hit.clone());
-        light_mappings.insert(GameEvent::Overspeed, light_hit);
+        light_mappings.insert(GameEvent::CriticalHit, light_hit);
 
         self.profiles.push(Profile {
             id: "light_background".to_string(),

@@ -13,65 +13,67 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
   const [indicator, setIndicator] = useState(data.indicator || 'speed');
   
   const INDICATORS = [
-    // Flight Parameters
-    { id: 'speed', label: 'IAS', unit: 'km/h', icon: Activity, color: '#3b82f6', category: 'Flight' },
-    { id: 'tas', label: 'TAS', unit: 'km/h', icon: Activity, color: '#6366f1', category: 'Flight' },
-    { id: 'altitude', label: 'Altitude', unit: 'm', icon: Wind, color: '#06b6d4', category: 'Flight' },
-    { id: 'mach', label: 'Mach', unit: 'M', icon: Zap, color: '#8b5cf6', category: 'Flight' },
-    { id: 'aoa', label: 'AoA', unit: '°', icon: Activity, color: '#f97316', category: 'Flight' },
-    { id: 'g_load', label: 'G-Load (Ny)', unit: 'G', icon: Zap, color: '#eab308', category: 'Flight' },
+    // === AIRCRAFT: Flight Parameters (from /state) ===
+    { id: 'ias', label: 'IAS', unit: 'km/h', icon: Activity, color: '#3b82f6', category: 'Aircraft: Flight' },
+    { id: 'tas', label: 'TAS', unit: 'km/h', icon: Activity, color: '#6366f1', category: 'Aircraft: Flight' },
+    { id: 'altitude', label: 'Altitude', unit: 'm', icon: Wind, color: '#06b6d4', category: 'Aircraft: Flight' },
+    { id: 'mach', label: 'Mach', unit: 'M', icon: Zap, color: '#8b5cf6', category: 'Aircraft: Flight' },
+    { id: 'aoa', label: 'AoA', unit: '°', icon: Activity, color: '#f97316', category: 'Aircraft: Flight' },
+    { id: 'g_load', label: 'G-Load (Ny)', unit: 'G', icon: Zap, color: '#eab308', category: 'Aircraft: Flight' },
     
-    // Controls
-    { id: 'aileron', label: 'Aileron', unit: '%', icon: Settings, color: '#3b82f6', category: 'Controls' },
-    { id: 'elevator', label: 'Elevator', unit: '%', icon: Settings, color: '#6366f1', category: 'Controls' },
-    { id: 'rudder', label: 'Rudder', unit: '%', icon: Settings, color: '#8b5cf6', category: 'Controls' },
-    { id: 'flaps', label: 'Flaps', unit: '%', icon: Settings, color: '#a855f7', category: 'Controls' },
-    { id: 'gear', label: 'Landing Gear', unit: '%', icon: Settings, color: '#c084fc', category: 'Controls' },
-    { id: 'airbrake', label: 'Airbrake', unit: '%', icon: Settings, color: '#e879f9', category: 'Controls' },
+    // === AIRCRAFT: Controls (from /state) ===
+    { id: 'aileron', label: 'Aileron', unit: '%', icon: Settings, color: '#3b82f6', category: 'Aircraft: Controls' },
+    { id: 'elevator', label: 'Elevator', unit: '%', icon: Settings, color: '#6366f1', category: 'Aircraft: Controls' },
+    { id: 'rudder', label: 'Rudder', unit: '%', icon: Settings, color: '#8b5cf6', category: 'Aircraft: Controls' },
+    { id: 'flaps', label: 'Flaps', unit: '%', icon: Settings, color: '#a855f7', category: 'Aircraft: Controls' },
+    { id: 'gear', label: 'Landing Gear', unit: '%', icon: Settings, color: '#c084fc', category: 'Aircraft: Controls' },
+    { id: 'airbrake', label: 'Airbrake', unit: '%', icon: Settings, color: '#e879f9', category: 'Aircraft: Controls' },
     
-    // Stick/Pedals (Raw Input)
-    { id: 'stick_elevator', label: 'Stick Elevator', unit: '', icon: Navigation, color: '#3b82f6', category: 'Raw Input' },
-    { id: 'stick_aileron', label: 'Stick Aileron', unit: '', icon: Navigation, color: '#6366f1', category: 'Raw Input' },
-    { id: 'pedals', label: 'Rudder Pedals', unit: '', icon: Navigation, color: '#8b5cf6', category: 'Raw Input' },
+    // === AIRCRAFT: Stick/Pedals (from /indicators) ===
+    { id: 'stick_elevator', label: 'Stick Elevator', unit: '', icon: Navigation, color: '#3b82f6', category: 'Aircraft: Raw Input' },
+    { id: 'stick_ailerons', label: 'Stick Aileron', unit: '', icon: Navigation, color: '#6366f1', category: 'Aircraft: Raw Input' },
+    { id: 'pedals', label: 'Rudder Pedals', unit: '', icon: Navigation, color: '#8b5cf6', category: 'Aircraft: Raw Input' },
     
-    // Engine
-    { id: 'rpm', label: 'RPM', unit: 'RPM', icon: Gauge, color: '#ef4444', category: 'Engine' },
-    { id: 'engine_temp', label: 'Engine Temp', unit: '°C', icon: Thermometer, color: '#dc2626', category: 'Engine' },
-    { id: 'oil_temp', label: 'Oil Temp', unit: '°C', icon: Thermometer, color: '#f87171', category: 'Engine' },
-    { id: 'water_temp', label: 'Water Temp', unit: '°C', icon: Thermometer, color: '#fca5a5', category: 'Engine' },
-    { id: 'manifold_pressure', label: 'Manifold Pressure', unit: 'atm', icon: Gauge, color: '#fb923c', category: 'Engine' },
-    { id: 'throttle', label: 'Throttle', unit: '%', icon: Gauge, color: '#f59e0b', category: 'Engine' },
+    // === AIRCRAFT: Engine (from /state + /indicators) ===
+    { id: 'throttle', label: 'Throttle', unit: '%', icon: Gauge, color: '#f59e0b', category: 'Aircraft: Engine' },
+    { id: 'rpm', label: 'RPM', unit: 'RPM', icon: Gauge, color: '#ef4444', category: 'Aircraft: Engine' },
+    { id: 'manifold_pressure', label: 'Manifold Pressure', unit: 'atm', icon: Gauge, color: '#fb923c', category: 'Aircraft: Engine' },
+    { id: 'oil_temp', label: 'Oil Temp', unit: '°C', icon: Thermometer, color: '#f87171', category: 'Aircraft: Engine' },
+    { id: 'water_temp', label: 'Water Temp', unit: '°C', icon: Thermometer, color: '#fca5a5', category: 'Aircraft: Engine' },
     
-    // Weapons
-    { id: 'ammo', label: 'Ammo Count', unit: 'pcs', icon: Crosshair, color: '#fbbf24', category: 'Weapons' },
-    { id: 'cannon_ready', label: 'Cannon Ready', unit: '', icon: Crosshair, color: '#ef4444', category: 'Weapons' },
+    // === AIRCRAFT: Resources (from /state) ===
+    { id: 'fuel', label: 'Fuel', unit: 'kg', icon: Fuel, color: '#10b981', category: 'Aircraft: Resources' },
+    { id: 'fuel_percent', label: 'Fuel %', unit: '%', icon: Fuel, color: '#34d399', category: 'Aircraft: Resources' },
     
-    // Resources
-    { id: 'fuel', label: 'Fuel', unit: 'kg', icon: Fuel, color: '#10b981', category: 'Resources' },
-    { id: 'fuel_percent', label: 'Fuel %', unit: '%', icon: Fuel, color: '#34d399', category: 'Resources' },
+    // === AIRCRAFT: Advanced (from /indicators) ===
+    { id: 'blister1', label: 'Blister 1', unit: '', icon: Wind, color: '#3b82f6', category: 'Aircraft: Advanced' },
+    { id: 'blister2', label: 'Blister 2', unit: '', icon: Wind, color: '#6366f1', category: 'Aircraft: Advanced' },
+    { id: 'gear_lamp_down', label: 'Gear Lamp Down', unit: '', icon: Settings, color: '#ef4444', category: 'Aircraft: Advanced' },
+    { id: 'gear_lamp_up', label: 'Gear Lamp Up', unit: '', icon: Settings, color: '#10b981', category: 'Aircraft: Advanced' },
     
-    // Tank Specific
-    { id: 'stabilizer', label: 'Stabilizer', unit: '', icon: Settings, color: '#8b5cf6', category: 'Tank' },
-    { id: 'gear_ratio', label: 'Gear Ratio', unit: '', icon: Gauge, color: '#a855f7', category: 'Tank' },
-    { id: 'has_speed_warning', label: 'Speed Warning', unit: '', icon: Zap, color: '#ef4444', category: 'Tank' },
-    { id: 'cruise_control', label: 'Cruise Control', unit: '', icon: Settings, color: '#10b981', category: 'Tank' },
-    { id: 'driving_direction_mode', label: 'Drive Direction', unit: '', icon: Navigation, color: '#6366f1', category: 'Tank' },
+    // === TANK/SHIP: Movement (from /indicators) ===
+    { id: 'speed', label: 'Speed', unit: 'km/h', icon: Activity, color: '#3b82f6', category: 'Tank: Movement' },
     
-    // Crew
-    { id: 'crew_total', label: 'Crew Total', unit: '', icon: Users, color: '#10b981', category: 'Crew' },
-    { id: 'crew_current', label: 'Crew Alive', unit: '', icon: Users, color: '#34d399', category: 'Crew' },
-    { id: 'crew_distance', label: 'Crew Distance', unit: 'm', icon: Users, color: '#6ee7b7', category: 'Crew' },
-    { id: 'gunner_state', label: 'Gunner State', unit: '', icon: Users, color: '#a7f3d0', category: 'Crew' },
-    { id: 'driver_state', label: 'Driver State', unit: '', icon: Users, color: '#d1fae5', category: 'Crew' },
+    // === TANK: Controls (from /indicators) ===
+    { id: 'tank_gear', label: 'Gear', unit: '', icon: Settings, color: '#a855f7', category: 'Tank: Controls' },
+    { id: 'stabilizer', label: 'Stabilizer', unit: '', icon: Settings, color: '#8b5cf6', category: 'Tank: Controls' },
+    { id: 'has_speed_warning', label: 'Speed Warning', unit: '', icon: Zap, color: '#ef4444', category: 'Tank: Controls' },
+    { id: 'cruise_control', label: 'Cruise Control', unit: '', icon: Settings, color: '#10b981', category: 'Tank: Controls' },
+    { id: 'driving_direction_mode', label: 'Drive Direction', unit: '', icon: Navigation, color: '#6366f1', category: 'Tank: Controls' },
     
-    // Advanced Aerodynamics
-    { id: 'blister1', label: 'Blister 1', unit: '', icon: Wind, color: '#3b82f6', category: 'Advanced' },
-    { id: 'blister2', label: 'Blister 2', unit: '', icon: Wind, color: '#6366f1', category: 'Advanced' },
-    { id: 'blister3', label: 'Blister 3', unit: '', icon: Wind, color: '#8b5cf6', category: 'Advanced' },
-    { id: 'blister4', label: 'Blister 4', unit: '', icon: Wind, color: '#a855f7', category: 'Advanced' },
-    { id: 'gear_lamp_up', label: 'Gear Lamp Up', unit: '', icon: Settings, color: '#10b981', category: 'Advanced' },
-    { id: 'gear_lamp_down', label: 'Gear Lamp Down', unit: '', icon: Settings, color: '#ef4444', category: 'Advanced' },
-    { id: 'gear_lamp_off', label: 'Gear Lamp Off', unit: '', icon: Settings, color: '#6b7280', category: 'Advanced' },
+    // === TANK: Weapons (from /indicators) ===
+    { id: 'first_stage_ammo', label: 'Ready Ammo', unit: 'rounds', icon: Crosshair, color: '#fbbf24', category: 'Tank: Weapons' },
+    
+    // === TANK: Crew (from /indicators) ===
+    { id: 'crew_total', label: 'Crew Total', unit: '', icon: Users, color: '#10b981', category: 'Tank: Crew' },
+    { id: 'crew_current', label: 'Crew Alive', unit: '', icon: Users, color: '#34d399', category: 'Tank: Crew' },
+    { id: 'crew_distance', label: 'Crew Distance', unit: 'm', icon: Users, color: '#6ee7b7', category: 'Tank: Crew' },
+    { id: 'gunner_state', label: 'Gunner State', unit: '', icon: Users, color: '#a7f3d0', category: 'Tank: Crew' },
+    { id: 'driver_state', label: 'Driver State', unit: '', icon: Users, color: '#d1fae5', category: 'Tank: Crew' },
+    
+    // === TANK: Defense (from /indicators) ===
+    { id: 'lws', label: 'LWS (Laser Warning)', unit: '', icon: Zap, color: '#f59e0b', category: 'Tank: Defense' },
+    { id: 'ircm', label: 'IRCM (IR Countermeasure)', unit: '', icon: Zap, color: '#eab308', category: 'Tank: Defense' },
   ];
   
   const selectedIndicator = INDICATORS.find(i => i.id === indicator) || INDICATORS[0];
@@ -176,6 +178,21 @@ export function InputNode({ data, id, selected }: { data: InputNodeData; id: str
           borderRadius: '4px'
         }}>
           ✓ Connect to Condition node
+        </div>
+        
+        {/* API Limitation Notice */}
+        <div style={{
+          marginTop: '6px',
+          fontSize: '7px',
+          color: '#64748b',
+          textAlign: 'center',
+          background: 'rgba(100, 116, 139, 0.1)',
+          padding: '4px',
+          borderRadius: '4px',
+          borderLeft: '2px solid #64748b'
+        }}>
+          ⚠️ Aircraft: Full telemetry available<br/>
+          ⚠️ Tanks/Ships: Limited to /indicators only
         </div>
       </div>
       <Handle 
