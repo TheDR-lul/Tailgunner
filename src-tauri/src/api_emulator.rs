@@ -217,6 +217,7 @@ impl APIEmulator {
         self.state.lock().unwrap().ammo = ammo;
     }
 
+    #[allow(dead_code)]
     pub fn set_engine_running(&self, running: bool) {
         self.state.lock().unwrap().engine_running = running;
     }
@@ -233,6 +234,7 @@ impl APIEmulator {
         self.state.lock().unwrap().fuel_kg = fuel_kg;
     }
 
+    #[allow(dead_code)]
     pub fn trigger_event(&self, event_type: String, data: HashMap<String, String>) {
         let event = EmulatedEvent {
             event_type,
@@ -245,6 +247,7 @@ impl APIEmulator {
         self.events.lock().unwrap().push(event);
     }
 
+    #[allow(dead_code)]
     pub fn get_events(&self, since_timestamp: u64) -> Vec<EmulatedEvent> {
         self.events
             .lock()
@@ -255,6 +258,7 @@ impl APIEmulator {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub fn clear_events(&self) {
         self.events.lock().unwrap().clear();
     }

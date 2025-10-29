@@ -64,6 +64,7 @@ impl GamepadProxy {
         self.config.lock().await.enabled = enabled;
     }
 
+    #[allow(dead_code)]
     pub async fn is_enabled(&self) -> bool {
         self.config.lock().await.enabled
     }
@@ -151,6 +152,7 @@ mod platform {
     
     // We'll use XInput on Windows
     // For now, this is a placeholder for the actual implementation
+    #[allow(dead_code)]
     pub async fn read_gamepad_state() -> Option<RumbleState> {
         // TODO: Implement XInput reading
         // This would require:
@@ -168,6 +170,7 @@ mod platform {
     use super::*;
     
     // For Linux/macOS, we'd use evdev or other platform-specific APIs
+    #[allow(dead_code)]
     pub async fn read_gamepad_state() -> Option<RumbleState> {
         // TODO: Implement platform-specific reading
         None
