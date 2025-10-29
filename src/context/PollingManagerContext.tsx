@@ -131,7 +131,7 @@ export function usePollingManager() {
 }
 
 // Enhanced usePolling hook that integrates with PollingManager
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface UseManagedPollingOptions {
   enabled?: boolean;

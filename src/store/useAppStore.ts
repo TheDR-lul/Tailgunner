@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { DeviceInfo, Pattern } from '../types';
+import type { DeviceInfo } from '../types';
+import type { Pattern } from '../hooks/PatternsProvider';
 
 interface AppState {
   // Engine state
