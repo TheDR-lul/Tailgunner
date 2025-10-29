@@ -214,10 +214,10 @@ export function VibrationNode({ data, id, selected }: { data: VibrationNodeData;
     const nearestIndex = findNearestPoint(clickPoint);
     
     if (nearestIndex !== null) {
-      // Start dragging existing point
+      // Start dragging existing point with LMB or RMB
       setDraggedPointIndex(nearestIndex);
-    } else {
-      // Add new point
+    } else if (e.button === 0) {
+      // Add new point only with left click (when not clicking on existing point)
       const newCurve = [...curve, clickPoint].sort((a, b) => a.x - b.x);
       setCurve(newCurve);
     }

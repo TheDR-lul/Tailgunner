@@ -10,7 +10,6 @@ interface CurvePoint {
 
 interface LinearNodeData {
   duration: number;
-  position: number; // 0.0 to 1.0 (target position)
   mode: 'once' | 'continuous';
   curve?: CurvePoint[]; // Motion curve for smooth movement
 }
@@ -18,7 +17,6 @@ interface LinearNodeData {
 export function LinearNode({ data, id, selected }: { data: LinearNodeData; id: string; selected?: boolean }) {
   const { t } = useTranslation();
   const [duration, setDuration] = useState(data.duration || 1.0);
-  const [position, setPosition] = useState(data.position || 0.5);
   const [mode, setMode] = useState(data.mode || 'once');
   const [curve, setCurve] = useState<CurvePoint[]>(data.curve || [
     { x: 0.0, y: 0.0 },
@@ -35,10 +33,9 @@ export function LinearNode({ data, id, selected }: { data: LinearNodeData; id: s
   
   useEffect(() => {
     data.duration = duration;
-    data.position = position;
     data.mode = mode;
     data.curve = curve;
-  }, [duration, position, mode, curve, data]);
+  }, [duration, mode, curve, data]);
   
   // Draw curve on canvas
   useEffect(() => {
@@ -112,16 +109,6 @@ export function LinearNode({ data, id, selected }: { data: LinearNodeData; id: s
       ctx.stroke();
     });
     
-    // Labels
-    ctx.fillStyle = '#64748b';
-    ctx.font = '10px monospace';
-    ctx.fillText('Time →', 5, height - 5);
-    ctx.save();
-    ctx.translate(10, height / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText('Position →', 0, 0);
-    ctx.restore();
-    
   }, [curve, hoveredPointIndex, draggedPointIndex]);
   
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -141,14 +128,11 @@ export function LinearNode({ data, id, selected }: { data: LinearNodeData; id: s
       );
       
       if (distance < HOVER_RADIUS) {
+        // Start dragging with LMB or RMB
         setDraggedPointIndex(i);
         return;
       }
     }
-    
-    // Add new point
-    const newCurve = [...curve, { x, y }].sort((a, b) => a.x - b.x);
-    setCurve(newCurve);
   };
   
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -277,34 +261,24 @@ export function LinearNode({ data, id, selected }: { data: LinearNodeData; id: s
           
           <div className="nodrag">
             <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
-              Duration (s): {duration.toFixed(1)}
+              Duration (seconds):
             </label>
             <input
-              type="range"
-              min="0.1"
-              max="5"
-              step="0.1"
+              type="number"
               value={duration}
               onChange={(e) => setDuration(parseFloat(e.target.value))}
-              style={{ width: '100%' }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-            />
-          </div>
-          
-          <div className="nodrag">
-            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
-              Position: {(position * 100).toFixed(0)}%
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={position}
-              onChange={(e) => setPosition(parseFloat(e.target.value))}
-              style={{ width: '100%' }}
+              min="0.1"
+              max="10"
+              step="0.1"
+              style={{
+                width: '100%',
+                background: 'rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(93, 138, 168, 0.5)',
+                color: '#94a3b8',
+                padding: '4px 6px',
+                borderRadius: '4px',
+                fontSize: '11px'
+              }}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
@@ -312,34 +286,71 @@ export function LinearNode({ data, id, selected }: { data: LinearNodeData; id: s
           </div>
           
           <div className="nodrag" style={{ marginTop: '8px' }}>
-            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '4px', display: 'block' }}>
+            <label style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '6px', display: 'block' }}>
               Motion Curve:
             </label>
-            <canvas
-              ref={canvasRef}
-              width={160}
-              height={100}
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseLeave={handleCanvasMouseLeave}
-              onDoubleClick={handleCanvasDoubleClick}
-              style={{
-                width: '100%',
-                height: 'auto',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                borderRadius: '4px',
-                cursor: draggedPointIndex !== null ? 'grabbing' : hoveredPointIndex !== null ? 'grab' : 'crosshair',
-                background: '#0f172a'
-              }}
-            />
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'stretch' }}>
+              {/* Y-axis labels */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                fontSize: '8px',
+                color: '#64748b',
+                paddingRight: '2px',
+                minWidth: '25px'
+              }}>
+                <span>100%</span>
+                <span>Pos</span>
+                <span>0%</span>
+              </div>
+              
+              {/* Canvas area */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <canvas
+                  ref={canvasRef}
+                  width={160}
+                  height={100}
+                  onMouseDown={handleCanvasMouseDown}
+                  onMouseMove={handleCanvasMouseMove}
+                  onMouseUp={handleCanvasMouseUp}
+                  onMouseLeave={handleCanvasMouseLeave}
+                  onDoubleClick={handleCanvasDoubleClick}
+                  onContextMenu={(e) => e.preventDefault()}
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '4px',
+                    cursor: draggedPointIndex !== null ? 'grabbing' : hoveredPointIndex !== null ? 'grab' : 'crosshair',
+                    background: '#0f172a'
+                  }}
+                />
+                
+                {/* X-axis labels */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '8px',
+                  color: '#64748b',
+                  marginTop: '2px',
+                  paddingLeft: '2px',
+                  paddingRight: '2px'
+                }}>
+                  <span>0s</span>
+                  <span>Time</span>
+                  <span>{duration.toFixed(1)}s</span>
+                </div>
+              </div>
+            </div>
+            
             <div style={{
-              fontSize: '9px',
+              fontSize: '8px',
               color: '#64748b',
               marginTop: '4px',
               textAlign: 'center'
             }}>
-              Click: Add • Drag: Move • Double-click: Remove
+              Drag: Move • 2× click: Remove
             </div>
           </div>
           
