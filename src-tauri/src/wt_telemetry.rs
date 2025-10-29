@@ -393,7 +393,7 @@ impl WTTelemetryReader {
         let url = format!("{}/hudmsg?lastEvt={}&lastDmg={}", 
             &self.base_url, self.last_hud_evt_id, self.last_hud_dmg_id);
         
-        log::debug!("[HUD Fetch] 🌐 Requesting: {}", url);
+        log::trace!("[HUD Fetch] 🌐 Requesting: {}", url);
         
         let response = self.client
             .get(&url)
@@ -406,7 +406,7 @@ impl WTTelemetryReader {
             .await
             .context("Failed to parse HUD messages")?;
         
-        log::debug!("[HUD Fetch] 📦 Response: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
+        log::trace!("[HUD Fetch] 📦 Response: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
         
         let mut events = Vec::new();
         

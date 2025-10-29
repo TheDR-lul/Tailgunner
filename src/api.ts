@@ -1,7 +1,14 @@
 // API for working with Tauri backend
 
 import { invoke } from '@tauri-apps/api/core';
-import type { DeviceInfo, Profile, VibrationPattern, GameStatusInfo } from './types';
+import type { 
+  DeviceInfo, 
+  Profile, 
+  VibrationPattern, 
+  GameStatusInfo,
+  GamepadProxyConfig,
+  RumbleState
+} from './types';
 
 export const api = {
   // Initialize devices
@@ -281,6 +288,35 @@ export const api = {
 
   async emulatorSendHudmsg(message: string, eventType: string): Promise<void> {
     return invoke('emulator_send_hudmsg', { message, eventType });
+  },
+
+  // === Gamepad Proxy ===
+  async gamepadGetConfig(): Promise<GamepadProxyConfig> {
+    return invoke('gamepad_get_config');
+  },
+
+  async gamepadSetConfig(config: GamepadProxyConfig): Promise<void> {
+    return invoke('gamepad_set_config', { config });
+  },
+
+  async gamepadSetEnabled(enabled: boolean): Promise<void> {
+    return invoke('gamepad_set_enabled', { enabled });
+  },
+
+  async gamepadGetRumbleState(): Promise<RumbleState> {
+    return invoke('gamepad_get_rumble_state');
+  },
+
+  async gamepadGetIntensity(): Promise<number> {
+    return invoke('gamepad_get_intensity');
+  },
+
+  async gamepadSetRumble(leftMotor: number, rightMotor: number): Promise<void> {
+    return invoke('gamepad_set_rumble', { leftMotor, rightMotor });
+  },
+
+  async gamepadIsRunning(): Promise<boolean> {
+    return invoke('gamepad_is_running');
   },
 };
 

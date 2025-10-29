@@ -1,0 +1,154 @@
+.gamepad-proxy-card {
+  border-left: 3px solid rgba(139, 92, 246, 0.5);
+}
+
+.rumble-status {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(139, 92, 246, 0.05);
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+}
+
+.rumble-indicator {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.rumble-label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  min-width: 120px;
+}
+
+.rumble-bar-wrapper {
+  position: relative;
+  height: 1.25rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.rumble-bar {
+  height: 100%;
+  transition: width 0.1s ease;
+  border-radius: 0.375rem;
+}
+
+.rumble-bar.left-motor {
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+}
+
+.rumble-bar.right-motor {
+  background: linear-gradient(90deg, #ec4899, #f472b6);
+}
+
+.rumble-value {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 3rem;
+  text-align: right;
+  font-family: 'Courier New', monospace;
+}
+
+.combined-intensity {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.combined-intensity strong {
+  color: var(--text-primary);
+}
+
+.combined-intensity span {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: 'Courier New', monospace;
+}
+
+.gamepad-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.setting-item label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.setting-item input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.setting-item input[type="range"] {
+  width: 100%;
+}
+
+.test-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.gamepad-info-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+}
+
+.gamepad-info-badge span {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.gamepad-info-badge div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.gamepad-info-badge strong {
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+}
+
+.gamepad-info-badge small {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+

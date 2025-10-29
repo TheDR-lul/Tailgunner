@@ -20,8 +20,11 @@
     "lucide-react": "^0.462.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-hot-toast": "^2.4.1",
+    "react-hotkeys-hook": "^4.5.0",
     "react-i18next": "^15.2.0",
-    "reactflow": "^11.11.4"
+    "reactflow": "^11.11.4",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

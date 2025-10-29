@@ -17,6 +17,7 @@ mod hud_messages;
 mod map_module;
 mod api_emulator;
 mod api_server;
+mod gamepad_proxy;
 
 use haptic_engine::{HapticEngine, GameStatusInfo};
 use pattern_engine::VibrationPattern;
@@ -31,6 +32,7 @@ use serde_json::Value;
 pub struct AppState {
     engine: Arc<Mutex<HapticEngine>>,
     emulator: Arc<api_emulator::APIEmulator>,
+    gamepad_proxy: Arc<gamepad_proxy::GamepadProxy>,
     server_running: Arc<Mutex<bool>>,
     server_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
@@ -1250,6 +1252,61 @@ async fn emulator_send_hudmsg(message: String, event_type: String) -> Result<(),
     }
 }
 
+// === Gamepad Proxy Commands ===
+#[tauri::command]
+async fn gamepad_get_config(state: tauri::State<'_, AppState>) -> Result<gamepad_proxy::GamepadProxyConfig, String> {
+    Ok(state.gamepad_proxy.get_config().await)
+}
+
+#[tauri::command]
+async fn gamepad_set_config(
+    state: tauri::State<'_, AppState>,
+    config: gamepad_proxy::GamepadProxyConfig
+) -> Result<(), String> {
+    state.gamepad_proxy.set_config(config).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn gamepad_set_enabled(state: tauri::State<'_, AppState>, enabled: bool) -> Result<(), String> {
+    state.gamepad_proxy.set_enabled(enabled).await;
+    
+    if enabled {
+        state.gamepad_proxy.start().await
+            .map_err(|e| format!("Failed to start gamepad proxy: {}", e))?;
+    } else {
+        state.gamepad_proxy.stop().await
+            .map_err(|e| format!("Failed to stop gamepad proxy: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn gamepad_get_rumble_state(state: tauri::State<'_, AppState>) -> Result<gamepad_proxy::RumbleState, String> {
+    Ok(state.gamepad_proxy.get_rumble_state().await)
+}
+
+#[tauri::command]
+async fn gamepad_get_intensity(state: tauri::State<'_, AppState>) -> Result<f32, String> {
+    Ok(state.gamepad_proxy.get_combined_intensity().await)
+}
+
+#[tauri::command]
+async fn gamepad_set_rumble(
+    state: tauri::State<'_, AppState>,
+    left_motor: f32,
+    right_motor: f32
+) -> Result<(), String> {
+    state.gamepad_proxy.set_rumble(left_motor, right_motor).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn gamepad_is_running(state: tauri::State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.gamepad_proxy.is_running().await)
+}
+
 pub fn run() {
     // Initialize logger
     // Set default log level: DEBUG for our code, WARN for libraries
@@ -1288,6 +1345,7 @@ pub fn run() {
     
     let engine = Arc::new(Mutex::new(engine));
     let emulator = Arc::new(api_emulator::APIEmulator::new());
+    let gamepad_proxy = Arc::new(gamepad_proxy::GamepadProxy::new());
     let server_running = Arc::new(Mutex::new(false));
     let server_handle = Arc::new(Mutex::new(None));
     
@@ -1295,7 +1353,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .manage(AppState { engine, emulator, server_running, server_handle })
+        .manage(AppState { engine, emulator, gamepad_proxy, server_running, server_handle })
         .invoke_handler(tauri::generate_handler![
             init_devices,
             start_engine,
@@ -1364,6 +1422,13 @@ pub fn run() {
             emulator_set_fuel,
             emulator_send_chat,
             emulator_send_hudmsg,
+            gamepad_get_config,
+            gamepad_set_config,
+            gamepad_set_enabled,
+            gamepad_get_rumble_state,
+            gamepad_get_intensity,
+            gamepad_set_rumble,
+            gamepad_is_running,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

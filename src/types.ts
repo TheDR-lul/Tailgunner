@@ -7,6 +7,22 @@ export interface DeviceInfo {
   device_type?: string;
 }
 
+// Gamepad Proxy types
+export interface GamepadProxyConfig {
+  enabled: boolean;
+  proxy_to_devices: boolean;
+  sensitivity: number;
+  deadzone: number;
+  left_motor_weight: number;
+  right_motor_weight: number;
+}
+
+export interface RumbleState {
+  left_motor: number;
+  right_motor: number;
+  timestamp: number;
+}
+
 export interface Profile {
   id: string;
   name: string;

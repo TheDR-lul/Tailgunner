@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Toaster } from "react-hot-toast";
 import "./App.css";
 import "./styles/nodes.css";
 import "./styles/modal.css";
@@ -19,9 +20,13 @@ import { VehicleModeCard } from "./components/VehicleModeCard";
 import { GameChat } from "./components/GameChat";
 import { MissionInfo } from "./components/MissionInfo";
 import { APIEmulator } from "./components/APIEmulator";
+import { GamepadProxy } from "./components/GamepadProxy";
+import { AnalyticsDashboard } from "./components/AnalyticsDashboard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { User, Coffee, Settings } from "lucide-react";
 import { api } from "./api";
 import { usePatterns, Pattern } from "./hooks/usePatterns";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
 function App() {
   const { t } = useTranslation();
@@ -122,8 +127,37 @@ function App() {
     }
   };
 
+  const toggleEngine = async () => {
+    try {
+      if (isRunning) {
+        await api.stopEngine();
+      } else {
+        await api.startEngine();
+      }
+    } catch (error) {
+      console.error('[App] Failed to toggle engine:', error);
+    }
+  };
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    toggleEngine,
+    createPattern: () => handleEditPattern(),
+    openTemplates: () => {}, // PatternManager handles this
+    togglePlayerModal: () => setIsPlayerModalOpen(!isPlayerModalOpen),
+    toggleSettingsModal: () => setIsSettingsModalOpen(!isSettingsModalOpen),
+    toggleTestMode,
+    closeModal: () => {
+      setIsEditorOpen(false);
+      setIsPlayerModalOpen(false);
+      setIsSettingsModalOpen(false);
+    },
+  });
+
   return (
-    <div className="app-container">
+    <ErrorBoundary>
+      <Toaster />
+      <div className="app-container">
       {/* Modern header */}
       <header className="app-header">
         <div className="header-content">
@@ -181,6 +215,8 @@ function App() {
           <aside className="sidebar-left">
             <Dashboard />
             <DeviceList />
+            <GamepadProxy />
+            <AnalyticsDashboard />
             <GameStatus />
             <VehicleModeCard />
             <VehicleInfoCard />
@@ -231,7 +267,8 @@ function App() {
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
 
