@@ -40,6 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Drag points with LMB/RMB, double-click to remove
   - Time-synchronized axis labels and grid overlay
 
+- **Interactive MiniMap**
+  - Real-time tactical map with live object tracking
+  - Dynamic zoom & pan (1.0x-4.0x), mouse wheel + drag controls
+  - Follow Player mode with auto-centering
+  - View modes: Current (cropped, matches in-game) / Full Map
+  - Map tools: Distance measure, place markers, nearest units tracker
+  - Grid reference system (A-Z, 1-9) matching War Thunder
+  - Compass bearings (N, NE, E, SE, S, SW, W, NW)
+  - Configurable update rate (200-2000ms)
+  - Accurate coordinate conversion and map crop matching in-game view
+  - Real-time distance calculations in meters
+
 ### Changed
 - **UI Responsive Design**
   - Complete interface scaling audit with flexible CSS Grid layouts
@@ -123,20 +135,6 @@ Sustained feedback while conditions are active:
 - **Auto-Stop** - Vibration ends when condition becomes false
 - **Perfect For:** G-load warnings, overspeed alerts, flutter warnings, low fuel
 
-#### 🗺️ MiniMap Enhancements
-Advanced features and tools for tactical map:
-- **Map Tools:**
-  - Distance Measure - Click two points for range and bearing
-  - Place Markers - Mark strategic positions
-  - Nearest Units - Auto-track 5 closest enemies and allies with distances
-- **Dynamic Zoom & Pan** - Mouse wheel zoom (1.0x-4.0x), drag to pan
-- **Follow Player Mode** - Auto-center camera on your position
-- **View Modes:**
-  - Current View - Matches in-game tactical map (cropped)
-  - Full Map - Shows entire map area
-- **Configurable Updates** - Adjustable refresh rate (200-2000ms)
-- **Compass Bearings** - N, NE, E, SE, S, SW, W, NW for all units
-
 #### 🐛 Debug Console
 Monitor everything in real-time:
 - **Live Trigger Logs** - See exactly when triggers fire
@@ -182,14 +180,6 @@ Monitor everything in real-time:
 - Fixed HUD event system not being initialized in main loop
 - Fixed `get_vehicle_limits_manager()` creating new instance instead of returning existing
 - Fixed vibration patterns ignoring custom curve points from UI
-
-#### Map System
-- **Fixed map crop to match in-game view** - Application now shows same zoomed area as War Thunder
-- Corrected coordinate conversion from API (0..1) to visible area
-- Fixed Y-axis inversion (API Y=0 is North, Y=1 is South)
-- Accurate grid reference calculation (e.g., "C-4") with proper offset
-- Distance calculations now use real world coordinates (meters)
-- Map image cropping based on `grid_size` and `grid_zero` parameters
 
 #### Linter Warnings
 - Removed unused `active_continuous_triggers` HashMap field
@@ -245,7 +235,6 @@ Monitor everything in real-time:
 - Linear motion and rotation device support
 - Full English/Russian localization
 - Persistent trigger configuration
-- **Interactive MiniMap** - Real-time tactical map with live updates, grid system, player/enemy tracking
 
 ### Changed
 - Complete UI redesign with React Flow
